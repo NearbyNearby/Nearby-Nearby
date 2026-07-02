@@ -6,6 +6,7 @@ import io
 import uuid
 from unittest.mock import AsyncMock
 from PIL import Image as PILImage
+import pillow_heif
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,11 @@ from app.models.poi import PointOfInterest, POIType
 from app.models.image import Image, ImageType
 from app.models.user import User
 from app.database import get_db
+from app.services.image_service import ImageService
+
+# The image service registers this at import time; register here too so the test
+# fixtures can build HEIC files independently.
+pillow_heif.register_heif_opener()
 
 
 @pytest.fixture(autouse=True)
@@ -285,7 +291,8 @@ class TestImageUpload:
             data={"image_type": "main"}
         )
 
-        # File size enforcement might not be configured yet - accepting for now
+        # A solid-color 5000x5000 JPEG compresses well under the 15MB cap, so it
+        # is accepted. See test_upload_oversize_rejected for the 413 path.
         assert response.status_code in [200, 413]
 
     def test_max_count_enforcement(self, client: TestClient, test_poi, test_user, test_image, db_session: Session):
@@ -311,3 +318,71 @@ class TestImageUpload:
 
         assert response.status_code == 400
         assert "Maximum 1 images allowed" in response.json()["detail"]
+
+    def test_upload_heic_stores_jpeg(self, client: TestClient, test_poi, test_user):
+        """HEIC uploads are transcoded to JPEG for cross-browser rendering."""
+        client.headers = {"Authorization": f"Bearer test_token"}
+
+        # Build a small HEIC image in memory.
+        img = PILImage.new('RGB', (100, 100), color='red')
+        heic_bytes = io.BytesIO()
+        img.save(heic_bytes, format='HEIF')
+        heic_bytes.seek(0)
+
+        response = client.post(
+            f"/api/images/upload/{test_poi.id}",
+            files={"file": ("photo.heic", heic_bytes, "image/heic")},
+            data={"image_type": "main"},
+        )
+        assert response.status_code == 200, response.content
+        image_id = response.json()["id"]
+
+        # The stored original must be JPEG, not HEIC.
+        record = client.get(f"/api/images/image/{image_id}")
+        assert record.status_code == 200
+        data = record.json()
+        assert data["mime_type"] == "image/jpeg"
+        assert data["filename"].endswith(".jpg")
+
+    def test_upload_invalid_mime_rejected(self, client: TestClient, test_poi, test_user):
+        """Non-image content types are rejected with 400."""
+        client.headers = {"Authorization": f"Bearer test_token"}
+
+        response = client.post(
+            f"/api/images/upload/{test_poi.id}",
+            files={"file": ("notes.txt", io.BytesIO(b"hello world"), "text/plain")},
+            data={"image_type": "main"},
+        )
+        assert response.status_code == 400
+        assert "Invalid file type" in response.json()["detail"]
+
+    def test_upload_oversize_rejected(self, client: TestClient, test_poi, test_user):
+        """Payloads over the 15MB cap are rejected before PIL processing."""
+        client.headers = {"Authorization": f"Bearer test_token"}
+
+        # 16MB of bytes: the size check runs before PIL, so raw bytes are fine.
+        oversize = io.BytesIO(b"\x00" * (16 * 1024 * 1024))
+
+        response = client.post(
+            f"/api/images/upload/{test_poi.id}",
+            files={"file": ("big.jpg", oversize, "image/jpeg")},
+            data={"image_type": "main"},
+        )
+        assert response.status_code == 413
+        assert "15MB" in response.json()["detail"]
+
+    def test_exif_orientation_applied(self):
+        """create_size_variants honors the EXIF Orientation tag (upright output)."""
+        # Orientation=6 means the stored 120x80 image should display as 80x120.
+        img = PILImage.new('RGB', (120, 80), color='green')
+        exif = PILImage.Exif()
+        exif[0x0112] = 6  # Orientation: rotate 90 CW on display
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', exif=exif)
+
+        service = ImageService()
+        variants = service.create_size_variants(buf.getvalue(), "image/jpeg")
+
+        # After exif_transpose the dimensions are swapped vs the raw 120x80.
+        assert variants["original"]["width"] == 80
+        assert variants["original"]["height"] == 120

@@ -18,8 +18,8 @@ from shared.models.enums import ImageType
 IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     ImageType.main: {
         "max_count": 1,
-        "max_size_mb": 10,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400),
@@ -28,8 +28,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.gallery: {
         "max_count": 20,
-        "max_size_mb": 10,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400),
@@ -38,8 +38,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.entry: {
         "max_count": 3,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)
@@ -47,8 +47,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.parking: {
         "max_count": 5,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)
@@ -56,8 +56,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.restroom: {
         "max_count": 10,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)
@@ -65,8 +65,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.rental: {
         "max_count": 10,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)
@@ -74,8 +74,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.playground: {
         "max_count": 10,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)
@@ -83,8 +83,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.menu: {
         "max_count": 10,
-        "max_size_mb": 10,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400),
@@ -93,8 +93,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.trail_head: {
         "max_count": 10,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)
@@ -102,8 +102,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.trail_exit: {
         "max_count": 10,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)
@@ -111,8 +111,8 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     },
     ImageType.access_point: {
         "max_count": 10,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)
@@ -121,7 +121,7 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     ImageType.map: {
         "max_count": 5,
         "max_size_mb": 20,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400),
@@ -131,13 +131,13 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
     ImageType.downloadable_map: {
         "max_count": 5,
         "max_size_mb": 50,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "application/pdf"],
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"],
         "sizes": {}  # No resizing for downloadable maps
     },
     ImageType.sponsor_logo: {
         "max_count": 1,
-        "max_size_mb": 5,
-        "allowed_mimes": ["image/jpeg", "image/png", "image/webp"],
+        "max_size_mb": 15,
+        "allowed_mimes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
         "sizes": {
             "thumbnail": (150, 150),
             "medium": (400, 400)

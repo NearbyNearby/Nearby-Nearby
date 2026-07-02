@@ -38,6 +38,17 @@ def _create_test_png(width=10, height=10):
     return signature + ihdr + idat + iend
 
 
+def _create_test_heic():
+    """Create a small HEIC image for upload testing."""
+    from PIL import Image as PILImage
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    buf = io.BytesIO()
+    img = PILImage.new('RGB', (12, 12), color='green')
+    img.save(buf, format='HEIF')
+    return buf.getvalue()
+
+
 def _create_test_jpeg():
     """Create a minimal JPEG file for testing."""
     # Use PIL if available, otherwise fall back to a minimal JPEG
@@ -135,6 +146,28 @@ class TestUploadImage:
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["url"] is not None
+
+
+class TestUploadHeic:
+    def test_upload_heic_happy_path(self, admin_client, ensure_minio_bucket):
+        """HEIC upload is accepted and stored as JPEG in MinIO."""
+        biz = create_business(admin_client, name="Heic Upload Biz")
+        poi_id = biz["id"]
+
+        heic_bytes = _create_test_heic()
+        resp = admin_client.post(
+            f"/api/images/upload/{poi_id}",
+            files={"file": ("photo.heic", io.BytesIO(heic_bytes), "image/heic")},
+            data={"image_type": "main"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["url"] is not None
+
+        # The stored original must be transcoded to JPEG.
+        images = admin_client.get(f"/api/images/poi/{poi_id}").json()
+        originals = [img for img in images if img.get("parent_image_id") is None]
+        assert originals, "no original image record found"
+        assert originals[0]["mime_type"] == "image/jpeg"
 
 
 class TestGetImages:
