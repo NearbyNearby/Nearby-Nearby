@@ -239,6 +239,8 @@ Both applications share the same production PostgreSQL database. Documentation l
 - Never perform INSERT, UPDATE, DELETE, or any data modification operations on production data
 - All write operations should only target development or test databases
 - Database migrations should be tested locally first, then carefully applied to production
+- **Before applying any Alembic migration to prod**: take a manual RDS snapshot first (`aws rds create-db-snapshot --db-instance-identifier nearby-admin-db --db-snapshot-identifier pre-migration-<rev>-<date> --profile nn-prod`)
+- **Expand/contract only**: never rename or drop a column that live code reads in the same release. Sequence: add new, deploy code reading both, backfill, stop writing old, drop old in a later release (the `m_payphone` rename outage is the precedent)
 
 This rule ensures data integrity and prevents accidental modifications to live production data.
 
