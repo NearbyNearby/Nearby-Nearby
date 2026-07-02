@@ -148,6 +148,22 @@ module "ecs" {
   ecr_repository_arns      = values(module.ecr.repository_arns)
 }
 
+# --- Nightly logical DB backup (pg_dump -> versioned S3, Glacier lifecycle) ---
+module "backup" {
+  source = "../../modules/backup"
+
+  project        = var.project
+  environment    = var.environment
+  aws_region     = var.aws_region
+  aws_account_id = var.aws_account_id
+
+  cluster_arn           = module.ecs.cluster_arn
+  private_subnet_ids    = module.networking.private_subnet_ids
+  ecs_security_group_id = module.networking.ecs_security_group_id
+
+  ssm_database_url_arn = module.secrets.database_url_arn
+}
+
 # --- VPC Peering (ECS VPC ↔ Default VPC where RDS lives) ---
 resource "aws_vpc_peering_connection" "ecs_to_default" {
   vpc_id      = module.networking.vpc_id
