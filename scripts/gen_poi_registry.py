@@ -38,7 +38,9 @@ from pathlib import Path
 # Paths
 # --------------------------------------------------------------------------- #
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MODEL_FILE = REPO_ROOT / "nearby-admin" / "backend" / "app" / "models" / "poi.py"
+# The POI ORM is now defined once in shared/models/poi.py (Task 1.2); reflect
+# over it. The admin/app model modules are thin re-export shims.
+MODEL_FILE = REPO_ROOT / "shared" / "models" / "poi.py"
 ENUMS_FILE = REPO_ROOT / "shared" / "models" / "enums.py"
 OUTPUT_FILE = REPO_ROOT / "shared" / "poi_fields.json"
 # The Vite frontend build context only includes nearby-app/app/, so it cannot
@@ -133,8 +135,9 @@ def reflect_static() -> list[tuple[str, str, str]]:
 
 
 def reflect_orm() -> list[tuple[str, str, str]] | None:
-    """Try to import the admin models and read __table__.columns. Returns None
-    if the import environment is unavailable."""
+    """Try to import the models and read __table__.columns. Returns None if the
+    import environment is unavailable (falls back to static parse). The admin
+    ``app.models.poi`` path is a thin re-export of the shared ORM (Task 1.2)."""
     try:
         sys.path.insert(0, str(REPO_ROOT))
         sys.path.insert(0, str(REPO_ROOT / "nearby-admin" / "backend"))

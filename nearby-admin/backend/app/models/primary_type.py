@@ -1,14 +1,4 @@
-import uuid
-from sqlalchemy import Column, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+"""Re-export shim. The PrimaryType ORM lives once in
+shared/models/primary_type.py (Task 1.2). Edit shared/models/, not here."""
 
-from app.database import Base
-
-
-class PrimaryType(Base):
-    __tablename__ = "primary_types"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(120), nullable=False, unique=True, index=True)
-    slug = Column(String(160), nullable=False, unique=True, index=True)
-    description = Column(Text)
+from shared.models.primary_type import PrimaryType  # noqa: F401
