@@ -284,8 +284,9 @@ def _build_location(poi):
 
 # The card/list response (``POINearbyResult``) is a small, fixed contract. The
 # registry drives WHICH fields are eligible (card == true, public, applies_to),
-# but the schema only declares a subset; we emit the intersection plus the
-# structural keys the legacy card response always carried.
+# and this whitelist must stay a SUPERSET of every public ``card == true``
+# registry field (minus ``DOCUMENTED_CARD_EXCLUSIONS`` below). The drift is
+# guarded by ``tests/test_card_schema_drift.py`` — no more silent drops.
 _CARD_SCHEMA_KEYS = frozenset(
     {
         "id",
@@ -306,6 +307,28 @@ _CARD_SCHEMA_KEYS = frozenset(
         "categories",
         "main_category",
         "featured_image",
+        # --- Task 1.4: card badges/tier that the registry marks card:true ---
+        "listing_type",   # + is_sponsor drive the paid-tier card styling
+        "is_sponsor",
+        "difficulty",     # trail difficulty badge
+        "length_text",    # trail length badge
+        "start_datetime",  # event start-date badge
+        "icon_free_wifi",  # amenity icons (computed booleans)
+        "icon_pet_friendly",
+        "icon_public_restroom",
+        "icon_wheelchair_accessible",
+    }
+)
+
+# Registry fields that are ``card == true`` / ``audience == "public"`` but are
+# intentionally NOT emitted on the card, each with a one-line reason. The drift
+# guard allows exactly these to be absent from ``_CARD_SCHEMA_KEYS``.
+DOCUMENTED_CARD_EXCLUSIONS = frozenset(
+    {
+        # ``images:main`` would require eager-loading the images relation per
+        # nearby result; the card renders no <img> and uses the flat
+        # ``featured_image`` URL already carried on the poi row for any hero.
+        "main_image",
     }
 )
 
