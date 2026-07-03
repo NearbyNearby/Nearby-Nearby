@@ -99,7 +99,7 @@ export default function Navbar({ navOverlay, searchOverlay }) {
                     <Link role="menuitem" to="/disaster-network" className="aaa_menu_1_link" onClick={navOverlay.close}>Disaster</Link>
                   </li>
                   <li role="none" className="aaa_menu_1_list_item">
-                    <a role="menuitem" href="https://blog.nearbynearby.com/" className="aaa_menu_1_link" target="_blank" rel="noopener noreferrer">Updates</a>
+                    <Link role="menuitem" to="/updates" className="aaa_menu_1_link" onClick={navOverlay.close}>Updates</Link>
                   </li>
 
                   {/* More dropdown — submenu always in DOM, toggled via class */}

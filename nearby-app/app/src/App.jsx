@@ -26,6 +26,8 @@ import SuggestEvent from './pages/SuggestEvent';
 import EventsCalendar from './pages/EventsCalendar';
 import DisasterNetwork from './pages/DisasterNetwork';
 import Help from './pages/Help';
+import Updates from './pages/Updates';
+import { updates } from './data/updates';
 
 function App() {
   const navOverlay = useOverlay('nav_overlay', { skipDesktop: true });
@@ -67,6 +69,11 @@ function App() {
           <Route path="/events-calendar" element={<EventsCalendar />} />
           <Route path="/disaster-network" element={<DisasterNetwork />} />
           <Route path="/help" element={<Help />} />
+          {/* Updates (blog) — index + one route per post from the registry */}
+          <Route path="/updates" element={<Updates />} />
+          {updates.map(post => (
+            <Route key={post.slug} path={`/updates/${post.slug}`} element={<post.Component />} />
+          ))}
         </Routes>
       </main>
 

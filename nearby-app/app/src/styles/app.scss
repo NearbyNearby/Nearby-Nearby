@@ -1526,7 +1526,16 @@ input[type="submit"],
 .added_to_cart, 
 .widget a.button,
 .btn_default,
-.button {
+.button,
+
+input[type="button"]:visited, 
+input[type="reset"]:visited, 
+input[type="submit"]:visited, 
+.button:visited, 
+.added_to_cart:visited, 
+.widget a.button:visited,
+.btn_default:visited,
+.button:visited,{
   background-color: $link_color;
   border-radius: 3px;
   border: 0;
@@ -1576,13 +1585,11 @@ input[type="submit"]:hover,
 .btn_outline_purple:hover {
   background-color: $nn_purple1 !important;
   color: white !important;
-
 }
 
 .btn_outline_teal:hover {
   background-color: $nn_teal1 !important;
   color: white !important;
-
 }
 
 .overlay_center,
@@ -2966,6 +2973,95 @@ section,
   font-size: 90%;
   line-height: 1.2;
 
+}
+
+/* ===================================================================== *
+ *  UPDATES (blog) — DISABLED for now (site design-system styles cover these).
+ * ===================================================================== */
+
+// --- index card extras (used on /updates, layered on .query_*_style3) ---
+.query_date_style3 {
+  font-size: 80%;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: $nn_teal1;
+  margin: 0 0 6px 0;
+}
+
+.query_read_more_style3 {
+  display: inline-block;
+  margin-top: 12px;
+  font-weight: 600;
+  color: $nn_teal1;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// --- homepage "view all updates" button wrapper ---
+.blog_view_all {
+  padding-top: 40px;
+}
+
+//--- single update post header + body ---
+.update_header {
+  text-align: left;
+}
+
+.update_meta {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: white;
+  color: rgba($color: #FFF, $alpha: .77);
+}
+
+.update_excerpt {
+  margin-top: 14px;
+}
+
+.update_featured_image {
+  margin: 0 0 35px 0;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+}
+
+.update_inline_image {
+  margin: 30px 0;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+
+  figcaption {
+    margin-top: 8px;
+    font-size: 85%;
+    color: $nn_gray;
+    text-align: center;
+  }
+}
+
+.update_quote {
+  margin: 30px 0;
+  padding: 10px 0 10px 22px;
+  border-left: 4px solid $nn_teal1;
+  font-style: italic;
+  color: $nn_slate;
+}
+
+.update_back {
+  margin-top: 45px;
 }
 
 #sponsor_layer_1 {
