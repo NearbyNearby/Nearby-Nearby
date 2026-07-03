@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -88,53 +88,49 @@ function AutoFitBounds({ bounds, radiusMiles }) {
  * visit starts fresh. pointerEvents:'none' ensures marker clicks are never blocked.
  */
 function ScrollWheelToggle() {
-  const map = useMap();
   const [active, setActive] = useState(false);
 
-  const activate = () => {
-    map.scrollWheelZoom.enable();
-    setActive(true);
-  };
+  // #108 fix: enable scroll-wheel zoom via Leaflet MAP events instead of a
+  // click-catching overlay. In Leaflet a marker click does NOT propagate to the
+  // map 'click', so numbered-marker clicks reach their handler again (scroll to
+  // card + highlight), while clicking the empty map still activates scroll zoom.
+  const map = useMapEvents({
+    click: () => { map.scrollWheelZoom.enable(); setActive(true); },
+    mouseout: () => { map.scrollWheelZoom.disable(); setActive(false); },
+  });
 
-  const deactivate = () => {
-    map.scrollWheelZoom.disable();
-    setActive(false);
-  };
-
+  // Hover hint only. This layer is pointerEvents:none so it NEVER intercepts
+  // marker or map clicks (that overlay was the cause of #108).
+  if (active) return null;
   return (
     <div
+      className="map-scroll-hint-layer"
       style={{
         position: 'absolute',
         inset: 0,
-        zIndex: 400,          // above tiles (200) and markers (300), below controls (1000)
-        pointerEvents: active ? 'none' : 'auto',
-        cursor: active ? 'default' : 'pointer',
+        zIndex: 400,
+        pointerEvents: 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: active ? 'transparent' : 'rgba(0,0,0,0)',
       }}
-      onClick={activate}
-      onMouseLeave={deactivate}
       aria-hidden="true"
     >
-      {!active && (
-        <div
-          style={{
-            background: 'rgba(0,0,0,0.55)',
-            color: 'white',
-            padding: '6px 14px',
-            borderRadius: '4px',
-            fontSize: '13px',
-            fontWeight: 600,
-            pointerEvents: 'none',
-            opacity: 0,           // invisible by default; shown on hover via CSS
-          }}
-          className="map-scroll-hint"
-        >
-          Click map to enable scroll
-        </div>
-      )}
+      <div
+        className="map-scroll-hint"
+        style={{
+          background: 'rgba(0,0,0,0.55)',
+          color: 'white',
+          padding: '6px 14px',
+          borderRadius: '4px',
+          fontSize: '13px',
+          fontWeight: 600,
+          pointerEvents: 'none',
+          opacity: 0,           // shown on map hover via CSS
+        }}
+      >
+        Click map to enable scroll
+      </div>
     </div>
   );
 }
