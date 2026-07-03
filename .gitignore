@@ -75,12 +75,6 @@ token.json
 client_secret*.json
 *.credentials.json
 
-# Local SCSS source files (Barry's per-component editing companions — not part
-# of the build). The ONE exception is the central app stylesheet, which IS the
-# source of truth and is compiled by Vite/sass at build time.
-*.scss
-!nearby-app/app/src/styles/app.scss
-
 # Claude Code
 .claude/
 
