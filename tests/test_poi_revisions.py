@@ -20,7 +20,7 @@ from conftest import (
     create_category,
     _mock_get_current_user_with_role,
 )
-from app.models import POIRevision, POIRelationship
+from app.models import POIRevision, POIRelationship, PointOfInterest
 
 
 def _revisions_for(db, poi_id):
@@ -205,6 +205,41 @@ class TestUserIdCapture:
         biz = create_business(admin_client, name="Anon Biz")
         rev = _revisions_for(db_session, biz["id"])[0]
         assert rev.user_id is None
+
+
+class TestCreateErrorContract:
+    """The audit snapshot flush must not swallow a real DB error.
+
+    ``record_poi_revision`` runs BEFORE ``create_poi``'s commit, and for an EVENT
+    create the snapshot's ``db.flush()`` is the first statement that inserts the
+    events row. A bad subtype FK (a ``venue_poi_id`` pointing at no POI) must
+    surface as the pre-branch clean HTTP 400 'Database integrity error', NOT a 500
+    leaking SQLAlchemy internals (which is what a swallowed flush + later
+    PendingRollbackError produced)."""
+
+    def test_event_create_with_bad_venue_fk_returns_400_not_500(self, admin_client, db_session):
+        bad_venue = uuid.uuid4()  # syntactically valid, references no POI
+        resp = admin_client.post("/api/pois/", json={
+            "name": "Bad Venue Event",
+            "poi_type": "EVENT",
+            "location": {"type": "Point", "coordinates": [-79.3, 35.6]},
+            "event": {
+                "start_datetime": "2026-06-15T18:00:00Z",
+                "venue_poi_id": str(bad_venue),
+            },
+        })
+
+        assert resp.status_code == 400, resp.text
+        assert "Database integrity error" in resp.json()["detail"]
+
+        # The failed create rolled back cleanly: nothing persisted on either side.
+        assert (
+            db_session.query(PointOfInterest)
+            .filter(PointOfInterest.name == "Bad Venue Event")
+            .count()
+            == 0
+        )
+        assert db_session.query(POIRevision).count() == 0
 
 
 class TestMigrationRoundTrip:

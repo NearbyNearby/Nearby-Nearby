@@ -100,6 +100,14 @@ terraform plan  -lock=false -var enable_https_listener=true   # expect: 4 add, 2
 terraform apply -lock=false -var enable_https_listener=true
 ```
 
+The port-80 redirect flip is ordered AFTER the 443 listener by terraform: both
+`aws_lb_listener.http` and `aws_lb_listener_rule.admin` `depends_on`
+`aws_lb_listener.https`, which in turn waits on `aws_acm_certificate_validation.origin`
+(ISSUED). So even if the cert is not yet ISSUED, a failed stage-2 apply leaves
+port 80 forwarding untouched rather than redirecting to a 443 listener that never
+came up. Still wait for `ISSUED` (above) before applying so the apply completes
+cleanly in one pass.
+
 Persist the flag so future plans stay at stage 2: set `enable_https_listener =
 true` in `terraform.tfvars` instead of passing `-var` each time.
 

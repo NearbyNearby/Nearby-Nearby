@@ -7,10 +7,14 @@ the mutation. It never commits: the caller's existing commit persists the audit
 row atomically with the mutation, so audit and data commit together or roll back
 together (see Task 1.1 in docs/architecture/production-hardening-plan.md).
 
-Best-effort but in-transaction: building the snapshot is fully wrapped, so a
+Best-effort but in-transaction: snapshot SERIALIZATION is wrapped, so a
 serialization bug degrades the snapshot content (stores an ``_snapshot_error``
-marker) instead of raising and rolling back the real mutation. The insert itself
-is a plain, always-valid append.
+marker) instead of raising and rolling back the real mutation. The flush that
+materializes the row is NOT swallowed: a genuine DB error (e.g. an EVENT create
+with a bad subtype FK) surfaces to the caller's existing handler exactly as a
+plain commit would (create_poi's IntegrityError -> HTTP 400) rather than leaving
+the session in pending-rollback and leaking a 500. The insert itself is a plain,
+always-valid append.
 """
 
 import uuid
@@ -53,16 +57,18 @@ def _relationship_summary(poi) -> list:
 
 def _build_snapshot(db, poi) -> dict:
     """Serialize the POI to a JSON-safe dict: base + subtype + categories +
-    relationship summary. Fully defensive: any failure yields a minimal
-    error-marked snapshot so the mutation is never rolled back by the audit."""
+    relationship summary. Only the SERIALIZATION is defensive: a serialization
+    bug yields a minimal error-marked snapshot so the audit never rolls back a
+    real mutation. The flush below is NOT swallowed."""
     # Flush + refresh so a freshly-created POI's location is a real WKBElement
     # (not the unflushed 'POINT(x y)' WKT string) and its categories/subtype are
-    # queryable, exactly matching what the GET endpoint would serialize.
-    try:
-        db.flush()
-        db.refresh(poi)
-    except Exception:
-        pass
+    # queryable, exactly matching what the GET endpoint would serialize. This
+    # flush is also the mutation's write to the DB, so a bad subtype FK surfaces
+    # here as the IntegrityError it would raise at commit time; let it propagate
+    # to the caller's error handling (create_poi maps it to a clean HTTP 400)
+    # instead of swallowing it and leaving the session in pending-rollback.
+    db.flush()
+    db.refresh(poi)
 
     try:
         from app import schemas

@@ -98,6 +98,12 @@ resource "aws_lb_listener" "http" {
   port              = 80
   protocol          = "HTTP"
 
+  # Stage 2 safety: the redirect flip can only apply AFTER the 443 listener
+  # exists (which itself waits on the ACM cert being ISSUED). Otherwise a
+  # partial apply could flip port 80 to a 301 while 443 never comes up, taking
+  # both domains dark. Vacuous when enable_https_listener=false (no https).
+  depends_on = [aws_lb_listener.https]
+
   dynamic "default_action" {
     for_each = var.enable_https_listener ? [] : [1]
     content {
@@ -127,6 +133,10 @@ resource "aws_lb_listener" "http" {
 resource "aws_lb_listener_rule" "admin" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 100
+
+  # Same stage-2 ordering as the port-80 default action: don't flip the admin
+  # host to a 301 until the 443 listener it redirects to exists.
+  depends_on = [aws_lb_listener.https]
 
   dynamic "action" {
     for_each = var.enable_https_listener ? [] : [1]
