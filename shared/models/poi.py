@@ -230,7 +230,8 @@ class PointOfInterest(Base):
 
     # Parks & Trails Additional Info
     # payphone_location renamed to _deprecated_payphone_location (Migration A, m_payphone_001).
-    # Data consolidated into the plural payphone_locations array below.
+    # Data consolidated into the plural payphone_locations array below; the legacy
+    # column was dropped by migration p_drop_deprecated_001 (Task 1.3).
     payphone_locations = Column(JSONB)  # [{"lat": 0, "lng": 0, "description": "Near entrance"}] - multiple payphones
     park_entry_notes = Column(Text)  # Park entry description/notes
     # park_entry_photo moved to Images table (image_type='entry')
@@ -263,9 +264,9 @@ class PointOfInterest(Base):
     hours = Column(JSONB)   # Complex hours structure with multiple periods, seasonal, dawn/dusk, holidays
     # holiday_hours — DEPRECATED (Issue #70). Column renamed to
     # `_deprecated_holiday_hours` by Alembic migration g70_001. Holiday hours
-    # now live under `hours.holidays`. Not mapped on the ORM so SELECTs ignore
-    # the legacy column; the data was backfilled into hours.holidays by the
-    # migration. The column will be dropped in a later wave.
+    # now live under `hours.holidays`. Never mapped on the ORM; the data was
+    # backfilled into hours.holidays by the migration and the legacy column was
+    # dropped by migration p_drop_deprecated_001 (Task 1.3).
     amenities = Column(JSONB)  # {"payment_methods": ["Cash", "Credit Card"]}
     ideal_for = Column(JSONB)  # List of ideal_for options
     contact_info = Column(JSONB)  # {"best": {"name": "Rhonda", ...}, "emergency": {...}}
@@ -494,8 +495,8 @@ class Event(Base):
     # Column renamed to `_deprecated_primary_display_category` by Alembic
     # migration g42_001. Canonical primary-category storage is
     # `poi_categories.is_main` + `points_of_interest.main_category_id`.
-    # Intentionally not mapped on the ORM model so SELECTs ignore the legacy
-    # data; the column will be dropped in a later wave.
+    # Never mapped on the ORM model; the legacy column was dropped by
+    # migration p_drop_deprecated_001 (Task 1.3).
 
     # Task 138: Extended Organizer
     organizer_email = Column(String)

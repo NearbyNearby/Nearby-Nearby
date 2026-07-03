@@ -188,7 +188,7 @@ def map_type(token: str, col_name: str) -> str:
 DICT_FIELDS = {
     "other_socials", "mobility_access", "repeat_pattern", "venue_inheritance",
     "organizer_social_media", "amenities", "contact_info", "compliance",
-    "custom_fields", "photos", "hours", "trailhead_location", "payphone_location",
+    "custom_fields", "photos", "hours", "trailhead_location",
 }
 
 # --------------------------------------------------------------------------- #
@@ -276,7 +276,7 @@ _GROUPS_RAW = {
     "Restrooms": [
         "icon_public_restroom", "public_toilets", "toilet_locations",
         "toilet_description", "accessible_restroom",
-        "accessible_restroom_details", "payphone_location",
+        "accessible_restroom_details",
         "payphone_locations",
     ],
     "Alcohol & Smoking": [
@@ -389,7 +389,7 @@ def applies_to_for(table_key: str, name: str) -> list[str]:
         "hunting_fishing_allowed", "hunting_types", "fishing_allowed",
         "fishing_types", "licenses_required", "hunting_fishing_info",
         "membership_passes", "membership_details", "associated_trails",
-        "camping_lodging", "park_entry_notes", "payphone_location",
+        "camping_lodging", "park_entry_notes",
         "payphone_locations", "drone_usage", "drone_policy",
     }
     if name in business_only:
@@ -495,10 +495,9 @@ COMPUTED_FIELDS = {
 }
 # (3) deprecated -> replaced_by. None means "no successor" (note documents it).
 DEPRECATED = {
-    "payphone_location": "payphone_locations",
     # The following legacy names may or may not still be ORM-mapped; if present
     # they are flagged. Their data has migrated elsewhere.
-    "holiday_hours": "hours",          # data moved under hours.holidays
+    # payphone_location + holiday_hours dropped in migration p_drop_deprecated_001.
     "key_facilities": "facilities_options",
     "public_transit_info": "arrival_methods",
     "wheelchair_accessible": "icon_wheelchair_accessible",
