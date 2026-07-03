@@ -86,7 +86,10 @@ export default function TrailDetail({ poi }) {
   /* ── Accordion section definitions ── */
   const aboutCol1 = [
     hasVal(poi.description_long) && <ContentGroup key="desc" title="About"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_long) }} /></ContentGroup>,
-    hasVal(poi.outdoor_types) && <ContentGroup key="ot" title="Outdoor Types"><ChipList items={poi.outdoor_types} /></ContentGroup>,
+    // Per doc: Trail About pulls Outdoor Features as NATURAL FEATURES only.
+    hasVal(poi.natural_features) && <ContentGroup key="nf" title="Natural Features"><ChipList items={poi.natural_features.map((f) => (typeof f === 'string' ? f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : f))} /></ContentGroup>,
+    // Per doc: "Categories + Discovery" for a trail = its Trail Experience categories.
+    hasVal(poi.categories) && <ContentGroup key="te" title="Trail Experience"><ChipList items={poi.categories} /></ContentGroup>,
     ig && Object.entries(ig).filter(([k]) => k !== '_legacy').map(([group, items]) =>
       Array.isArray(items) && items.length > 0 && (
         <ContentGroup key={group} title={group.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}><ChipList items={items} /></ContentGroup>
@@ -178,6 +181,10 @@ export default function TrailDetail({ poi }) {
     ),
   ].filter(Boolean);
 
+  // Accordions hidden per the POI Accordion show/hide doc. Trail keeps About+Hours,
+  // Address+Parking, Trail Guide, Public Restrooms, Pet Policy, Contact.
+  // (Pricing + Passes hidden for now — Pittsboro trails/parks are free.)
+  const HIDDEN_ACCORDIONS = new Set(['mobility', 'drone', 'locally_history', 'pricing']);
   const sections = [
     (aboutCol1.length || aboutCol2.length) && { id: 'about_hours', title: 'About + Hours', defaultOpen: true, col1: aboutCol1, col2: aboutCol2 },
     (addrCol1.length || addrCol2.length) && { id: 'address_parking', title: 'Address + Parking', col1: addrCol1, col2: addrCol2 },
@@ -224,7 +231,7 @@ export default function TrailDetail({ poi }) {
       ].filter(Boolean),
       col2: [hasVal(poi.email) && <ContentGroup key="em" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>].filter(Boolean),
     },
-  ].filter(Boolean);
+  ].filter(Boolean).filter((s) => !HIDDEN_ACCORDIONS.has(s.id));
 
   return (
     <>
@@ -255,7 +262,7 @@ export default function TrailDetail({ poi }) {
           <div id="accordion_1_box" className="poi_accordion_box">
             <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
               {sections.map((s) => (
-                <AccSection key={s.id} id={s.id} title={s.title} defaultOpen={!!s.defaultOpen} col1={s.col1} col2={s.col2} />
+                <AccSection key={s.id} title={s.title} defaultOpen={false} col1={s.col1} col2={s.col2} />
               ))}
             </div>
           </div>

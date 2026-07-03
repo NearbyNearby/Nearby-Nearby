@@ -1,7 +1,16 @@
 import { useState } from 'react';
+import { useAccordionGroup } from './accordionGroup';
 
-export default function AccSection({ id, title, defaultOpen = false, col1, col2, children }) {
-  const [open, setOpen] = useState(!!defaultOpen);
+// Stable, unique DOM id per accordion, derived from its title so the SAME
+// accordion has the SAME id across every POI type (e.g. "Pet Policy" ->
+// poi_acc_pet_policy, "About + Hours" -> poi_acc_about_hours).
+function accSlug(title) {
+  return (title || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+export default function AccSection({ title, defaultOpen = false, col1, col2, children }) {
+  const group = useAccordionGroup();
+  const [localOpen, setLocalOpen] = useState(!!defaultOpen);
 
   const hasC1 = col1 && (Array.isArray(col1) ? col1.some(Boolean) : true);
   const hasC2 = col2 && (Array.isArray(col2) ? col2.some(Boolean) : true);
@@ -9,17 +18,22 @@ export default function AccSection({ id, title, defaultOpen = false, col1, col2,
 
   if (!hasC1 && !hasC2 && !hasChildren) return null;
 
-  const panelId = `acc_panel_${id || title?.replace(/\s+/g, '_')}`;
+  const slug = accSlug(title);
+  const sectionId = `poi_acc_${slug}`;
+  const panelId = `acc_panel_${slug}`;
+  // Single-open when inside an AccordionGroup; otherwise self-managed.
+  const open = group ? group.openId === sectionId : localOpen;
+  const toggleOpen = () => (group ? group.toggle(sectionId) : setLocalOpen((o) => !o));
   const useColumns = hasC1 || hasC2;
 
   return (
-    <div id={id} className={`acc_section${open ? ' acc_active' : ''}`}>
+    <div id={sectionId} className={`acc_section${open ? ' acc_active' : ''}`}>
       <button
         className="btn_reset acc_head"
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
       >
         <h3 className="acc_title">{title}</h3>
         <div className="acc_toggles">

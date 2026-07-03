@@ -216,8 +216,12 @@ export default function BusinessDetail({ poi }) {
   // Single section list. The server tier-gates the underlying fields, so
   // free-tier listings naturally have empty Menu/Alcohol/Playground sections
   // and those sections self-hide via the empty-column filter below.
+  // Accordions hidden per the POI Accordion show/hide doc. The builders above
+  // are kept intact; to restore an accordion, remove its key from this set.
+  const HIDDEN_ACCORDIONS = new Set(['menu', 'alc', 'wc', 'play']);
+
   const ALL_SECTIONS = [
-    { key: 'about', title: 'About + Details', open: true, col1: aboutCol1, col2: aboutCol2 },
+    { key: 'about', title: 'About + Hours', open: true, col1: aboutCol1, col2: aboutCol2 },
     { key: 'addr', title: 'Address + Parking', open: true, col1: addrCol1, col2: addrCol2 },
     { key: 'price', title: 'Pricing + Offers', open: false, col1: pricingCol1, col2: pricingCol2 },
     { key: 'menu', title: 'Menu + Ordering', open: false, col1: menuCol1, col2: menuCol2 },
@@ -228,7 +232,7 @@ export default function BusinessDetail({ poi }) {
     { key: 'play', title: 'Playground', open: false, col1: playgroundCol1, col2: playgroundCol2 },
     { key: 'contact', title: 'Contact', open: false, col1: contactCol1, col2: contactCol2 },
   ];
-  const sections = ALL_SECTIONS.filter((s) => s.col1.length > 0 || s.col2.length > 0);
+  const sections = ALL_SECTIONS.filter((s) => !HIDDEN_ACCORDIONS.has(s.key) && (s.col1.length > 0 || s.col2.length > 0));
 
   return (
     <>
@@ -264,7 +268,7 @@ export default function BusinessDetail({ poi }) {
             <div id="accordion_1_box" className="poi_accordion_box">
               <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
                 {sections.map((s) => (
-                  <AccSection key={s.key} title={s.title} defaultOpen={s.open} col1={s.col1.length > 0 ? s.col1 : null} col2={s.col2.length > 0 ? s.col2 : null} />
+                  <AccSection key={s.key} title={s.title} defaultOpen={false} col1={s.col1.length > 0 ? s.col1 : null} col2={s.col2.length > 0 ? s.col2 : null} />
                 ))}
               </div>
             </div>

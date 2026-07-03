@@ -1,3 +1,11 @@
+// The quick-info + photos box (#poi_quick_info_photos_box) is hidden on ALL POI
+// detail pages per the POI Accordion show/hide doc. This stub renders nothing.
+// To restore: delete this stub and uncomment the original implementation below.
+export default function QuickInfoPhotosBox() {
+  return null;
+}
+
+/*
 export default function QuickInfoPhotosBox({ title, quickInfoRows, images, onOpenLightbox }) {
   const gridImages = images ? images.slice(0, 8) : [];
 
@@ -43,3 +51,4 @@ export default function QuickInfoPhotosBox({ title, quickInfoRows, images, onOpe
     </div>
   );
 }
+*/
