@@ -22,6 +22,7 @@ from shared.models.poi import (
     Event,
 )
 from shared.models.image import Image, IMAGE_TYPE_CONFIG
+from shared.models.poi_revision import POIRevision
 
 __all__ = [
     "Base",
@@ -41,4 +42,5 @@ __all__ = [
     "Event",
     "Image",
     "IMAGE_TYPE_CONFIG",
+    "POIRevision",
 ]

@@ -11,6 +11,7 @@ from app.database import get_db
 from app.core.security import get_current_user
 from app.core.permissions import require_admin_or_editor
 from app.utils.autosave_whitelist import AUTOSAVE_ALLOWED_FIELDS, AUTOSAVE_DENIED_FIELDS
+from app.utils.poi_revision import record_poi_revision
 from app.crud.crud_poi import apply_phase1_computed
 from app.schemas._coercers import coerce_empty_literals
 
@@ -31,7 +32,7 @@ def create_poi(
     if poi.poi_type == 'EVENT' and poi.event is None:
         raise HTTPException(status_code=400, detail="Event data required for poi_type 'EVENT'")
 
-    return crud.create_poi(db=db, poi=poi)
+    return crud.create_poi(db=db, poi=poi, user_id=getattr(current_user, 'id', None))
 
 
 def _coerce_poi_types(poi_type: Optional[List[str]]):
@@ -136,7 +137,7 @@ def update_poi(
     if not db_poi:
         raise HTTPException(status_code=404, detail="Point of Interest not found")
     
-    updated_poi = crud.update_poi(db=db, db_obj=db_poi, obj_in=poi_in)
+    updated_poi = crud.update_poi(db=db, db_obj=db_poi, obj_in=poi_in, user_id=getattr(current_user, 'id', None))
     return updated_poi
 
 
@@ -154,7 +155,7 @@ def delete_poi(
             "detail": "POI has been published; archive instead of deleting.",
             "action": "archive"
         })
-    db_poi = crud.delete_poi(db, poi_id=poi_id)
+    db_poi = crud.delete_poi(db, poi_id=poi_id, user_id=getattr(current_user, 'id', None))
     if db_poi is None:
         raise HTTPException(status_code=404, detail="Point of Interest not found")
     return db_poi
@@ -232,6 +233,8 @@ def autosave_poi(
                 setattr(sub, k, merged[k])
                 break
 
+    # Append-only audit row, in the SAME transaction as the autosave (Task 1.1).
+    record_poi_revision(db, poi, 'update', user_id=getattr(current_user, 'id', None))
     db.commit()
 
     # Best-effort embed-on-write (A7): AFTER the commit above, never before.
@@ -456,6 +459,13 @@ def reschedule_event(
     # Update original event status
     db_poi.event.event_status = 'Rescheduled'
     db_poi.event.new_event_link = str(new_poi_id)
+
+    # Append-only audit rows for both sides of the reschedule, in the SAME
+    # transaction (Task 1.1): the cloned event is a create, the original is an
+    # update (status -> Rescheduled).
+    uid = getattr(current_user, 'id', None)
+    record_poi_revision(db, new_poi, 'create', user_id=uid)
+    record_poi_revision(db, db_poi, 'update', user_id=uid)
 
     db.commit()
     db.refresh(new_poi)

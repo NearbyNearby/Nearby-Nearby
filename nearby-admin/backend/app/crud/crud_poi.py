@@ -9,6 +9,7 @@ from typing import Dict, Any
 from app import models, schemas
 from app.crud.crud_category import get_category
 from app.utils.html_sanitizer import sanitize_poi_fields
+from app.utils.poi_revision import record_poi_revision
 from geoalchemy2.types import Geography
 from shared.constants.field_options import EVENT_STATUS_EXPLANATION_REQUIRED
 from shared.utils.event_status import validate_status_transition
@@ -326,7 +327,7 @@ def get_pois_nearby(db: Session, *, poi_id: uuid.UUID, distance_km: float = 5.0,
     return nearby_pois
 
 
-def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
+def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
     # Create the POI with location
     # Exclude deprecated photo columns that have been moved to the Images table
     deprecated_photo_fields = {
@@ -440,6 +441,8 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
 
     try:
         db.add(db_poi)
+        # Append-only audit row, in the SAME transaction as the create (Task 1.1).
+        record_poi_revision(db, db_poi, 'create', user_id)
         db.commit()
         db.refresh(db_poi)
     except IntegrityError as e:
@@ -460,7 +463,7 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
     return db_poi
 
 
-def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.PointOfInterestUpdate) -> models.PointOfInterest:
+def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.PointOfInterestUpdate, user_id=None) -> models.PointOfInterest:
     update_data = obj_in.model_dump(exclude_unset=True)
 
     # Remove deprecated photo columns that have been moved to the Images table
@@ -667,6 +670,8 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
 
     try:
         db.add(db_obj)
+        # Append-only audit row, in the SAME transaction as the update (Task 1.1).
+        record_poi_revision(db, db_obj, 'update', user_id)
         db.commit()
         db.refresh(db_obj)
     except Exception as e:
@@ -684,9 +689,12 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
     return db_obj
 
 
-def delete_poi(db: Session, poi_id: uuid.UUID):
+def delete_poi(db: Session, poi_id: uuid.UUID, user_id=None):
     db_poi = get_poi(db, poi_id)
     if db_poi:
+        # Snapshot BEFORE anything is removed. The revision (poi_id has no FK)
+        # must outlive the POI it describes (Task 1.1).
+        record_poi_revision(db, db_poi, 'delete', user_id)
         # First, delete all relationships that reference this POI
         from app.models.poi import POIRelationship
         relationships_to_delete = db.query(POIRelationship).filter(
