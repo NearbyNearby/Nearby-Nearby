@@ -88,6 +88,10 @@ module "alb" {
   vpc_id                = module.networking.vpc_id
   public_subnet_ids     = module.networking.public_subnet_ids
   alb_security_group_id = module.networking.alb_security_group_id
+
+  # Origin TLS (Task 0.6). false = stage 1 (ACM cert + validation records only);
+  # true = stage 2 (443 listener live, port 80 redirects). See docs/infrastructure/origin-tls.md.
+  enable_https_listener = var.enable_https_listener
 }
 
 # --- ECS ---
