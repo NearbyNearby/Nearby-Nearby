@@ -172,7 +172,7 @@ class Trail(TrailBase):
     model_config = ConfigDict(from_attributes=True)
 
 # Event Schemas
-class EventBase(BaseModel):
+class EventBase(EmptyStringToNoneMixin, BaseModel):
     start_datetime: datetime
     end_datetime: Optional[datetime] = None
     is_repeating: bool = False
@@ -255,7 +255,7 @@ class EventBase(BaseModel):
         return v
 
 class EventCreate(EventBase): pass
-class EventUpdate(BaseModel):
+class EventUpdate(EmptyStringToNoneMixin, BaseModel):
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
     is_repeating: Optional[bool] = None

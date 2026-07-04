@@ -200,6 +200,46 @@ def attach_hero_images(db, pois: List[Any]) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Clone: copy a POI's image rows onto another POI (event reschedule)
+# --------------------------------------------------------------------------- #
+# Identity / ownership / timestamp columns are regenerated per clone; every other
+# column (image_type / storage_url / display_order / caption / alt_text / ...) is
+# copied verbatim.
+_IMAGE_CLONE_SKIP = frozenset({"id", "poi_id", "created_at", "updated_at"})
+
+
+def clone_images(db, src_poi_id, dst_poi_id) -> int:
+    """Copy the ORIGINAL image rows of ``src_poi_id`` onto ``dst_poi_id`` (new
+    ids, new poi_id, every other column verbatim).
+
+    Size variants (``parent_image_id`` set) are skipped — they are derived from an
+    original and re-derivable. Used by the event reschedule clone so the copy
+    keeps its photos (the raw column copy alone drops them: photos live in the
+    images table now, not the legacy JSONB columns). Flushes so a following
+    snapshot / commit sees the rows. Returns the number of image rows written.
+    """
+    from shared.models.image import Image
+
+    originals = (
+        db.query(Image)
+        .filter(Image.poi_id == src_poi_id, Image.parent_image_id.is_(None))
+        .order_by(Image.display_order, Image.id)
+        .all()
+    )
+    written = 0
+    for img in originals:
+        data = {
+            c.name: getattr(img, c.name)
+            for c in Image.__table__.columns
+            if c.name not in _IMAGE_CLONE_SKIP
+        }
+        db.add(Image(poi_id=dst_poi_id, **data))
+        written += 1
+    db.flush()
+    return written
+
+
+# --------------------------------------------------------------------------- #
 # Backfill: legacy photo URLs -> images rows (idempotent)
 # --------------------------------------------------------------------------- #
 def _extract_url(entry: Any) -> Optional[str]:

@@ -46,6 +46,18 @@ Idempotency: cleanup only touches non-conforming rows; the constraint add is
 guarded by a ``pg_constraint`` lookup. Downgrade drops the constraints; the
 normalization is NOT reverted (the original out-of-vocab values are unrecoverable
 and were invalid by design).
+
+Deploy ordering (MIGRATIONS-FIRST, with a caveat): the rest of the Phase 2 batch
+must apply before the code (their new tables/columns are read by the new code).
+This migration is the one exception where migrations-first has a small window:
+once the CHECK is live, a STILL-OLD task that writes an untouched Radio field
+(the admin form's default for ``drone_usage`` is ``''``) would trip the CHECK.
+The new code coerces ''/whitespace -> NULL for these columns before writing (see
+``app/schemas/_coercers.py`` CHECK_ENUM_STRING_FIELDS), so once the deploy
+completes the hazard is gone; the residual risk is only an old task doing a POI
+write during the short rolling window (rare at this manual-curation scale, and
+the reverse ordering would 500 every read for the r_/s_/v_ migrations, which is
+far worse). Apply with the batch; snapshot RDS first.
 """
 
 from alembic import op

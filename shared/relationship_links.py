@@ -27,6 +27,10 @@ dropped this release), so the raw data survives for a follow-up decision.
 
 Any entry whose target UUID does not resolve to an existing POI is a ghost ref
 and is skipped (and counted, by the backfill).
+
+Known limitation: edges carry no position, so a migrated link list loses its
+original array order (reads sort by target id for stability). If ordering ever
+matters, ``meta`` can carry a ``_pos`` ordinal like poi_points does.
 """
 
 from __future__ import annotations
@@ -214,6 +218,34 @@ def read_link_field_admin(db, source_poi_id: uuid.UUID, field: str) -> List[Any]
                 item.update(meta)
             out.append(item)
     return out
+
+
+def clone_outbound_edges(db, src_poi_id: uuid.UUID, dst_poi_id: uuid.UUID) -> int:
+    """Copy every OUTBOUND ``poi_relationships`` edge of ``src_poi_id`` onto
+    ``dst_poi_id`` (new rows: source=dst, same target / relationship_type / meta).
+
+    Used by the event reschedule clone so the copy keeps ALL of its links — the
+    six Task 2.1 types (service_location / vendor / ...) AND any legacy generic
+    edges (venue / sponsor / related / ...) — which live as edges, not columns,
+    and were silently dropped by the old raw-column-only clone. A self-edge onto
+    the clone is skipped. Flushes so a following snapshot / commit sees the rows.
+    Returns the number of edges written.
+    """
+    written = 0
+    for e in db.query(POIRelationship).filter(
+        POIRelationship.source_poi_id == src_poi_id
+    ).all():
+        if e.target_poi_id == dst_poi_id:
+            continue
+        db.add(POIRelationship(
+            source_poi_id=dst_poi_id,
+            target_poi_id=e.target_poi_id,
+            relationship_type=e.relationship_type,
+            meta=e.meta,
+        ))
+        written += 1
+    db.flush()
+    return written
 
 
 def backfill_link_edges(bind) -> Dict[str, Dict[str, int]]:

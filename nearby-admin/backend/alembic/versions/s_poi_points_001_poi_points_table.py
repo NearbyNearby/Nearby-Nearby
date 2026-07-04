@@ -41,12 +41,20 @@ Schema decisions:
 Backfill (idempotent): a ``(poi_id, kind)`` that already has rows is skipped, so
 re-running is a no-op and a kind already written by the new write path during a
 rolling deploy is never clobbered. Malformed / coordinate-less entries are
-skipped and counted; the counts are logged.
+skipped and counted; the counts are logged. Known limitation: that skip rule
+also means pins edited mid-rolling-deploy (an old task wrote JSONB after the new
+path already wrote rows for that kind) cannot be reconciled automatically —
+accepted at the current ~25-POI manually-curated scale.
 
-Deploy ordering (recommended): snapshot RDS -> deploy the new app+admin image
-(reads/writes poi_points; stops writing the JSONB columns) -> run this migration
-(backfill) -> re-run the backfill once after all tasks are new, to pick up any
-JSONB writes from old tasks during the rollout window.
+Deploy ordering (MIGRATIONS-FIRST — this migration BEFORE the code): the new code
+reads ``poi_points`` on every admin GET and public detail (a raw ``SELECT ... FROM
+poi_points``). If the code shipped before this migration creates the table, those
+reads hit a missing relation -> 500 (NOT "empty pins"). So apply this migration
+FIRST. It is safe against still-old tasks during the rolling window: the table is
+additive and old code never touches it. Recommended prod order: snapshot RDS ->
+run this migration -> deploy the new app+admin image (reads/writes poi_points;
+stops writing the JSONB columns) -> re-run the backfill once after all tasks are
+new, to pick up any JSONB writes from old tasks during the rollout window.
 
 Downgrade drops the table. The backfilled data is derived from the retained JSONB
 columns, so nothing is lost; a re-upgrade re-runs the idempotent backfill.

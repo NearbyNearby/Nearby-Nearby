@@ -35,15 +35,23 @@ What it does NOT do:
     columns stay as the authoritative fallback until reads/writes are fully
     cut over and verified in prod.
 
-Deploy ordering:
+Deploy ordering (MIGRATIONS-FIRST — this migration BEFORE the code):
+  * The new shared ORM MAPS ``poi_relationships.meta`` and the new code reads
+    edges (admin GET + public detail) via that column. If the code shipped before
+    this migration adds ``meta``, every ``poi_relationships`` query emits a column
+    that does not exist yet -> 500. So apply this migration FIRST.
   * ``relationship_type`` is an unconstrained ``varchar`` (no DB enum, no CHECK),
     so the new values are plain strings — there is NO enum "both backends must
     know the value first" hazard here, and both backends now share ONE ORM
     (Task 1.2), so a single deploy carries the reader/writer everywhere.
-  * Recommended prod order: snapshot RDS -> deploy the new app+admin image (reads
-    and writes edges; stops writing the JSONB columns) -> run this migration
-    (backfill) -> re-run the backfill once after all tasks are new, to catch any
-    JSONB writes from old tasks during the rolling window.
+  * Safe against still-old tasks during the rolling window: this migration only
+    ADDS a nullable column, recreates the two FKs as ON DELETE CASCADE, and
+    backfills edge rows — none of which old code reads (old code still reads the
+    retained JSONB columns).
+  * Recommended prod order: snapshot RDS -> run this migration -> deploy the new
+    app+admin image (reads and writes edges; stops writing the JSONB columns) ->
+    re-run the backfill once after all tasks are new, to catch any JSONB writes
+    from old tasks during the rolling window.
 
 Downgrade: reverses the SCHEMA only (drops ``meta``, restores the plain
 non-cascade FKs). It deliberately LEAVES the backfilled edge rows in place — they

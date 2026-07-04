@@ -84,6 +84,9 @@ def _apply_nearby_facets(query, facets, payment):
             query = query.filter(getattr(POI, column).is_(True))
         elif facet == 'alcohol':
             # "serves alcohol": any option set other than an explicit no.
+            # Known limitation: this also matches 'nearby' (alcohol available
+            # near, not at, the POI) and 'byob'. Semantics are debatable; tune
+            # the predicate here if stricter "served on premises" is wanted.
             query = query.filter(
                 POI.alcohol_available.isnot(None),
                 POI.alcohol_available != 'no_alcohol',

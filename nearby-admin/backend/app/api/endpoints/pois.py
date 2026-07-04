@@ -466,6 +466,9 @@ def reschedule_event(
     """
     from app.crud.crud_poi import generate_slug, ensure_unique_slug
     from geoalchemy2.shape import to_shape
+    from shared.relationship_links import LINK_FIELDS, clone_outbound_edges
+    from shared.poi_points import POINT_FIELDS, read_point_field, sync_point_rows
+    from shared.poi_media import LEGACY_PHOTO_FIELDS, clone_images
 
     db_poi = crud.get_poi(db, poi_id=poi_id)
     if not db_poi:
@@ -480,12 +483,25 @@ def reschedule_event(
     base_slug = generate_slug(db_poi.name, db_poi.address_city)
     new_slug = ensure_unique_slug(db, base_slug, exclude_id=None)
 
-    # Get columns to copy from POI (exclude id, slug, timestamps, relationships)
-    skip_cols = {'id', 'slug', 'created_at', 'last_updated', 'location'}
-    poi_data = {}
-    for col in models.PointOfInterest.__table__.columns:
-        if col.name not in skip_cols:
-            poi_data[col.name] = getattr(db_poi, col.name)
+    # Dead-weight legacy JSONB columns (Phase 2): the live data now lives in
+    # poi_relationships (links), poi_points (pins) and the images table (photos).
+    # Exclude them from the raw column copy so the clone does not carry stale JSONB
+    # dead data; the real edges / pins / photos are copied from those tables below.
+    poi_link_cols = {f for f, i in LINK_FIELDS.items() if i["owner"] == "poi"}
+    poi_point_cols = {f for f, i in POINT_FIELDS.items() if i["owner"] == "poi"}
+    dead_jsonb_cols = poi_link_cols | poi_point_cols | set(LEGACY_PHOTO_FIELDS)
+
+    # Get columns to copy from POI (exclude id, slug, timestamps, location, and the
+    # dead legacy JSONB columns above).
+    skip_cols = {'id', 'slug', 'created_at', 'last_updated', 'location'} | dead_jsonb_cols
+    poi_data = {
+        col.name: getattr(db_poi, col.name)
+        for col in models.PointOfInterest.__table__.columns
+        if col.name not in skip_cols
+    }
+    # Fix 1: a legacy '' in a CHECK-constrained enum column would trip the CHECK on
+    # the clone insert; coerce blank/whitespace -> NULL first.
+    coerce_empty_literals(poi_data, schemas.PointOfInterestUpdate)
 
     new_poi = models.PointOfInterest(id=new_poi_id, slug=new_slug, **poi_data)
 
@@ -498,12 +514,15 @@ def reschedule_event(
     db.add(new_poi)
     db.flush()
 
-    # Clone event fields
-    event_skip = {'poi_id'}
-    event_data = {}
-    for col in models.Event.__table__.columns:
-        if col.name not in event_skip:
-            event_data[col.name] = getattr(db_poi.event, col.name)
+    # Clone event fields (exclude poi_id and the event-owned legacy link column
+    # vendor_poi_links — those vendor links are copied as edges below).
+    event_link_cols = {f for f, i in LINK_FIELDS.items() if i["owner"] == "event"}
+    event_skip = {'poi_id'} | event_link_cols
+    event_data = {
+        col.name: getattr(db_poi.event, col.name)
+        for col in models.Event.__table__.columns
+        if col.name not in event_skip
+    }
 
     # Override with new dates and status
     event_data['start_datetime'] = body.new_start_datetime
@@ -520,6 +539,19 @@ def reschedule_event(
     # Update original event status
     db_poi.event.event_status = 'Rescheduled'
     db_poi.event.new_event_link = str(new_poi_id)
+
+    # Fix 2: copy the source POI's edges / pins / photos onto the clone. These live
+    # in poi_relationships / poi_points / images now, not the JSONB columns excluded
+    # above, so the raw column copy alone would silently drop every vendor link,
+    # other link kind, parking/restroom/playground/payphone pin, and photo. Same
+    # transaction, BEFORE the revision snapshot so it captures the complete clone
+    # (the snapshot's relationship summary reads the copied edges).
+    clone_outbound_edges(db, poi_id, new_poi_id)
+    for field, info in POINT_FIELDS.items():
+        if info["owner"] != "poi":
+            continue  # trail-owned pins never apply to an EVENT
+        sync_point_rows(db, new_poi_id, field, read_point_field(db, poi_id, field))
+    clone_images(db, poi_id, new_poi_id)
 
     # Append-only audit rows for both sides of the reschedule, in the SAME
     # transaction (Task 1.1): the cloned event is a create, the original is an

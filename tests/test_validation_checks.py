@@ -164,6 +164,91 @@ def test_status_api_update_rejects_invalid(admin_client):
 
 
 # --------------------------------------------------------------------------
+# Empty-string coercion: the admin form submits '' for an untouched Radio field
+# (e.g. drone_usage initialValue ''). These CHECK columns are Optional[str] (not
+# Optional[Literal]), so the original coercer did not touch them and '' would trip
+# the CHECK. The extended coercer NULLs ''/whitespace on create, update, autosave.
+# --------------------------------------------------------------------------
+# (col, poi_type, created_value). Blank '' is coerced to None BEFORE the CHECK; a
+# column with an ORM default ('status'->'Fully Open') then takes that default on
+# INSERT (still in-vocab), the rest persist NULL. Either way the CHECK is not
+# tripped — the point of the fix.
+BLANK_POI_COLUMNS = [
+    ("status", "BUSINESS", "Fully Open"),
+    ("gift_cards", "BUSINESS", None),
+    ("drone_usage", "PARK", None),
+    ("hunting_fishing_allowed", "PARK", None),
+    ("fishing_allowed", "PARK", None),
+]
+
+
+def _create_by_type(client, poi_type, **overrides):
+    return (create_business if poi_type == "BUSINESS" else create_park)(client, **overrides)
+
+
+@pytest.mark.parametrize("col,poi_type,created", BLANK_POI_COLUMNS)
+def test_blank_check_column_create_is_accepted(admin_client, col, poi_type, created):
+    # create_business/create_park assert 201 -> a blank untouched Radio no longer 400s.
+    poi = _create_by_type(admin_client, poi_type, **{col: ""})
+    assert poi[col] == created
+    got = admin_client.get(f"/api/pois/{poi['id']}").json()
+    assert got[col] == created
+
+
+@pytest.mark.parametrize("col,poi_type,created", BLANK_POI_COLUMNS)
+def test_blank_check_column_update_persists_null(admin_client, col, poi_type, created):
+    # On UPDATE the ORM default never fires, so '' -> None -> NULL for every column.
+    poi = _create_by_type(admin_client, poi_type)
+    resp = admin_client.put(f"/api/pois/{poi['id']}", json={col: ""})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()[col] is None
+
+
+@pytest.mark.parametrize("col,poi_type,created", BLANK_POI_COLUMNS)
+def test_blank_check_column_autosave_persists_null(admin_client, col, poi_type, created):
+    poi = _create_by_type(admin_client, poi_type)
+    resp = admin_client.patch(f"/api/pois/{poi['id']}/autosave", json={col: ""})
+    assert resp.status_code == 200, resp.text
+    got = admin_client.get(f"/api/pois/{poi['id']}").json()
+    assert got[col] is None
+
+
+def test_whitespace_only_check_column_coerced(admin_client):
+    # Whitespace-only, not just '', is coerced (drone_usage has no ORM default).
+    poi = create_park(admin_client, drone_usage="   ")
+    assert poi["drone_usage"] is None
+
+
+def test_event_status_blank_create_update_autosave(admin_client):
+    # create: '' -> None -> the events.event_status ORM default 'Scheduled' on INSERT.
+    poi = create_event(admin_client, event={
+        "start_datetime": "2026-06-15T18:00:00Z", "event_status": ""})
+    assert poi["event"]["event_status"] == "Scheduled"
+    # update: '' -> NULL (ORM default does not fire on UPDATE).
+    resp = admin_client.put(f"/api/pois/{poi['id']}",
+                            json={"event": {"start_datetime": "2026-06-15T18:00:00Z",
+                                            "event_status": ""}})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["event"]["event_status"] is None
+    # autosave: a flat '' event_status -> NULL (coerced on the raw dict path even
+    # though PointOfInterestUpdate does not declare event_status).
+    resp = admin_client.patch(f"/api/pois/{poi['id']}/autosave", json={"event_status": ""})
+    assert resp.status_code == 200, resp.text
+    got = admin_client.get(f"/api/pois/{poi['id']}").json()
+    assert got["event"]["event_status"] is None
+
+
+def test_form_shaped_payload_all_blank_check_columns_creates_cleanly(admin_client):
+    """A park created with every CHECK column blank (mirroring untouched-Radio form
+    defaults, e.g. drone_usage='') is accepted post-migration, not 400."""
+    poi = create_park(admin_client, status="", gift_cards="", drone_usage="",
+                      hunting_fishing_allowed="", fishing_allowed="")
+    assert poi["status"] == "Fully Open"  # ORM default on the coerced None
+    for col in ("gift_cards", "drone_usage", "hunting_fishing_allowed", "fishing_allowed"):
+        assert poi[col] is None, col
+
+
+# --------------------------------------------------------------------------
 # Migration round-trip: seed out-of-vocab data, upgrade normalizes + constrains.
 # --------------------------------------------------------------------------
 _CONSTRAINTS = {

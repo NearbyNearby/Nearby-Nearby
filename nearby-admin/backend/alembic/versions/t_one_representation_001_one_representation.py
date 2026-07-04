@@ -33,6 +33,15 @@ stripped from the payload; amenities.payment_methods is stripped before persist)
 Idempotent + rolling-deploy safe: every backfill dedups/fills-only, so re-running
 (e.g. once more after all tasks are the new image) is a no-op.
 
+Deploy ordering (MIGRATIONS-FIRST — this migration before the code): unlike the
+Task 2.1/2.3 migrations this adds no table/column, so there is no read-500 hazard
+either way. But the new code derives featured_image/photos/gallery_photos from the
+images table; a POI whose photo lived ONLY in a legacy column shows no hero until
+this backfill creates its images row. Run this migration FIRST so no hero is
+missing during the rolling window. Safe against still-old tasks: it only creates
+images rows (indistinguishable from uploads) and old code reads the images table
+normally.
+
 Downgrade is a documented NO-OP: this migration only backfills derived data from
 retained columns; a re-upgrade re-runs the idempotent backfills. (The image rows
 it may create are indistinguishable from user uploads and are left in place, like
