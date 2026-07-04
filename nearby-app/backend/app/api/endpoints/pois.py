@@ -525,9 +525,24 @@ def api_get_nearby_pois_by_id(
     poi_id: uuid.UUID,
     radius_miles: float = Query(5.0, description="Search radius in miles"),
     include_past_events: bool = Query(False, description="Include past events in results"),
+    facet: Optional[List[str]] = Query(
+        None,
+        description="Repeatable attribute facet: pet_friendly, restrooms, "
+        "wheelchair_accessible, free_wifi, playground, alcohol, kid_friendly",
+    ),
+    payment: Optional[str] = Query(
+        None, description="Filter to POIs accepting this payment method (e.g. Cash)"
+    ),
     db: Session = Depends(get_db),
 ):
-    nearby_pois = crud.crud_poi.get_nearby_pois(db, poi_id=str(poi_id), radius_miles=radius_miles)
+    # Facets compose with radius + publication gating in SQL. The search-within-
+    # nearby path (SearchBar) intersects hybrid-search results against this
+    # already-facet-filtered id set client-side, so facets flow through search
+    # without touching the global hybrid-search endpoint.
+    nearby_pois = crud.crud_poi.get_nearby_pois(
+        db, poi_id=str(poi_id), radius_miles=radius_miles,
+        facets=facet, payment=payment,
+    )
     nearby_pois = _exclude_past_and_cancelled_events(nearby_pois, include_past=include_past_events)
 
     # Convert location data for each POI. Card body is built by the registry-driven

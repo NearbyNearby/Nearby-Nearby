@@ -5,6 +5,7 @@ import SearchBar from '../SearchBar';
 import Map from '../Map';
 import NearbyCard from './NearbyCard';
 import NearbyFilters from './NearbyFilters';
+import NearbyFacets from './NearbyFacets';
 import DirectionsModal from '../common/DirectionsModal';
 import { getApiUrl } from '../../config';
 import { getPOIUrl } from '../../utils/slugify';
@@ -42,6 +43,8 @@ function NearbySection({ currentPOI }) {
   const [nearbyPOIs, setNearbyPOIs] = useState([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('All');
+  const [activeFacets, setActiveFacets] = useState([]);
+  const [activePayment, setActivePayment] = useState(null);
   const [radiusMiles, setRadiusMiles] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(8);
@@ -69,7 +72,7 @@ function NearbySection({ currentPOI }) {
     if (currentPOI) {
       fetchNearbyPOIs();
     }
-  }, [currentPOI, radiusMiles]);
+  }, [currentPOI, radiusMiles, activeFacets, activePayment]);
 
   // Close dropdowns on outside click or Escape
   useEffect(() => {
@@ -91,7 +94,10 @@ function NearbySection({ currentPOI }) {
   const fetchNearbyPOIs = async () => {
     setNearbyLoading(true);
     try {
-      const response = await fetch(getApiUrl(`api/pois/${currentPOI.id}/nearby?radius_miles=${radiusMiles}`));
+      const params = new URLSearchParams({ radius_miles: radiusMiles });
+      activeFacets.forEach(f => params.append('facet', f));
+      if (activePayment) params.append('payment', activePayment);
+      const response = await fetch(getApiUrl(`api/pois/${currentPOI.id}/nearby?${params.toString()}`));
       if (response.ok) {
         const data = await response.json();
         setNearbyPOIs(data);
@@ -108,8 +114,22 @@ function NearbySection({ currentPOI }) {
     setCurrentPage(1);
   };
 
+  const handleToggleFacet = (key) => {
+    setActiveFacets(prev =>
+      prev.includes(key) ? prev.filter(f => f !== key) : [...prev, key]
+    );
+    setCurrentPage(1);
+  };
+
+  const handlePaymentChange = (method) => {
+    setActivePayment(method);
+    setCurrentPage(1);
+  };
+
   const handleClear = () => {
     setSelectedFilter('All');
+    setActiveFacets([]);
+    setActivePayment(null);
     setRadiusMiles(5);
     setSelectedDate('');
     setSearchFilteredIds(null);
@@ -277,6 +297,16 @@ function NearbySection({ currentPOI }) {
             <NearbyFilters
               selectedFilter={selectedFilter}
               onFilterChange={handleFilterChange}
+            />
+          </div>
+
+          {/* Amenity facet chips — Task 2.2 */}
+          <div className="one_search_facets">
+            <NearbyFacets
+              activeFacets={activeFacets}
+              onToggleFacet={handleToggleFacet}
+              activePayment={activePayment}
+              onPaymentChange={handlePaymentChange}
             />
           </div>
 
