@@ -390,6 +390,11 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
     try:
         db.add(db_poi)
         db.flush()  # Get the ID without committing
+    except IntegrityError as e:
+        # A CHECK/constraint violation on a base column (e.g. a Task 2.6
+        # enum-like column) is a client error: surface it as 400, not 500.
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database integrity error: {e.orig}")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating POI: {e}")
@@ -766,6 +771,11 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
         record_poi_revision(db, db_obj, 'update', user_id)
         db.commit()
         db.refresh(db_obj)
+    except IntegrityError as e:
+        # Mirror create_poi: a constraint violation (e.g. a Task 2.6 CHECK on an
+        # enum-like column, or a bad FK) is a client error, surface it as 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database integrity error: {e.orig}")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"An error occurred during update: {e}")

@@ -78,7 +78,7 @@ class TestCreateBusinessAllFields:
             "smoking_options": ["Outdoor Only"],
             "smoking_details": "Patio smoking area",
             "wifi_options": ["Free WiFi"],
-            "drone_usage": "Not Allowed",
+            "drone_usage": "No",
             "drone_policy": "No drones permitted",
             "pet_options": ["Dogs Allowed Outside"],
             "pet_policy": "Well-behaved dogs on patio",

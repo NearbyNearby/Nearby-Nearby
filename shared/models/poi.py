@@ -39,6 +39,34 @@ class PointOfInterest(Base):
             "('platform','state','county','town')",
             name="ck_points_of_interest_sponsor_level_valid",
         ),
+        # Task 2.6 — enum-like VARCHAR columns constrained to their vocab.
+        CheckConstraint(
+            "status IS NULL OR status IN "
+            "('Fully Open','Partly Open','Temporary Hour Changes',"
+            "'Temporarily Closed','Call Ahead','Permanently Closed','Warning',"
+            "'Limited Capacity','Coming Soon','Under Development','Alert')",
+            name="ck_points_of_interest_status_valid",
+        ),
+        CheckConstraint(
+            "gift_cards IS NULL OR gift_cards IN "
+            "('yes_this_only','no','yes_select_others')",
+            name="ck_points_of_interest_gift_cards_valid",
+        ),
+        CheckConstraint(
+            "drone_usage IS NULL OR drone_usage IN "
+            "('Yes, follow all current Drone Laws','Yes, With Permit from Park','No')",
+            name="ck_points_of_interest_drone_usage_valid",
+        ),
+        CheckConstraint(
+            "hunting_fishing_allowed IS NULL OR hunting_fishing_allowed IN "
+            "('no','seasonal','year_round')",
+            name="ck_points_of_interest_hunting_fishing_allowed_valid",
+        ),
+        CheckConstraint(
+            "fishing_allowed IS NULL OR fishing_allowed IN "
+            "('no','catch_release','catch_keep','other')",
+            name="ck_points_of_interest_fishing_allowed_valid",
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -504,6 +532,15 @@ class Trail(Base):
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = (
+        # Task 2.6 — event_status constrained to EVENT_STATUS_OPTIONS vocab.
+        CheckConstraint(
+            "event_status IS NULL OR event_status IN "
+            "('Scheduled','Canceled','Postponed','Updated Date and/or Time',"
+            "'Rescheduled','Moved Online','Unofficial Proposed Date')",
+            name="ck_events_event_status_valid",
+        ),
+    )
 
     poi_id = Column(UUID(as_uuid=True), ForeignKey("points_of_interest.id"), primary_key=True)
     start_datetime = Column(TIMESTAMP(timezone=True), nullable=False)
