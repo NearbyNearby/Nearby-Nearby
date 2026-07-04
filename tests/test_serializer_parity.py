@@ -538,8 +538,20 @@ def test_serializer_parity(db_session, poi_type):
         "service_locations", "locally_found_at", "associated_trails",
         "membership_passes", "vendor_poi_links", "organization_memberships",
     }
+    # Task 2.3: same story for the six point-geometry fields — now sourced from
+    # the poi_points table ("points:<kind>"), no longer from their retained JSONB
+    # columns. This fixture sets the legacy JSONB attrs but creates NO poi_points
+    # rows, so the registry serializer correctly emits None while the baseline
+    # still reflects the raw JSONB. Intentional source change (verified
+    # end-to-end in test_poi_points.py), not silent value drift.
+    _POINT_KEYS = {
+        "parking_locations", "toilet_locations", "playground_locations",
+        "payphone_locations", "access_points", "trailhead_location",
+    }
+    _INTENTIONAL_SOURCE_CHANGES = _EDGE_LINK_KEYS | _POINT_KEYS
     value_mismatches = [
-        m for m in diff["value_mismatches"] if m["key"] not in _EDGE_LINK_KEYS
+        m for m in diff["value_mismatches"]
+        if m["key"] not in _INTENTIONAL_SOURCE_CHANGES
     ]
 
     # --- 1. Previously-DROPPED-by-POIDetail public keys are RESTORED. ---

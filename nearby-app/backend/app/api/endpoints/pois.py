@@ -222,6 +222,12 @@ def _apply_venue_inheritance(db: Session, poi_dict: dict, event) -> dict:
     if not venue_poi:
         return poi_dict
 
+    # Task 2.3: the inheritable parking_locations / toilet_locations now live in
+    # poi_points; reconstruct them onto the venue instance (set_committed_value,
+    # never dirties) so inheritance reads real data, not the stale JSONB columns.
+    from shared.poi_points import enrich_poi_point_fields
+    enrich_poi_point_fields(db, venue_poi)
+
     from shared.utils.venue_inheritance import resolve_venue_inheritance
 
     venue_data = {
@@ -364,6 +370,15 @@ def _serialize_detail_response(db: Session, db_poi, images: list):
       leaves at its default), corrupting the structural shape.
     * shadow   -> build BOTH, log the diff at WARNING, RETURN legacy unchanged.
     """
+    # Task 2.3: point-geometry fields live in poi_points now; the retained JSONB
+    # columns are stale. Reconstruct all six onto the ORM instance (via
+    # set_committed_value — never dirties the session) so the nested ``trail``
+    # structural object (access_points / trailhead_location — what TrailDetail.jsx
+    # renders) and the legacy/shadow flat reads reflect poi_points. The registry
+    # path additionally reads the four flat fields via its ``points:`` source.
+    from shared.poi_points import enrich_poi_point_fields
+    enrich_poi_point_fields(db, db_poi)
+
     if POI_SERIALIZER == "legacy":
         legacy_dict = _build_legacy_detail_dict(db, db_poi, images)
         return schemas.poi.POIDetail.model_validate(legacy_dict)

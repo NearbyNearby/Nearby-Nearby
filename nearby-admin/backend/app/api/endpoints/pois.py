@@ -36,6 +36,16 @@ def _enrich_link_fields(db: Session, poi):
     return poi
 
 
+def _enrich_response_fields(db: Session, poi):
+    """Enrich an admin POI response: Task 2.1 link fields (from edges) plus
+    Task 2.3 point fields (from poi_points, via set_committed_value so the
+    instance is never dirtied)."""
+    if poi is None:
+        return poi
+    from shared.poi_points import enrich_poi_point_fields
+    return enrich_poi_point_fields(db, _enrich_link_fields(db, poi))
+
+
 @router.post("/pois/", response_model=schemas.PointOfInterest, status_code=201)
 def create_poi(
     poi: schemas.PointOfInterestCreate,
@@ -52,7 +62,7 @@ def create_poi(
         raise HTTPException(status_code=400, detail="Event data required for poi_type 'EVENT'")
 
     result = crud.create_poi(db=db, poi=poi, user_id=getattr(current_user, 'id', None))
-    return _enrich_link_fields(db, result)
+    return _enrich_response_fields(db, result)
 
 
 def _coerce_poi_types(poi_type: Optional[List[str]]):
@@ -132,7 +142,7 @@ def read_poi(poi_id: uuid.UUID, db: Session = Depends(get_db)):
     db_poi = crud.get_poi(db, poi_id=poi_id)
     if db_poi is None:
         raise HTTPException(status_code=404, detail="Point of Interest not found")
-    return _enrich_link_fields(db, db_poi)
+    return _enrich_response_fields(db, db_poi)
 
 
 @router.get("/pois/{poi_id}/nearby", response_model=List[schemas.PointOfInterest], summary="Find nearby POIs")
@@ -158,7 +168,7 @@ def update_poi(
         raise HTTPException(status_code=404, detail="Point of Interest not found")
     
     updated_poi = crud.update_poi(db=db, db_obj=db_poi, obj_in=poi_in, user_id=getattr(current_user, 'id', None))
-    return _enrich_link_fields(db, updated_poi)
+    return _enrich_response_fields(db, updated_poi)
 
 
 @router.delete("/pois/{poi_id}", response_model=schemas.PointOfInterest)
@@ -212,6 +222,12 @@ def autosave_poi(
     from shared.relationship_links import LINK_FIELDS as _LINK_FIELDS, sync_link_edges as _sync_link_edges
     _link_values = {k: filtered.pop(k) for k in list(filtered) if k in _LINK_FIELDS}
 
+    # Task 2.3: point-geometry fields persist as poi_points rows, not JSONB. Pull
+    # them out likewise (none of them feed apply_phase1_computed, so removing them
+    # from the merged snapshot is safe); sync them as rows before commit.
+    from shared.poi_points import POINT_FIELDS as _POINT_FIELDS, sync_point_rows as _sync_point_rows
+    _point_values = {k: filtered.pop(k) for k in list(filtered) if k in _POINT_FIELDS}
+
     # Build a merged snapshot so the computed helper can read current values.
     merged: Dict[str, Any] = {c.name: getattr(poi, c.name) for c in poi.__table__.columns}
     for sub_attr in ('business', 'park', 'trail', 'event'):
@@ -262,6 +278,10 @@ def autosave_poi(
     # Task 2.1: sync any provided POI-to-POI link fields into edges (same txn).
     for _f, _v in _link_values.items():
         _sync_link_edges(db, poi.id, _f, _v)
+
+    # Task 2.3: sync any provided point-geometry fields into poi_points (same txn).
+    for _f, _v in _point_values.items():
+        _sync_point_rows(db, poi.id, _f, _v)
 
     # Append-only audit row, in the SAME transaction as the autosave (Task 1.1).
     record_poi_revision(db, poi, 'update', user_id=getattr(current_user, 'id', None))

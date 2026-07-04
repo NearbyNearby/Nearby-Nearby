@@ -11,6 +11,7 @@ because app code accesses them as ``models.poi.Category`` /
 from shared.models.poi import (  # noqa: F401
     PointOfInterest,
     POIRelationship,
+    POIPoint,
     Business,
     Park,
     Trail,

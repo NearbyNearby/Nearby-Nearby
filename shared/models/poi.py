@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, Numeric, TIMESTAMP, Boolean, Enum, CheckConstraint
+from sqlalchemy import Column, String, Text, ForeignKey, Numeric, TIMESTAMP, Boolean, Enum, CheckConstraint, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -384,6 +384,49 @@ class POIRelationship(Base):
 
     source_poi = relationship("PointOfInterest", foreign_keys=[source_poi_id], back_populates="source_relationships")
     target_poi = relationship("PointOfInterest", foreign_keys=[target_poi_id], back_populates="target_relationships")
+
+
+class POIPoint(Base):
+    """Task 2.3: per-POI point geometry moved OUT of JSONB into a PostGIS table.
+
+    One row = one map pin. ``geom`` (Point, 4326, GIST-indexed) makes spatial
+    queries ("nearest restroom to a coordinate", ST_DWithin/ST_Distance) possible;
+    ``meta`` (JSONB) carries every non-coordinate key from the original JSONB entry
+    verbatim (name, notes, parking/toilet/playground types, descriptions,
+    what3words, photo_ids, ...) plus a reserved ``_pos`` ordinal for stable order.
+
+    The six source columns (parking_locations / toilet_locations /
+    playground_locations / payphone_locations on points_of_interest;
+    access_points / trailhead_location on trails) are RETAINED this release
+    (expand/contract); the write path stops writing them and the reads reconstruct
+    the original shape from here — see ``shared/poi_points.py``.
+
+    ``kind`` is an unconstrained varchar guarded by a CHECK (matching the schema's
+    existing CHECK pattern; a native enum was deliberately avoided for the same
+    deploy-hazard reasons as ``relationship_type``). The prod schema is created by
+    migration ``s_poi_points_001``; the create_all test DB gets the table + CHECK
+    + FK CASCADE + GIST index straight from this model.
+    """
+
+    __tablename__ = "poi_points"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('parking','restroom','playground','payphone','trailhead','access_point')",
+            name="ck_poi_points_kind_valid",
+        ),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # ON DELETE CASCADE: deleting a POI removes all its points (map pins are owned).
+    poi_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("points_of_interest.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    kind = Column(String, nullable=False)
+    geom = Column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
+    meta = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"), default=dict)
 
 
 class Business(Base):

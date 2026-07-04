@@ -664,6 +664,19 @@ SOURCE_OVERRIDE = {
     "membership_passes":        "edges:membership_pass",
     "organization_memberships": "edges:organization_membership",
     "vendor_poi_links":         "edges:vendor",
+    # (9c) Task 2.3: the six point-geometry fields are now served from the
+    # GIST-indexed poi_points table, not their (retained) JSONB columns. Their
+    # source is "points:<kind>" so the serializer reconstructs the original
+    # JSONB shape from poi_points rows. Keep in sync with shared/poi_points.py
+    # (POINT_FIELDS). The two trail-owned fields (access_points,
+    # trailhead_location) remain STRUCTURAL on the wire — surfaced via the
+    # nested trail object, which the detail path enriches from poi_points.
+    "parking_locations":    "points:parking",
+    "toilet_locations":     "points:restroom",
+    "playground_locations": "points:playground",
+    "payphone_locations":   "points:payphone",
+    "access_points":        "points:access_point",
+    "trailhead_location":   "points:trailhead",
 }
 # (10b) explicit registry-type overrides (column SQL type doesn't imply the widget).
 TYPE_OVERRIDE = {
@@ -748,8 +761,9 @@ def build_entry(table_key: str, name: str, sql_token: str, decl_index: int) -> d
         tier = "paid"
 
     computed = name in COMPUTED_FIELDS
-    # Task 2.1 edge-sourced link fields take precedence over the default
-    # "<table>.<column>" source (they are read from poi_relationships, not JSONB).
+    # Task 2.1 edge-sourced link fields and Task 2.3 points-sourced geometry
+    # fields take precedence over the default "<table>.<column>" source (they are
+    # read from poi_relationships / poi_points, not JSONB).
     source = SOURCE_OVERRIDE.get(name) or COMPUTED_FIELDS.get(name, f"{table_key}.{name}")
 
     # Render taxonomy (B4): admin fields are always hidden. Otherwise apply the
