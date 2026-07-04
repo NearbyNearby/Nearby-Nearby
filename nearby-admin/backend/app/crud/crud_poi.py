@@ -337,6 +337,16 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
     }
     poi_data = poi.model_dump(exclude={'location', 'business', 'park', 'trail', 'event', 'category_ids', 'main_category_id'} | deprecated_photo_fields)
 
+    # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, NOT as
+    # JSONB. Pull the top-level link fields out of poi_data so they are never
+    # written to their JSONB columns; they are synced as edges once the POI (and
+    # any target POIs) exist. vendor_poi_links (event subtype) is pulled below.
+    from shared.relationship_links import LINK_FIELDS as _LINK_FIELDS, sync_link_edges as _sync_link_edges
+    _link_values = {
+        _f: poi_data.pop(_f, None)
+        for _f, _i in _LINK_FIELDS.items() if _i["owner"] == "poi"
+    }
+
     # Sanitize HTML content in the POI data
     poi_data = sanitize_poi_fields(poi_data)
 
@@ -421,6 +431,8 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
     elif poi.poi_type == 'EVENT' and poi.event:
         event_data = poi.event.model_dump()
         event_data = sanitize_poi_fields({'event': event_data}).get('event', {})
+        # Task 2.1: vendor_poi_links is a link field — persist as edges, not JSONB.
+        _link_values['vendor_poi_links'] = event_data.pop('vendor_poi_links', None)
         # Duplicate prevention: check same venue + date + name
         venue_id = event_data.get('venue_poi_id')
         start_dt = event_data.get('start_datetime')
@@ -441,6 +453,12 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
 
     try:
         db.add(db_poi)
+        # Task 2.1: sync POI-to-POI link fields into poi_relationships edges,
+        # BEFORE the revision snapshot (so its relationship summary reflects the
+        # new edges) and INSIDE this try so a premature flush from an invalid FK
+        # (e.g. a bad venue_poi_id) surfaces as an IntegrityError -> 400, not 500.
+        for _f, _v in _link_values.items():
+            _sync_link_edges(db, db_poi.id, _f, _v)
         # Append-only audit row, in the SAME transaction as the create (Task 1.1).
         record_poi_revision(db, db_poi, 'create', user_id)
         db.commit()
@@ -465,6 +483,17 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
 
 def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.PointOfInterestUpdate, user_id=None) -> models.PointOfInterest:
     update_data = obj_in.model_dump(exclude_unset=True)
+
+    # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, NOT as
+    # JSONB. Pop the top-level link fields that were provided in THIS request so
+    # they are never setattr'd onto their JSONB columns; sync them as edges below.
+    # A field absent from update_data is left untouched (partial-update safe).
+    from shared.relationship_links import LINK_FIELDS as _LINK_FIELDS, sync_link_edges as _sync_link_edges
+    _link_values = {
+        _f: update_data.pop(_f)
+        for _f, _i in _LINK_FIELDS.items()
+        if _i["owner"] == "poi" and _f in update_data
+    }
 
     # Remove deprecated photo columns that have been moved to the Images table
     deprecated_photo_fields = [
@@ -533,6 +562,9 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
 
     if 'event' in update_data and poi_type_str == 'EVENT':
         event_data = update_data.pop('event')
+        # Task 2.1: vendor_poi_links is a link field — persist as edges, not JSONB.
+        if 'vendor_poi_links' in event_data:
+            _link_values['vendor_poi_links'] = event_data.pop('vendor_poi_links')
         # Task 157: Date Change Guard
         date_changing = event_data.get('start_datetime') or event_data.get('end_datetime')
         current_status = getattr(db_obj.event, 'event_status', None) if db_obj.event else None
@@ -670,6 +702,10 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
 
     try:
         db.add(db_obj)
+        # Task 2.1: sync provided POI-to-POI link fields into poi_relationships
+        # edges (BEFORE the revision snapshot, in the same transaction).
+        for _f, _v in _link_values.items():
+            _sync_link_edges(db, db_obj.id, _f, _v)
         # Append-only audit row, in the SAME transaction as the update (Task 1.1).
         record_poi_revision(db, db_obj, 'update', user_id)
         db.commit()

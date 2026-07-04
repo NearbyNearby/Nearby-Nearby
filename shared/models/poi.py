@@ -364,9 +364,23 @@ class PointOfInterest(Base):
 class POIRelationship(Base):
     __tablename__ = "poi_relationships"
 
-    source_poi_id = Column(UUID(as_uuid=True), ForeignKey("points_of_interest.id"), primary_key=True)
-    target_poi_id = Column(UUID(as_uuid=True), ForeignKey("points_of_interest.id"), primary_key=True)
-    relationship_type = Column(String, primary_key=True)  # e.g., "venue", "trail_in_park", "service_provider"
+    # ON DELETE CASCADE: deleting a POI removes every edge that references it, in
+    # BOTH directions (source and target). This is the referential-integrity fix
+    # that kills the "ghost ref" left behind by the old untyped JSONB UUID arrays
+    # (Task 2.1). The prod schema gains the cascade via migration r_ghost_refs_001;
+    # the create_all test DB gets it straight from these ForeignKey definitions.
+    source_poi_id = Column(UUID(as_uuid=True), ForeignKey("points_of_interest.id", ondelete="CASCADE"), primary_key=True)
+    target_poi_id = Column(UUID(as_uuid=True), ForeignKey("points_of_interest.id", ondelete="CASCADE"), primary_key=True)
+    # relationship_type is an unconstrained varchar (no DB enum, no CHECK). Known
+    # values: the legacy generic set (venue, vendor, sponsor, related,
+    # trail_in_park, service_provider) plus the Task 2.1 link-field types
+    # (service_location, locally_found_at, associated_trail, membership_pass,
+    # organization_membership; vendor is reused for event vendor links).
+    relationship_type = Column(String, primary_key=True)
+    # Per-edge metadata migrated out of the old JSONB entries (e.g. an event
+    # vendor's vendor_type, or an organization-membership entry's display name /
+    # external link). NULL for plain UUID-array links that carried no extra keys.
+    meta = Column(JSONB, nullable=True)
 
     source_poi = relationship("PointOfInterest", foreign_keys=[source_poi_id], back_populates="source_relationships")
     target_poi = relationship("PointOfInterest", foreign_keys=[target_poi_id], back_populates="target_relationships")

@@ -17,6 +17,25 @@ from app.schemas._coercers import coerce_empty_literals
 
 router = APIRouter()
 
+
+def _enrich_link_fields(db: Session, poi):
+    """Task 2.1: reconstruct the six POI-to-POI link fields from
+    poi_relationships edges onto the ORM instance so the admin response serializes
+    them from edges (they are no longer stored in JSONB). In-memory only — never
+    committed (get_db does not commit; any autoflush is rolled back on close)."""
+    if poi is None:
+        return poi
+    from shared.relationship_links import LINK_FIELDS, read_link_field_admin
+    for field, info in LINK_FIELDS.items():
+        value = read_link_field_admin(db, poi.id, field)
+        if info["owner"] == "event":
+            if getattr(poi, "event", None) is not None:
+                poi.event.vendor_poi_links = value
+        else:
+            setattr(poi, field, value)
+    return poi
+
+
 @router.post("/pois/", response_model=schemas.PointOfInterest, status_code=201)
 def create_poi(
     poi: schemas.PointOfInterestCreate,
@@ -32,7 +51,8 @@ def create_poi(
     if poi.poi_type == 'EVENT' and poi.event is None:
         raise HTTPException(status_code=400, detail="Event data required for poi_type 'EVENT'")
 
-    return crud.create_poi(db=db, poi=poi, user_id=getattr(current_user, 'id', None))
+    result = crud.create_poi(db=db, poi=poi, user_id=getattr(current_user, 'id', None))
+    return _enrich_link_fields(db, result)
 
 
 def _coerce_poi_types(poi_type: Optional[List[str]]):
@@ -112,7 +132,7 @@ def read_poi(poi_id: uuid.UUID, db: Session = Depends(get_db)):
     db_poi = crud.get_poi(db, poi_id=poi_id)
     if db_poi is None:
         raise HTTPException(status_code=404, detail="Point of Interest not found")
-    return db_poi
+    return _enrich_link_fields(db, db_poi)
 
 
 @router.get("/pois/{poi_id}/nearby", response_model=List[schemas.PointOfInterest], summary="Find nearby POIs")
@@ -138,7 +158,7 @@ def update_poi(
         raise HTTPException(status_code=404, detail="Point of Interest not found")
     
     updated_poi = crud.update_poi(db=db, db_obj=db_poi, obj_in=poi_in, user_id=getattr(current_user, 'id', None))
-    return updated_poi
+    return _enrich_link_fields(db, updated_poi)
 
 
 @router.delete("/pois/{poi_id}", response_model=schemas.PointOfInterest)
@@ -186,6 +206,12 @@ def autosave_poi(
     }
     coerce_empty_literals(filtered, schemas.PointOfInterestUpdate)
 
+    # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, not
+    # JSONB. Pull any provided link fields out of the autosave payload so they are
+    # never setattr'd onto their JSONB columns; sync them as edges before commit.
+    from shared.relationship_links import LINK_FIELDS as _LINK_FIELDS, sync_link_edges as _sync_link_edges
+    _link_values = {k: filtered.pop(k) for k in list(filtered) if k in _LINK_FIELDS}
+
     # Build a merged snapshot so the computed helper can read current values.
     merged: Dict[str, Any] = {c.name: getattr(poi, c.name) for c in poi.__table__.columns}
     for sub_attr in ('business', 'park', 'trail', 'event'):
@@ -232,6 +258,10 @@ def autosave_poi(
             if k in sub_cols and k != 'poi_id':
                 setattr(sub, k, merged[k])
                 break
+
+    # Task 2.1: sync any provided POI-to-POI link fields into edges (same txn).
+    for _f, _v in _link_values.items():
+        _sync_link_edges(db, poi.id, _f, _v)
 
     # Append-only audit row, in the SAME transaction as the autosave (Task 1.1).
     record_poi_revision(db, poi, 'update', user_id=getattr(current_user, 'id', None))

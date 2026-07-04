@@ -639,12 +639,31 @@ RENDER_HIDDEN = {
     # internal display-control toggle (hides exact location on the map); it is a
     # moderation flag, not a user-facing attribute row.
     "dont_display_location",
+    # Task 2.1: event vendors are rendered by the dedicated EventVendors component
+    # (via /pois/{id}/vendors), not the generic auto field-row — hide the flat
+    # vendor_poi_links row to avoid a double render.
+    "vendor_poi_links",
 }
 # (9) relation-typed multi/JSONB columns that hold POI-id links.
 RELATION_LINK_FIELDS = {
     "service_locations", "locally_found_at", "associated_trails",
     "membership_passes", "organization_memberships", "vendor_poi_links",
     "venue_poi_id", "organizer_poi_id",
+}
+# (9b) Task 2.1: the six POI-to-POI link fields are now served from the
+# poi_relationships edge table, not their (retained) JSONB columns. Their
+# registry ``source`` is "edges:<relationship_type>" so the serializer resolves
+# linked POIs from edges. Keep in sync with shared/relationship_links.py
+# (LINK_FIELDS). ``vendor_poi_links`` is additionally render-hidden (see
+# RENDER_HIDDEN) because the app renders event vendors via the dedicated
+# ``/pois/{id}/vendors`` endpoint, not the generic auto field-row.
+SOURCE_OVERRIDE = {
+    "service_locations":        "edges:service_location",
+    "locally_found_at":         "edges:locally_found_at",
+    "associated_trails":        "edges:associated_trail",
+    "membership_passes":        "edges:membership_pass",
+    "organization_memberships": "edges:organization_membership",
+    "vendor_poi_links":         "edges:vendor",
 }
 # (10b) explicit registry-type overrides (column SQL type doesn't imply the widget).
 TYPE_OVERRIDE = {
@@ -729,7 +748,9 @@ def build_entry(table_key: str, name: str, sql_token: str, decl_index: int) -> d
         tier = "paid"
 
     computed = name in COMPUTED_FIELDS
-    source = COMPUTED_FIELDS.get(name, f"{table_key}.{name}")
+    # Task 2.1 edge-sourced link fields take precedence over the default
+    # "<table>.<column>" source (they are read from poi_relationships, not JSONB).
+    source = SOURCE_OVERRIDE.get(name) or COMPUTED_FIELDS.get(name, f"{table_key}.{name}")
 
     # Render taxonomy (B4): admin fields are always hidden. Otherwise apply the
     # curated RENDER_HIDDEN / RENDER_BESPOKE overrides; default is "auto".

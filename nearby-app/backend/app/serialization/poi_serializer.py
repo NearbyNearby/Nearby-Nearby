@@ -154,6 +154,16 @@ def _read_source(db, poi, entry: Dict[str, Any], images: List[Any]) -> Any:
             if _image_type_of(img) == image_type
         ]
 
+    # edges:<relationship_type> — Task 2.1 POI-to-POI links resolved from the
+    # poi_relationships edge table (published targets only), as RelationLink-shaped
+    # summaries. Needs ``db``; the card path (db=None) never carries these fields.
+    if source.startswith("edges:"):
+        if db is None:
+            return []
+        from shared.relationship_links import read_edges_public
+        rel_type = source.split(":", 1)[1]
+        return read_edges_public(db, poi.id, rel_type)
+
     # computed.<fn> — read the stored column by entry key (icon_*,
     # accessible_restroom, inclusive_playground are real boolean columns).
     if source.startswith("computed."):

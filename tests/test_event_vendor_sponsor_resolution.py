@@ -9,13 +9,26 @@ Uses ORM helpers (not admin_client) to create data, then app_client to read.
 
 import pytest
 from conftest import orm_create_event, orm_create_business
+from shared.models.poi import POIRelationship
+
+
+def _add_vendor_edge(db, event, vendor, vendor_type=None):
+    """Task 2.1: event vendors now live in poi_relationships (type 'vendor');
+    vendor_type is carried in the edge meta."""
+    db.add(POIRelationship(
+        source_poi_id=event.id,
+        target_poi_id=vendor.id,
+        relationship_type="vendor",
+        meta={"vendor_type": vendor_type} if vendor_type else None,
+    ))
+    db.flush()
 
 
 class TestVendorResolution:
-    """GET /pois/{poi_id}/vendors resolves vendor_poi_links."""
+    """GET /pois/{poi_id}/vendors resolves 'vendor' edges to POI summaries."""
 
     def test_vendors_resolves_linked_pois(self, db_session, app_client):
-        """vendor_poi_links with POI IDs should resolve to POI summaries."""
+        """A 'vendor' edge should resolve to a POI summary."""
         vendor = orm_create_business(db_session, name="BBQ Vendor", published=True)
         vendor_id = str(vendor.id)
 
@@ -23,11 +36,9 @@ class TestVendorResolution:
             db_session,
             name="BBQ Festival",
             published=True,
-            event_fields={
-                "start_datetime": "2026-08-01T12:00:00+00:00",
-                "vendor_poi_links": [{"poi_id": vendor_id, "vendor_type": "Food"}],
-            },
+            event_fields={"start_datetime": "2026-08-01T12:00:00+00:00"},
         )
+        _add_vendor_edge(db_session, event, vendor, vendor_type="Food")
         event_id = str(event.id)
         db_session.commit()
 
@@ -38,6 +49,7 @@ class TestVendorResolution:
         assert len(data) == 1
         assert data[0]["id"] == vendor_id
         assert data[0]["name"] == "BBQ Vendor"
+        assert data[0]["vendor_type"] == "Food"
         assert "slug" in data[0]
 
     def test_vendors_empty_list_when_no_vendors(self, db_session, app_client):
@@ -57,17 +69,14 @@ class TestVendorResolution:
     def test_vendors_skips_unpublished_pois(self, db_session, app_client):
         """Vendor POIs that are not published should be excluded."""
         vendor = orm_create_business(db_session, name="Draft Vendor", published=False)
-        vendor_id = str(vendor.id)
 
         event = orm_create_event(
             db_session,
             name="Vendor Event Draft",
             published=True,
-            event_fields={
-                "start_datetime": "2026-08-01T12:00:00+00:00",
-                "vendor_poi_links": [{"poi_id": vendor_id, "vendor_type": "Crafts"}],
-            },
+            event_fields={"start_datetime": "2026-08-01T12:00:00+00:00"},
         )
+        _add_vendor_edge(db_session, event, vendor, vendor_type="Crafts")
         event_id = str(event.id)
         db_session.commit()
 

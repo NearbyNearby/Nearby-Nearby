@@ -798,50 +798,41 @@ def get_event_vendors(
     poi_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
-    """Resolve vendor_poi_links JSONB to published POI summaries."""
-    from sqlalchemy.orm import joinedload
+    """Resolve event vendor links to published POI summaries.
 
-    poi = db.query(models.poi.PointOfInterest).options(
-        joinedload(models.poi.PointOfInterest.event)
-    ).filter(
+    Task 2.1: vendor links now live in the ``poi_relationships`` edge table
+    (relationship_type ``vendor``, source = the event POI); the per-vendor
+    ``vendor_type`` is carried in the edge's ``meta``. The response shape is
+    unchanged from the legacy vendor_poi_links JSONB path.
+    """
+    poi = db.query(models.poi.PointOfInterest).filter(
         models.poi.PointOfInterest.id == poi_id,
         models.poi.PointOfInterest.publication_status == "published",
     ).first()
     if not poi:
         raise HTTPException(status_code=404, detail="POI not found")
 
-    event = poi.event
-    if not event:
+    edges = db.query(models.poi.POIRelationship).filter(
+        models.poi.POIRelationship.source_poi_id == poi.id,
+        models.poi.POIRelationship.relationship_type == "vendor",
+    ).all()
+    if not edges:
         return []
 
-    vendor_links = event.vendor_poi_links
-    if not vendor_links or not isinstance(vendor_links, list):
-        return []
-
-    # Collect vendor POI IDs
-    vendor_poi_ids = [
-        v["poi_id"] for v in vendor_links
-        if isinstance(v, dict) and v.get("poi_id")
-    ]
-    if not vendor_poi_ids:
-        return []
-
-    # Fetch published vendor POIs
+    target_ids = [e.target_poi_id for e in edges]
     vendor_pois = db.query(models.poi.PointOfInterest).filter(
-        models.poi.PointOfInterest.id.in_(vendor_poi_ids),
+        models.poi.PointOfInterest.id.in_(target_ids),
         models.poi.PointOfInterest.publication_status == "published",
     ).all()
-
-    vendor_map = {str(vp.id): vp for vp in vendor_pois}
+    vendor_map = {vp.id: vp for vp in vendor_pois}
 
     results = []
-    for link in vendor_links:
-        if not isinstance(link, dict) or not link.get("poi_id"):
-            continue
-        vp = vendor_map.get(link["poi_id"])
+    for edge in edges:
+        vp = vendor_map.get(edge.target_poi_id)
         if not vp:
             continue
         poi_type = vp.poi_type.value if hasattr(vp.poi_type, 'value') else vp.poi_type
+        meta = edge.meta or {}
         results.append({
             "id": str(vp.id),
             "name": vp.name,
@@ -849,7 +840,7 @@ def get_event_vendors(
             "poi_type": poi_type,
             "address_city": vp.address_city,
             "featured_image": vp.featured_image,
-            "vendor_type": link.get("vendor_type"),
+            "vendor_type": meta.get("vendor_type"),
         })
 
     return results

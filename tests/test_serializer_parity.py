@@ -527,6 +527,21 @@ def test_serializer_parity(db_session, poi_type):
 
     diff = diff_serializers(norm_baseline, norm_registry)
 
+    # Task 2.1: the six POI-to-POI link fields are now sourced from the
+    # poi_relationships edge table ("edges:<type>"), no longer from their JSONB
+    # columns. This parity fixture sets the legacy JSONB attrs but creates NO
+    # edges, so the registry serializer correctly emits [] for them while the
+    # POIDetail baseline still reflects the raw JSONB. That is an EXPECTED,
+    # intentional source change (verified end-to-end in test_ghost_refs.py), not
+    # silent value drift — exclude these keys from the value-drift assertion.
+    _EDGE_LINK_KEYS = {
+        "service_locations", "locally_found_at", "associated_trails",
+        "membership_passes", "vendor_poi_links", "organization_memberships",
+    }
+    value_mismatches = [
+        m for m in diff["value_mismatches"] if m["key"] not in _EDGE_LINK_KEYS
+    ]
+
     # --- 1. Previously-DROPPED-by-POIDetail public keys are RESTORED. ---
     # The pre-B3 baseline is the POIDetail allowlist (PII already removed by the
     # B0 hotfix), so the meaningful guarantee is "the registry RESTORES the public
@@ -542,8 +557,8 @@ def test_serializer_parity(db_session, poi_type):
     )
 
     # --- 2. No silent value change for any key present in BOTH payloads. ---
-    assert diff["value_mismatches"] == [], (
-        f"[{poi_type}] value drift on kept keys: {diff['value_mismatches']}"
+    assert value_mismatches == [], (
+        f"[{poi_type}] value drift on kept keys: {value_mismatches}"
     )
 
     # --- 3. Explicit (the real cutover guarantee): NONE of the PII keys nor
