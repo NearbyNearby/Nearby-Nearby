@@ -178,7 +178,7 @@
     "label": "Status",
     "type": "text",
     "group": "Core Information",
-    "order": 1020,
+    "order": 1022,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -207,7 +207,7 @@
     "label": "Status Message",
     "type": "text",
     "group": "Core Information",
-    "order": 1021,
+    "order": 1023,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -236,7 +236,7 @@
     "label": "Is Verified",
     "type": "boolean",
     "group": "Core Information",
-    "order": 1022,
+    "order": 1024,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -265,7 +265,7 @@
     "label": "Is Disaster Hub",
     "type": "boolean",
     "group": "Core Information",
-    "order": 1023,
+    "order": 1025,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -294,7 +294,7 @@
     "label": "Lat Long Most Accurate",
     "type": "boolean",
     "group": "Core Information",
-    "order": 1024,
+    "order": 1026,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -323,7 +323,7 @@
     "label": "Free WiFi",
     "type": "boolean",
     "group": "Core Information",
-    "order": 1025,
+    "order": 1027,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -352,7 +352,7 @@
     "label": "Publication Status",
     "type": "text",
     "group": "Core Information",
-    "order": 1029,
+    "order": 1031,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -381,7 +381,7 @@
     "label": "Has Been Published",
     "type": "boolean",
     "group": "Core Information",
-    "order": 1030,
+    "order": 1032,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -410,7 +410,7 @@
     "label": "Listing Type",
     "type": "text",
     "group": "Core Information",
-    "order": 1040,
+    "order": 1042,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -439,7 +439,7 @@
     "label": "Is Sponsor",
     "type": "boolean",
     "group": "Core Information",
-    "order": 1041,
+    "order": 1043,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -468,7 +468,7 @@
     "label": "Sponsor Level",
     "type": "text",
     "group": "Core Information",
-    "order": 1042,
+    "order": 1044,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -497,7 +497,7 @@
     "label": "History Paragraph",
     "type": "richtext",
     "group": "Core Information",
-    "order": 1078,
+    "order": 1080,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -870,11 +870,53 @@
     "replaced_by": null
   },
   {
+    "key": "geom_line",
+    "label": "Geom Line",
+    "type": "geo",
+    "group": "Location",
+    "order": 3020,
+    "applies_to": [
+      "TRAIL"
+    ],
+    "tier": "any",
+    "audience": "admin",
+    "render": "hidden",
+    "icon": null,
+    "value_source": null,
+    "schema_org": null,
+    "source": "poi.geom_line",
+    "computed": false,
+    "card": false,
+    "deprecated": false,
+    "replaced_by": null
+  },
+  {
+    "key": "geom_area",
+    "label": "Geom Area",
+    "type": "geo",
+    "group": "Location",
+    "order": 3021,
+    "applies_to": [
+      "PARK"
+    ],
+    "tier": "any",
+    "audience": "admin",
+    "render": "hidden",
+    "icon": null,
+    "value_source": null,
+    "schema_org": null,
+    "source": "poi.geom_area",
+    "computed": false,
+    "card": false,
+    "deprecated": false,
+    "replaced_by": null
+  },
+  {
     "key": "website_url",
     "label": "Website URL",
     "type": "url",
     "group": "Contact",
-    "order": 4031,
+    "order": 4033,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -903,7 +945,7 @@
     "label": "Phone Number",
     "type": "phone",
     "group": "Contact",
-    "order": 4032,
+    "order": 4034,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -932,7 +974,7 @@
     "label": "Email",
     "type": "email",
     "group": "Contact",
-    "order": 4033,
+    "order": 4035,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -961,7 +1003,7 @@
     "label": "Instagram Username",
     "type": "text",
     "group": "Contact",
-    "order": 4034,
+    "order": 4036,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -990,7 +1032,7 @@
     "label": "Facebook Username",
     "type": "text",
     "group": "Contact",
-    "order": 4035,
+    "order": 4037,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1019,7 +1061,7 @@
     "label": "X (Twitter) Username",
     "type": "text",
     "group": "Contact",
-    "order": 4036,
+    "order": 4038,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1048,7 +1090,7 @@
     "label": "TikTok Username",
     "type": "text",
     "group": "Contact",
-    "order": 4037,
+    "order": 4039,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1077,7 +1119,7 @@
     "label": "Linkedin Username",
     "type": "text",
     "group": "Contact",
-    "order": 4038,
+    "order": 4040,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1106,7 +1148,7 @@
     "label": "Other Socials",
     "type": "dict",
     "group": "Contact",
-    "order": 4039,
+    "order": 4041,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1135,7 +1177,7 @@
     "label": "Contact Info",
     "type": "dict",
     "group": "Contact",
-    "order": 4138,
+    "order": 4140,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1164,7 +1206,7 @@
     "label": "Hours But Appointment Required",
     "type": "boolean",
     "group": "Hours",
-    "order": 5102,
+    "order": 5104,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1193,7 +1235,7 @@
     "label": "Hours",
     "type": "dict",
     "group": "Hours",
-    "order": 5135,
+    "order": 5137,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1222,7 +1264,7 @@
     "label": "Ideal For Key",
     "type": "multi",
     "group": "Business Details",
-    "order": 6085,
+    "order": 6087,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1251,7 +1293,7 @@
     "label": "Price Range Per Person",
     "type": "text",
     "group": "Business Details",
-    "order": 6086,
+    "order": 6088,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1272,7 +1314,7 @@
     "label": "Pricing",
     "type": "text",
     "group": "Business Details",
-    "order": 6087,
+    "order": 6089,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1293,7 +1335,7 @@
     "label": "Gift Cards",
     "type": "text",
     "group": "Business Details",
-    "order": 6089,
+    "order": 6091,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1314,7 +1356,7 @@
     "label": "Youth Amenities",
     "type": "multi",
     "group": "Business Details",
-    "order": 6090,
+    "order": 6092,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1335,7 +1377,7 @@
     "label": "Business Amenities",
     "type": "multi",
     "group": "Business Details",
-    "order": 6091,
+    "order": 6093,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1356,7 +1398,7 @@
     "label": "Entertainment Options",
     "type": "multi",
     "group": "Business Details",
-    "order": 6092,
+    "order": 6094,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1377,7 +1419,7 @@
     "label": "Amenities",
     "type": "dict",
     "group": "Business Details",
-    "order": 6136,
+    "order": 6138,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1406,7 +1448,7 @@
     "label": "Ideal For",
     "type": "multi",
     "group": "Business Details",
-    "order": 6137,
+    "order": 6139,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1435,7 +1477,7 @@
     "label": "Cost",
     "type": "text",
     "group": "Pricing",
-    "order": 7044,
+    "order": 7046,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1464,7 +1506,7 @@
     "label": "Pricing Details",
     "type": "richtext",
     "group": "Pricing",
-    "order": 7045,
+    "order": 7047,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1493,7 +1535,7 @@
     "label": "Payment Methods",
     "type": "multi",
     "group": "Pricing",
-    "order": 7051,
+    "order": 7053,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1522,7 +1564,7 @@
     "label": "Discounts",
     "type": "multi",
     "group": "Pricing",
-    "order": 7088,
+    "order": 7090,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1551,7 +1593,7 @@
     "label": "Cost Type",
     "type": "text",
     "group": "Pricing",
-    "order": 7205,
+    "order": 7207,
     "applies_to": [
       "EVENT"
     ],
@@ -1572,7 +1614,7 @@
     "label": "Menu Photos",
     "type": "multi",
     "group": "Menu & Ordering",
-    "order": 8093,
+    "order": 8095,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1593,7 +1635,7 @@
     "label": "Menu Link",
     "type": "url",
     "group": "Menu & Ordering",
-    "order": 8094,
+    "order": 8096,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1614,7 +1656,7 @@
     "label": "Delivery Links",
     "type": "multi",
     "group": "Menu & Ordering",
-    "order": 8095,
+    "order": 8097,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1635,7 +1677,7 @@
     "label": "Reservation Links",
     "type": "multi",
     "group": "Menu & Ordering",
-    "order": 8096,
+    "order": 8098,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1656,7 +1698,7 @@
     "label": "Appointment Links",
     "type": "multi",
     "group": "Menu & Ordering",
-    "order": 8097,
+    "order": 8099,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1677,7 +1719,7 @@
     "label": "Online Ordering Links",
     "type": "multi",
     "group": "Menu & Ordering",
-    "order": 8098,
+    "order": 8100,
     "applies_to": [
       "BUSINESS"
     ],
@@ -1698,7 +1740,7 @@
     "label": "Appointment Booking URL",
     "type": "url",
     "group": "Menu & Ordering",
-    "order": 8101,
+    "order": 8103,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1727,7 +1769,7 @@
     "label": "Parking Types",
     "type": "multi",
     "group": "Parking",
-    "order": 9046,
+    "order": 9048,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1756,7 +1798,7 @@
     "label": "Parking Locations",
     "type": "multi",
     "group": "Parking",
-    "order": 9047,
+    "order": 9049,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1785,7 +1827,7 @@
     "label": "Parking Notes",
     "type": "richtext",
     "group": "Parking",
-    "order": 9048,
+    "order": 9050,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1814,7 +1856,7 @@
     "label": "Expect To Pay Parking",
     "type": "text",
     "group": "Parking",
-    "order": 9049,
+    "order": 9051,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1843,7 +1885,7 @@
     "label": "Accessible Parking Details",
     "type": "multi",
     "group": "Parking",
-    "order": 9059,
+    "order": 9061,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1872,7 +1914,7 @@
     "label": "Wheelchair Accessible",
     "type": "boolean",
     "group": "Accessibility",
-    "order": 10028,
+    "order": 10030,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1901,7 +1943,7 @@
     "label": "Wheelchair Details",
     "type": "richtext",
     "group": "Accessibility",
-    "order": 10058,
+    "order": 10060,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1930,7 +1972,7 @@
     "label": "Mobility Access",
     "type": "dict",
     "group": "Accessibility",
-    "order": 10062,
+    "order": 10064,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1959,7 +2001,7 @@
     "label": "Cell Service",
     "type": "enum",
     "group": "Accessibility",
-    "order": 10063,
+    "order": 10065,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -1988,7 +2030,7 @@
     "label": "Public Restroom",
     "type": "boolean",
     "group": "Restrooms",
-    "order": 11027,
+    "order": 11029,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2017,7 +2059,7 @@
     "label": "Accessible Restroom",
     "type": "boolean",
     "group": "Restrooms",
-    "order": 11060,
+    "order": 11062,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2046,7 +2088,7 @@
     "label": "Accessible Restroom Details",
     "type": "multi",
     "group": "Restrooms",
-    "order": 11061,
+    "order": 11063,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2075,7 +2117,7 @@
     "label": "Public Toilets",
     "type": "multi",
     "group": "Restrooms",
-    "order": 11071,
+    "order": 11073,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2104,7 +2146,7 @@
     "label": "Toilet Locations",
     "type": "multi",
     "group": "Restrooms",
-    "order": 11072,
+    "order": 11074,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2133,7 +2175,7 @@
     "label": "Toilet Description",
     "type": "richtext",
     "group": "Restrooms",
-    "order": 11073,
+    "order": 11075,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2162,7 +2204,7 @@
     "label": "Payphone Locations",
     "type": "multi",
     "group": "Restrooms",
-    "order": 11116,
+    "order": 11118,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2184,7 +2226,7 @@
     "label": "Alcohol Options",
     "type": "multi",
     "group": "Alcohol & Smoking",
-    "order": 12052,
+    "order": 12054,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2213,7 +2255,7 @@
     "label": "Alcohol Policy Details",
     "type": "richtext",
     "group": "Alcohol & Smoking",
-    "order": 12053,
+    "order": 12055,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2242,7 +2284,7 @@
     "label": "Alcohol Available",
     "type": "text",
     "group": "Alcohol & Smoking",
-    "order": 12054,
+    "order": 12056,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2271,7 +2313,7 @@
     "label": "Alcohol Availability",
     "type": "multi",
     "group": "Alcohol & Smoking",
-    "order": 12055,
+    "order": 12057,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2300,7 +2342,7 @@
     "label": "BYOB Allowed",
     "type": "boolean",
     "group": "Alcohol & Smoking",
-    "order": 12056,
+    "order": 12058,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2329,7 +2371,7 @@
     "label": "Alcohol Notes",
     "type": "richtext",
     "group": "Alcohol & Smoking",
-    "order": 12057,
+    "order": 12059,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2358,7 +2400,7 @@
     "label": "Smoking Options",
     "type": "multi",
     "group": "Alcohol & Smoking",
-    "order": 12064,
+    "order": 12066,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2387,7 +2429,7 @@
     "label": "Smoking Details",
     "type": "richtext",
     "group": "Alcohol & Smoking",
-    "order": 12065,
+    "order": 12067,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2416,7 +2458,7 @@
     "label": "Pet Friendly",
     "type": "boolean",
     "group": "Pets",
-    "order": 13026,
+    "order": 13028,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2445,7 +2487,7 @@
     "label": "Pet Options",
     "type": "multi",
     "group": "Pets",
-    "order": 13069,
+    "order": 13071,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2474,7 +2516,7 @@
     "label": "Pet Policy",
     "type": "richtext",
     "group": "Pets",
-    "order": 13070,
+    "order": 13072,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2503,7 +2545,7 @@
     "label": "Playground Available",
     "type": "boolean",
     "group": "Playground",
-    "order": 14108,
+    "order": 14110,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2532,7 +2574,7 @@
     "label": "Playground Types",
     "type": "multi",
     "group": "Playground",
-    "order": 14109,
+    "order": 14111,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2561,7 +2603,7 @@
     "label": "Playground Surface Types",
     "type": "multi",
     "group": "Playground",
-    "order": 14110,
+    "order": 14112,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2590,7 +2632,7 @@
     "label": "Playground Notes",
     "type": "richtext",
     "group": "Playground",
-    "order": 14111,
+    "order": 14113,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2619,7 +2661,7 @@
     "label": "Playground Locations",
     "type": "multi",
     "group": "Playground",
-    "order": 14112,
+    "order": 14114,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2648,7 +2690,7 @@
     "label": "Playground Age Groups",
     "type": "multi",
     "group": "Playground",
-    "order": 14113,
+    "order": 14115,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2677,7 +2719,7 @@
     "label": "Playground ADA Checklist",
     "type": "multi",
     "group": "Playground",
-    "order": 14114,
+    "order": 14116,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2706,7 +2748,7 @@
     "label": "Inclusive Playground",
     "type": "boolean",
     "group": "Playground",
-    "order": 14115,
+    "order": 14117,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -2735,7 +2777,7 @@
     "label": "Drone Usage",
     "type": "text",
     "group": "Outdoor Features",
-    "order": 15067,
+    "order": 15069,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2757,7 +2799,7 @@
     "label": "Drone Policy",
     "type": "richtext",
     "group": "Outdoor Features",
-    "order": 15068,
+    "order": 15070,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2779,7 +2821,7 @@
     "label": "Facilities Options",
     "type": "multi",
     "group": "Outdoor Features",
-    "order": 15118,
+    "order": 15120,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2801,7 +2843,7 @@
     "label": "Night Sky Viewing",
     "type": "richtext",
     "group": "Outdoor Features",
-    "order": 15119,
+    "order": 15121,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2823,7 +2865,7 @@
     "label": "Natural Features",
     "type": "multi",
     "group": "Outdoor Features",
-    "order": 15120,
+    "order": 15122,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2845,7 +2887,7 @@
     "label": "Outdoor Types",
     "type": "multi",
     "group": "Outdoor Features",
-    "order": 15121,
+    "order": 15123,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2867,7 +2909,7 @@
     "label": "Things To Do",
     "type": "multi",
     "group": "Outdoor Features",
-    "order": 15122,
+    "order": 15124,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2889,7 +2931,7 @@
     "label": "Birding Wildlife",
     "type": "richtext",
     "group": "Outdoor Features",
-    "order": 15123,
+    "order": 15125,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2911,7 +2953,7 @@
     "label": "Drone Usage Policy",
     "type": "text",
     "group": "Outdoor Features",
-    "order": 15146,
+    "order": 15148,
     "applies_to": [
       "PARK"
     ],
@@ -2932,7 +2974,7 @@
     "label": "Hunting Fishing Allowed",
     "type": "text",
     "group": "Hunting & Fishing",
-    "order": 16124,
+    "order": 16126,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2954,7 +2996,7 @@
     "label": "Hunting Types",
     "type": "multi",
     "group": "Hunting & Fishing",
-    "order": 16125,
+    "order": 16127,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2976,7 +3018,7 @@
     "label": "Fishing Allowed",
     "type": "text",
     "group": "Hunting & Fishing",
-    "order": 16126,
+    "order": 16128,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -2998,7 +3040,7 @@
     "label": "Fishing Types",
     "type": "multi",
     "group": "Hunting & Fishing",
-    "order": 16127,
+    "order": 16129,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -3020,7 +3062,7 @@
     "label": "Licenses Required",
     "type": "multi",
     "group": "Hunting & Fishing",
-    "order": 16128,
+    "order": 16130,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -3042,7 +3084,7 @@
     "label": "Hunting Fishing Info",
     "type": "richtext",
     "group": "Hunting & Fishing",
-    "order": 16129,
+    "order": 16131,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -3064,7 +3106,7 @@
     "label": "Associated Trails",
     "type": "relation",
     "group": "Trail Details",
-    "order": 17132,
+    "order": 17134,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -3086,7 +3128,7 @@
     "label": "Camping Lodging",
     "type": "richtext",
     "group": "Trail Details",
-    "order": 17133,
+    "order": 17135,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -3108,7 +3150,7 @@
     "label": "Length Text",
     "type": "text",
     "group": "Trail Details",
-    "order": 17148,
+    "order": 17150,
     "applies_to": [
       "TRAIL"
     ],
@@ -3129,7 +3171,7 @@
     "label": "Length Segments",
     "type": "multi",
     "group": "Trail Details",
-    "order": 17149,
+    "order": 17151,
     "applies_to": [
       "TRAIL"
     ],
@@ -3150,7 +3192,7 @@
     "label": "Difficulty",
     "type": "text",
     "group": "Trail Details",
-    "order": 17150,
+    "order": 17152,
     "applies_to": [
       "TRAIL"
     ],
@@ -3171,7 +3213,7 @@
     "label": "Difficulty Description",
     "type": "richtext",
     "group": "Trail Details",
-    "order": 17151,
+    "order": 17153,
     "applies_to": [
       "TRAIL"
     ],
@@ -3192,7 +3234,7 @@
     "label": "Route Type",
     "type": "text",
     "group": "Trail Details",
-    "order": 17152,
+    "order": 17154,
     "applies_to": [
       "TRAIL"
     ],
@@ -3213,7 +3255,7 @@
     "label": "Trail Markings",
     "type": "richtext",
     "group": "Trail Details",
-    "order": 17156,
+    "order": 17158,
     "applies_to": [
       "TRAIL"
     ],
@@ -3234,7 +3276,7 @@
     "label": "Downloadable Trail Map",
     "type": "text",
     "group": "Trail Details",
-    "order": 17158,
+    "order": 17160,
     "applies_to": [
       "TRAIL"
     ],
@@ -3255,7 +3297,7 @@
     "label": "Trail Surfaces",
     "type": "multi",
     "group": "Trail Details",
-    "order": 17159,
+    "order": 17161,
     "applies_to": [
       "TRAIL"
     ],
@@ -3276,7 +3318,7 @@
     "label": "Trail Conditions",
     "type": "multi",
     "group": "Trail Details",
-    "order": 17160,
+    "order": 17162,
     "applies_to": [
       "TRAIL"
     ],
@@ -3297,7 +3339,7 @@
     "label": "Trail Experiences",
     "type": "multi",
     "group": "Trail Details",
-    "order": 17161,
+    "order": 17163,
     "applies_to": [
       "TRAIL"
     ],
@@ -3318,7 +3360,7 @@
     "label": "Mile Markers",
     "type": "boolean",
     "group": "Trail Details",
-    "order": 17162,
+    "order": 17164,
     "applies_to": [
       "TRAIL"
     ],
@@ -3339,7 +3381,7 @@
     "label": "Trailhead Signage",
     "type": "boolean",
     "group": "Trail Details",
-    "order": 17163,
+    "order": 17165,
     "applies_to": [
       "TRAIL"
     ],
@@ -3360,7 +3402,7 @@
     "label": "Audio Guide Available",
     "type": "boolean",
     "group": "Trail Details",
-    "order": 17164,
+    "order": 17166,
     "applies_to": [
       "TRAIL"
     ],
@@ -3381,7 +3423,7 @@
     "label": "QR Trail Guide",
     "type": "boolean",
     "group": "Trail Details",
-    "order": 17165,
+    "order": 17167,
     "applies_to": [
       "TRAIL"
     ],
@@ -3402,7 +3444,7 @@
     "label": "Trail Guide Notes",
     "type": "richtext",
     "group": "Trail Details",
-    "order": 17166,
+    "order": 17168,
     "applies_to": [
       "TRAIL"
     ],
@@ -3423,7 +3465,7 @@
     "label": "Trail Lighting",
     "type": "text",
     "group": "Trail Details",
-    "order": 17167,
+    "order": 17169,
     "applies_to": [
       "TRAIL"
     ],
@@ -3440,11 +3482,32 @@
     "replaced_by": null
   },
   {
+    "key": "length_miles",
+    "label": "Length (miles)",
+    "type": "number",
+    "group": "Trail Details",
+    "order": 17900,
+    "applies_to": [
+      "TRAIL"
+    ],
+    "tier": "any",
+    "audience": "public",
+    "render": "bespoke",
+    "icon": "ruler",
+    "value_source": null,
+    "schema_org": null,
+    "source": "trail.length_miles",
+    "computed": true,
+    "card": false,
+    "deprecated": false,
+    "replaced_by": null
+  },
+  {
     "key": "trailhead_location",
     "label": "Trailhead Location",
     "type": "dict",
     "group": "Trailhead & Access",
-    "order": 18153,
+    "order": 18155,
     "applies_to": [
       "TRAIL"
     ],
@@ -3465,7 +3528,7 @@
     "label": "Trailhead Latitude",
     "type": "number",
     "group": "Trailhead & Access",
-    "order": 18154,
+    "order": 18156,
     "applies_to": [
       "TRAIL"
     ],
@@ -3486,7 +3549,7 @@
     "label": "Trailhead Longitude",
     "type": "number",
     "group": "Trailhead & Access",
-    "order": 18155,
+    "order": 18157,
     "applies_to": [
       "TRAIL"
     ],
@@ -3507,7 +3570,7 @@
     "label": "Trailhead Access Details",
     "type": "richtext",
     "group": "Trailhead & Access",
-    "order": 18157,
+    "order": 18159,
     "applies_to": [
       "TRAIL"
     ],
@@ -3528,7 +3591,7 @@
     "label": "Access Points",
     "type": "multi",
     "group": "Trailhead & Access",
-    "order": 18168,
+    "order": 18170,
     "applies_to": [
       "TRAIL"
     ],
@@ -3549,7 +3612,7 @@
     "label": "Trail Entry Notes",
     "type": "richtext",
     "group": "Trailhead & Access",
-    "order": 18169,
+    "order": 18171,
     "applies_to": [
       "TRAIL"
     ],
@@ -3570,7 +3633,7 @@
     "label": "WiFi Options",
     "type": "multi",
     "group": "Event Details",
-    "order": 19066,
+    "order": 19068,
     "applies_to": [
       "EVENT"
     ],
@@ -3591,7 +3654,7 @@
     "label": "Start Datetime",
     "type": "datetime",
     "group": "Event Details",
-    "order": 19171,
+    "order": 19173,
     "applies_to": [
       "EVENT"
     ],
@@ -3612,7 +3675,7 @@
     "label": "End Datetime",
     "type": "datetime",
     "group": "Event Details",
-    "order": 19172,
+    "order": 19174,
     "applies_to": [
       "EVENT"
     ],
@@ -3633,7 +3696,7 @@
     "label": "Is Repeating",
     "type": "boolean",
     "group": "Event Details",
-    "order": 19173,
+    "order": 19175,
     "applies_to": [
       "EVENT"
     ],
@@ -3654,7 +3717,7 @@
     "label": "Repeat Pattern",
     "type": "dict",
     "group": "Event Details",
-    "order": 19174,
+    "order": 19176,
     "applies_to": [
       "EVENT"
     ],
@@ -3675,7 +3738,7 @@
     "label": "Venue Poi ID",
     "type": "relation",
     "group": "Event Details",
-    "order": 19175,
+    "order": 19177,
     "applies_to": [
       "EVENT"
     ],
@@ -3696,7 +3759,7 @@
     "label": "Venue Inheritance",
     "type": "dict",
     "group": "Event Details",
-    "order": 19176,
+    "order": 19178,
     "applies_to": [
       "EVENT"
     ],
@@ -3717,7 +3780,7 @@
     "label": "Series ID",
     "type": "relation",
     "group": "Event Details",
-    "order": 19177,
+    "order": 19179,
     "applies_to": [
       "EVENT"
     ],
@@ -3738,7 +3801,7 @@
     "label": "Excluded Dates",
     "type": "multi",
     "group": "Event Details",
-    "order": 19179,
+    "order": 19181,
     "applies_to": [
       "EVENT"
     ],
@@ -3759,7 +3822,7 @@
     "label": "Recurrence End Date",
     "type": "datetime",
     "group": "Event Details",
-    "order": 19180,
+    "order": 19182,
     "applies_to": [
       "EVENT"
     ],
@@ -3780,7 +3843,7 @@
     "label": "Manual Dates",
     "type": "multi",
     "group": "Event Details",
-    "order": 19181,
+    "order": 19183,
     "applies_to": [
       "EVENT"
     ],
@@ -3801,7 +3864,7 @@
     "label": "Venue Settings",
     "type": "multi",
     "group": "Event Details",
-    "order": 19183,
+    "order": 19185,
     "applies_to": [
       "EVENT"
     ],
@@ -3822,7 +3885,7 @@
     "label": "Event Entry Notes",
     "type": "richtext",
     "group": "Event Details",
-    "order": 19184,
+    "order": 19186,
     "applies_to": [
       "EVENT"
     ],
@@ -3843,7 +3906,7 @@
     "label": "Food And Drink Info",
     "type": "richtext",
     "group": "Event Details",
-    "order": 19185,
+    "order": 19187,
     "applies_to": [
       "EVENT"
     ],
@@ -3864,7 +3927,7 @@
     "label": "Coat Check Options",
     "type": "multi",
     "group": "Event Details",
-    "order": 19186,
+    "order": 19188,
     "applies_to": [
       "EVENT"
     ],
@@ -3885,7 +3948,7 @@
     "label": "Event Status",
     "type": "text",
     "group": "Event Details",
-    "order": 19194,
+    "order": 19196,
     "applies_to": [
       "EVENT"
     ],
@@ -3906,7 +3969,7 @@
     "label": "Status Explanation",
     "type": "text",
     "group": "Event Details",
-    "order": 19195,
+    "order": 19197,
     "applies_to": [
       "EVENT"
     ],
@@ -3927,7 +3990,7 @@
     "label": "Cancellation Paragraph",
     "type": "richtext",
     "group": "Event Details",
-    "order": 19196,
+    "order": 19198,
     "applies_to": [
       "EVENT"
     ],
@@ -3948,7 +4011,7 @@
     "label": "Contact Organizer Toggle",
     "type": "boolean",
     "group": "Event Details",
-    "order": 19197,
+    "order": 19199,
     "applies_to": [
       "EVENT"
     ],
@@ -3969,7 +4032,7 @@
     "label": "New Event Link",
     "type": "url",
     "group": "Event Details",
-    "order": 19198,
+    "order": 19200,
     "applies_to": [
       "EVENT"
     ],
@@ -3990,7 +4053,7 @@
     "label": "Ticket Links",
     "type": "multi",
     "group": "Event Details",
-    "order": 19206,
+    "order": 19208,
     "applies_to": [
       "EVENT"
     ],
@@ -4011,7 +4074,7 @@
     "label": "Sponsors",
     "type": "multi",
     "group": "Event Details",
-    "order": 19207,
+    "order": 19209,
     "applies_to": [
       "EVENT"
     ],
@@ -4032,7 +4095,7 @@
     "label": "Has Vendors",
     "type": "boolean",
     "group": "Event Vendors",
-    "order": 20187,
+    "order": 20189,
     "applies_to": [
       "EVENT"
     ],
@@ -4053,7 +4116,7 @@
     "label": "Vendor Types",
     "type": "multi",
     "group": "Event Vendors",
-    "order": 20188,
+    "order": 20190,
     "applies_to": [
       "EVENT"
     ],
@@ -4074,7 +4137,7 @@
     "label": "Vendor Application Deadline",
     "type": "datetime",
     "group": "Event Vendors",
-    "order": 20189,
+    "order": 20191,
     "applies_to": [
       "EVENT"
     ],
@@ -4095,7 +4158,7 @@
     "label": "Vendor Application Info",
     "type": "richtext",
     "group": "Event Vendors",
-    "order": 20190,
+    "order": 20192,
     "applies_to": [
       "EVENT"
     ],
@@ -4116,7 +4179,7 @@
     "label": "Vendor Fee",
     "type": "text",
     "group": "Event Vendors",
-    "order": 20191,
+    "order": 20193,
     "applies_to": [
       "EVENT"
     ],
@@ -4137,7 +4200,7 @@
     "label": "Vendor Requirements",
     "type": "richtext",
     "group": "Event Vendors",
-    "order": 20192,
+    "order": 20194,
     "applies_to": [
       "EVENT"
     ],
@@ -4158,7 +4221,7 @@
     "label": "Vendor Poi Links",
     "type": "relation",
     "group": "Event Vendors",
-    "order": 20193,
+    "order": 20195,
     "applies_to": [
       "EVENT"
     ],
@@ -4179,7 +4242,7 @@
     "label": "Organizer Name",
     "type": "text",
     "group": "Event Organizer",
-    "order": 21182,
+    "order": 21184,
     "applies_to": [
       "EVENT"
     ],
@@ -4200,7 +4263,7 @@
     "label": "Organizer Email",
     "type": "email",
     "group": "Event Organizer",
-    "order": 21200,
+    "order": 21202,
     "applies_to": [
       "EVENT"
     ],
@@ -4221,7 +4284,7 @@
     "label": "Organizer Phone",
     "type": "phone",
     "group": "Event Organizer",
-    "order": 21201,
+    "order": 21203,
     "applies_to": [
       "EVENT"
     ],
@@ -4242,7 +4305,7 @@
     "label": "Organizer Website",
     "type": "text",
     "group": "Event Organizer",
-    "order": 21202,
+    "order": 21204,
     "applies_to": [
       "EVENT"
     ],
@@ -4263,7 +4326,7 @@
     "label": "Organizer Social Media",
     "type": "dict",
     "group": "Event Organizer",
-    "order": 21203,
+    "order": 21205,
     "applies_to": [
       "EVENT"
     ],
@@ -4284,7 +4347,7 @@
     "label": "Organizer Poi ID",
     "type": "relation",
     "group": "Event Organizer",
-    "order": 21204,
+    "order": 21206,
     "applies_to": [
       "EVENT"
     ],
@@ -4305,7 +4368,7 @@
     "label": "Available For Rent",
     "type": "boolean",
     "group": "Rentals",
-    "order": 22074,
+    "order": 22076,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -4334,7 +4397,7 @@
     "label": "Rental Info",
     "type": "richtext",
     "group": "Rentals",
-    "order": 22075,
+    "order": 22077,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -4363,7 +4426,7 @@
     "label": "Rental Pricing",
     "type": "richtext",
     "group": "Rentals",
-    "order": 22076,
+    "order": 22078,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -4392,7 +4455,7 @@
     "label": "Rental Link",
     "type": "url",
     "group": "Rentals",
-    "order": 22077,
+    "order": 22079,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -4421,7 +4484,7 @@
     "label": "Membership Passes",
     "type": "relation",
     "group": "Memberships",
-    "order": 23130,
+    "order": 23132,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -4443,7 +4506,7 @@
     "label": "Membership Details",
     "type": "richtext",
     "group": "Memberships",
-    "order": 23131,
+    "order": 23133,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -4465,7 +4528,7 @@
     "label": "Service Locations",
     "type": "relation",
     "group": "Community",
-    "order": 24103,
+    "order": 24105,
     "applies_to": [
       "BUSINESS"
     ],
@@ -4486,7 +4549,7 @@
     "label": "Locally Found At",
     "type": "relation",
     "group": "Community",
-    "order": 24104,
+    "order": 24106,
     "applies_to": [
       "BUSINESS"
     ],
@@ -4507,7 +4570,7 @@
     "label": "Article Links",
     "type": "multi",
     "group": "Community",
-    "order": 24105,
+    "order": 24107,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -4536,7 +4599,7 @@
     "label": "Community Impact",
     "type": "richtext",
     "group": "Community",
-    "order": 24106,
+    "order": 24108,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -4565,7 +4628,7 @@
     "label": "Organization Memberships",
     "type": "relation",
     "group": "Community",
-    "order": 24107,
+    "order": 24109,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -4594,7 +4657,7 @@
     "label": "Price Range",
     "type": "text",
     "group": "Community",
-    "order": 24144,
+    "order": 24146,
     "applies_to": [
       "BUSINESS"
     ],
@@ -4946,7 +5009,7 @@
     "label": "Downloadable Maps",
     "type": "multi",
     "group": "Images & Media",
-    "order": 25050,
+    "order": 25052,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -4975,7 +5038,7 @@
     "label": "Featured Image",
     "type": "image",
     "group": "Images & Media",
-    "order": 25079,
+    "order": 25081,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5004,7 +5067,7 @@
     "label": "Gallery Photos",
     "type": "multi",
     "group": "Images & Media",
-    "order": 25099,
+    "order": 25101,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5033,7 +5096,7 @@
     "label": "Business Entry Notes",
     "type": "richtext",
     "group": "Images & Media",
-    "order": 25100,
+    "order": 25102,
     "applies_to": [
       "BUSINESS"
     ],
@@ -5054,7 +5117,7 @@
     "label": "Park Entry Notes",
     "type": "richtext",
     "group": "Images & Media",
-    "order": 25117,
+    "order": 25119,
     "applies_to": [
       "PARK",
       "TRAIL"
@@ -5076,7 +5139,7 @@
     "label": "Photos",
     "type": "dict",
     "group": "Images & Media",
-    "order": 25134,
+    "order": 25136,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5105,7 +5168,7 @@
     "label": "Compliance",
     "type": "dict",
     "group": "Disaster Response",
-    "order": 26139,
+    "order": 26141,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5134,7 +5197,7 @@
     "label": "Admin Notes",
     "type": "richtext",
     "group": "Admin Only",
-    "order": 27043,
+    "order": 27045,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5163,7 +5226,7 @@
     "label": "Main Contact Name",
     "type": "text",
     "group": "Admin Only",
-    "order": 27080,
+    "order": 27082,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5192,7 +5255,7 @@
     "label": "Main Contact Email",
     "type": "email",
     "group": "Admin Only",
-    "order": 27081,
+    "order": 27083,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5221,7 +5284,7 @@
     "label": "Main Contact Phone",
     "type": "phone",
     "group": "Admin Only",
-    "order": 27082,
+    "order": 27084,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5250,7 +5313,7 @@
     "label": "Offsite Emergency Contact",
     "type": "richtext",
     "group": "Admin Only",
-    "order": 27083,
+    "order": 27085,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5279,7 +5342,7 @@
     "label": "Emergency Protocols",
     "type": "richtext",
     "group": "Admin Only",
-    "order": 27084,
+    "order": 27086,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5308,7 +5371,7 @@
     "label": "Custom Fields",
     "type": "dict",
     "group": "Metadata",
-    "order": 28140,
+    "order": 28142,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5337,7 +5400,7 @@
     "label": "Created At",
     "type": "datetime",
     "group": "Metadata",
-    "order": 28141,
+    "order": 28143,
     "applies_to": [
       "BUSINESS",
       "SERVICES",
@@ -5366,7 +5429,7 @@
     "label": "Last Updated",
     "type": "datetime",
     "group": "Metadata",
-    "order": 28142,
+    "order": 28144,
     "applies_to": [
       "BUSINESS",
       "SERVICES",

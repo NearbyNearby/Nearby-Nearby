@@ -97,6 +97,14 @@ class PointOfInterest(Base):
 
     # Location (PostGIS)
     location = Column(Geometry(geometry_type='POINT', srid=4326), nullable=False)
+    # Task 2.4: real geometries for GIS. Nullable line/area geometries alongside
+    # the required POINT — trails may carry a LineString, parks a Polygon. Both
+    # are GIST-indexed (geoalchemy2 spatial_index default) and populated by import
+    # scripts / the future admin draw UI (Task 4.3). They are NEVER serialized as
+    # raw geometry to a public endpoint (registry audience=admin); the only public
+    # derivation is a trail's ST_Length-based length_miles (see shared/poi_geometry.py).
+    geom_line = Column(Geometry(geometry_type='LINESTRING', srid=4326), nullable=True)
+    geom_area = Column(Geometry(geometry_type='POLYGON', srid=4326), nullable=True)
 
     # Status and verification
     status = Column(String(50), default='Fully Open')

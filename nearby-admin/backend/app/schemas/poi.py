@@ -72,6 +72,39 @@ class PointGeometry(BaseModel):
             return {"type": "Point", "coordinates": list(point.coords)[0]}
         return v
 
+
+# Task 2.4: LineString / Polygon GeoJSON structures for the geom_line / geom_area
+# columns. Response-side only (create/update accept a loose GeoJSON dict validated
+# in the CRUD so invalid geometry -> 400). ``parse_wkb`` converts a stored
+# geoalchemy2 WKBElement to a GeoJSON dict so the value serializes JSON-safely —
+# and therefore appears JSON-safely in poi_revisions snapshots — exactly like
+# PointGeometry does for ``location``.
+class LineStringGeometry(BaseModel):
+    type: str = "LineString"
+    coordinates: List[List[float]]
+
+    @model_validator(mode='before')
+    @classmethod
+    def parse_wkb(cls, v):
+        if isinstance(v, WKBElement):
+            from shared.poi_geometry import wkb_to_geojson
+            return wkb_to_geojson(v) or v
+        return v
+
+
+class PolygonGeometry(BaseModel):
+    type: str = "Polygon"
+    coordinates: List[List[List[float]]]
+
+    @model_validator(mode='before')
+    @classmethod
+    def parse_wkb(cls, v):
+        if isinstance(v, WKBElement):
+            from shared.poi_geometry import wkb_to_geojson
+            return wkb_to_geojson(v) or v
+        return v
+
+
 # Business Schemas
 PRICE_RANGES = Literal['$', '$$', '$$$', '$$$$']
 
@@ -576,6 +609,12 @@ class PointOfInterestBase(EmptyStringToNoneMixin, BaseModel):
 
 class PointOfInterestCreate(PointOfInterestBase):
     location: PointGeometry
+    # Task 2.4: optional GeoJSON line/area geometries. Accepted as a loose dict so
+    # a malformed geometry is caught in the CRUD (via geojson_to_wkt) and returned
+    # as HTTP 400, not a Pydantic 422; a valid dict is validated + converted to WKT
+    # there. Not autosave — only the explicit create/update paths carry these.
+    geom_line: Optional[Dict[str, Any]] = None
+    geom_area: Optional[Dict[str, Any]] = None
     business: Optional[BusinessCreate] = None
     park: Optional[ParkCreate] = None
     trail: Optional[TrailCreate] = None
@@ -787,6 +826,10 @@ class PointOfInterestUpdate(EmptyStringToNoneMixin, BaseModel):
     alcohol_available: Optional[ALCOHOL_AVAILABLE] = None
 
     location: Optional[PointGeometry] = None
+    # Task 2.4: loose GeoJSON (validated -> 400 in the CRUD, like create). Partial-
+    # update safe — absent means "leave untouched", explicit null means "clear".
+    geom_line: Optional[Dict[str, Any]] = None
+    geom_area: Optional[Dict[str, Any]] = None
     business: Optional[BusinessCreate] = None
     park: Optional[ParkCreate] = None
     trail: Optional[TrailCreate] = None
@@ -800,6 +843,10 @@ class PointOfInterest(PointOfInterestBase):
     poi_type: str = Field(..., alias='poi_type')
     id: uuid.UUID
     location: PointGeometry
+    # Task 2.4: serialized as GeoJSON (None when unset) so they round-trip on the
+    # admin GET/POST/PUT responses and appear JSON-safely in poi_revisions snapshots.
+    geom_line: Optional[LineStringGeometry] = None
+    geom_area: Optional[PolygonGeometry] = None
     business: Optional[Business] = None
     park: Optional[Park] = None
     trail: Optional[Trail] = None

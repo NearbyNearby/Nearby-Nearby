@@ -242,7 +242,7 @@ _GROUPS_RAW = {
         "dont_display_location", "address_full", "address_street",
         "address_city", "address_state", "address_zip", "address_county",
         "front_door_latitude", "front_door_longitude", "arrival_methods",
-        "what3words_address", "location",
+        "what3words_address", "location", "geom_line", "geom_area",
     ],
     "Contact": [
         "website_url", "phone_number", "email", "instagram_username",
@@ -398,6 +398,11 @@ def applies_to_for(table_key: str, name: str) -> list[str]:
         return list(OUTDOOR)
     if name == "wifi_options":  # Events only per model comment
         return ["EVENT"]
+    # Task 2.4: trails carry lines, parks carry areas.
+    if name == "geom_line":
+        return ["TRAIL"]
+    if name == "geom_area":
+        return ["PARK"]
     return list(ALL_TYPES)
 
 
@@ -482,6 +487,12 @@ ADMIN_FIELDS = {
     # Both must never reach the public API (the registry-driven serializer emits
     # every audience==public field regardless of render).
     "contact_info", "compliance",
+    # Task 2.4: raw line/area geometries. Kept admin-audience so no public endpoint
+    # dumps a WKB/GeoJSON geometry blob — the public app has no line/polygon
+    # renderer yet (the draw UI + public map rendering is Task 4.3). The only
+    # public geometry derivation is the trail's computed length_miles. Flip to
+    # audience=public with a structural GeoJSON handler when Task 4.3 lands.
+    "geom_line", "geom_area",
 }
 # (2) computed icon booleans (server-derived from underlying data) + the two
 #     accessibility roll-ups. These stay audience=public but are computed.
@@ -565,6 +576,7 @@ LABEL_OVERRIDES = {
     "poi_type": "POI Type",
     "slug": "URL Slug",
     "wifi_options": "WiFi Options",
+    "length_miles": "Length (miles)",
 }
 # (8) bespoke renderers (fields too complex for the auto serializer/UI).
 BESPOKE_FIELDS = {
@@ -827,6 +839,58 @@ def build_image_entry(key: str, label: str, image_type: str,
 
 
 # --------------------------------------------------------------------------- #
+# Synthetic (non-column) fields
+# --------------------------------------------------------------------------- #
+# Fields with NO backing ORM column, so they are injected rather than reflected.
+# Task 2.4: ``length_miles`` is DERIVED from geom_line via ST_Length(geography)
+# and attached to the trail object by shared.poi_geometry.enrich_trail_length.
+# Sourced from the trail subtype so the serializer/contract surface it under the
+# nested ``trail`` object (like length_text), NOT as a flat top-level key.
+SYNTHETIC_FIELDS = [
+    {
+        "key": "length_miles",
+        "type": "number",
+        "group": "Trail Details",
+        "applies_to": ["TRAIL"],
+        "tier": "any",
+        "audience": "public",
+        "render": "bespoke",
+        "icon": "ruler",
+        "value_source": None,
+        "schema_org": None,
+        "source": "trail.length_miles",
+        "computed": True,
+        "card": False,
+    },
+]
+
+
+def build_synthetic_entry(spec: dict, order_base: int) -> dict:
+    group = spec["group"]
+    return {
+        "key": spec["key"],
+        "label": humanize(spec["key"]),
+        "type": spec["type"],
+        "group": group,
+        # Sort AFTER every reflected field in the group (real decl indices are the
+        # global column index, < ~300); 900+ keeps synthetics last, deterministically.
+        "order": GROUP_ORDER[group] * 100 + 900 + order_base,
+        "applies_to": list(spec["applies_to"]),
+        "tier": spec["tier"],
+        "audience": spec["audience"],
+        "render": spec["render"],
+        "icon": spec["icon"],
+        "value_source": spec["value_source"],
+        "schema_org": spec["schema_org"],
+        "source": spec["source"],
+        "computed": spec["computed"],
+        "card": spec["card"],
+        "deprecated": False,
+        "replaced_by": None,
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Assemble registry
 # --------------------------------------------------------------------------- #
 def build_registry() -> list[dict]:
@@ -854,6 +918,13 @@ def build_registry() -> list[dict]:
             continue
         seen.add(key)
         entries.append(build_image_entry(key, label, image_type, applies, i))
+
+    # Append synthetic (non-column) fields (Task 2.4: length_miles).
+    for i, spec in enumerate(SYNTHETIC_FIELDS):
+        if spec["key"] in seen:
+            continue
+        seen.add(spec["key"])
+        entries.append(build_synthetic_entry(spec, i))
 
     # Deterministic ordering: by (order, key).
     entries.sort(key=lambda e: (e["order"], e["key"]))

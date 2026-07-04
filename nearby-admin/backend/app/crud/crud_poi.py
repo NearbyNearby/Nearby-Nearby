@@ -12,7 +12,40 @@ from app.utils.html_sanitizer import sanitize_poi_fields
 from app.utils.poi_revision import record_poi_revision
 from geoalchemy2.types import Geography
 from shared.constants.field_options import EVENT_STATUS_EXPLANATION_REQUIRED
+from shared.poi_geometry import geojson_to_wkt
 from shared.utils.event_status import validate_status_transition
+
+
+# Sentinel distinguishing "key absent from the update payload" (leave the column
+# untouched) from "key present with value null" (clear the column). Task 2.4.
+_UNSET = object()
+
+
+def _set_optional_geometries(db_obj, *, geom_line=None, geom_area=None,
+                             set_line=True, set_area=True):
+    """Validate + assign the Task 2.4 geom_line / geom_area columns.
+
+    Each geometry is a GeoJSON dict, None (clear the column), or is skipped
+    entirely when ``set_*`` is False (the field was absent from an update). A
+    valid dict becomes plain WKT (the column typmod tags SRID 4326, exactly like
+    ``location``); an invalid geometry raises HTTP 400.
+    """
+    if set_line:
+        if geom_line is None:
+            db_obj.geom_line = None
+        else:
+            try:
+                db_obj.geom_line = geojson_to_wkt(geom_line, "LineString")
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid geom_line: {exc}")
+    if set_area:
+        if geom_area is None:
+            db_obj.geom_area = None
+        else:
+            try:
+                db_obj.geom_area = geojson_to_wkt(geom_area, "Polygon")
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid geom_area: {exc}")
 
 
 def compute_icon_booleans(poi: dict) -> dict:
@@ -346,7 +379,7 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
     from shared.poi_media import LEGACY_PHOTO_FIELDS
     from shared.poi_contact_payments import LEGACY_CONTACT_FIELD
     one_rep_stripped = set(LEGACY_PHOTO_FIELDS) | {LEGACY_CONTACT_FIELD}
-    poi_data = poi.model_dump(exclude={'location', 'business', 'park', 'trail', 'event', 'category_ids', 'main_category_id'} | deprecated_photo_fields | one_rep_stripped)
+    poi_data = poi.model_dump(exclude={'location', 'geom_line', 'geom_area', 'business', 'park', 'trail', 'event', 'category_ids', 'main_category_id'} | deprecated_photo_fields | one_rep_stripped)
 
     # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, NOT as
     # JSONB. Pull the top-level link fields out of poi_data so they are never
@@ -385,6 +418,10 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
 
     # Set the location geometry
     db_poi.location = f'POINT({poi.location.coordinates[0]} {poi.location.coordinates[1]})'
+
+    # Task 2.4: optional line/area geometries. Validate the GeoJSON -> WKT (the
+    # column typmod tags SRID 4326, exactly like location above); invalid -> 400.
+    _set_optional_geometries(db_poi, geom_line=poi.geom_line, geom_area=poi.geom_area)
 
     # First save the POI to get an ID
     try:
@@ -585,7 +622,21 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
         else:
             coords = location_data.coordinates
         db_obj.location = f'POINT({coords[0]} {coords[1]})'
-    
+
+    # Task 2.4: line/area geometry update (partial-update safe). A key present in
+    # update_data means the client sent it: a GeoJSON dict is validated -> WKT
+    # (invalid -> 400), an explicit null clears the column. A key absent is left
+    # untouched. Pop so it is never setattr'd onto the column as a raw dict below.
+    _geom_line = update_data.pop('geom_line', _UNSET)
+    _geom_area = update_data.pop('geom_area', _UNSET)
+    _set_optional_geometries(
+        db_obj,
+        geom_line=_geom_line if _geom_line is not _UNSET else None,
+        geom_area=_geom_area if _geom_area is not _UNSET else None,
+        set_line=_geom_line is not _UNSET,
+        set_area=_geom_area is not _UNSET,
+    )
+
     # Handle subtype updates
     # Note: db_obj.poi_type may be a POIType enum or a string depending on context
     poi_type_str = db_obj.poi_type.value if hasattr(db_obj.poi_type, 'value') else str(db_obj.poi_type)

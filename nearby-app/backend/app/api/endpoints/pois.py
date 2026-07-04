@@ -389,6 +389,13 @@ def _serialize_detail_response(db: Session, db_poi, images: list):
     from shared.poi_media import enrich_poi_media_fields
     enrich_poi_media_fields(db, db_poi, images=images)
 
+    # Task 2.4: derive the trail's length_miles from geom_line (ST_Length over
+    # geography) and attach it to the nested trail object. length_text stays the
+    # display fallback when no line exists (length_miles is then None). One indexed
+    # single-row query; detail path only (no N+1 on list/card responses).
+    from shared.poi_geometry import enrich_trail_length
+    enrich_trail_length(db, db_poi)
+
     if POI_SERIALIZER == "legacy":
         legacy_dict = _build_legacy_detail_dict(db, db_poi, images)
         return schemas.poi.POIDetail.model_validate(legacy_dict)
