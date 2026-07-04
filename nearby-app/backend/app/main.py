@@ -370,6 +370,10 @@ async def serve_spa(full_path: str):
         try:
             poi = get_poi_from_path(full_path, db)
             if poi:
+                # Task 2.5: the OG image reads poi.featured_image, now derived from
+                # the images table (the retained column is no longer written).
+                from shared.poi_media import enrich_poi_media_fields
+                enrich_poi_media_fields(db, poi)
                 # Read HTML and inject dynamic meta tags
                 with open(index_file, 'r') as f:
                     html = f.read()

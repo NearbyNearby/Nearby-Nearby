@@ -37,13 +37,15 @@ def _enrich_link_fields(db: Session, poi):
 
 
 def _enrich_response_fields(db: Session, poi):
-    """Enrich an admin POI response: Task 2.1 link fields (from edges) plus
-    Task 2.3 point fields (from poi_points, via set_committed_value so the
-    instance is never dirtied)."""
+    """Enrich an admin POI response: Task 2.1 link fields (from edges), Task 2.3
+    point fields (from poi_points), and Task 2.5 media fields (featured_image /
+    photos / gallery_photos derived from the images table) — all via
+    set_committed_value so the instance is never dirtied."""
     if poi is None:
         return poi
     from shared.poi_points import enrich_poi_point_fields
-    return enrich_poi_point_fields(db, _enrich_link_fields(db, poi))
+    from shared.poi_media import enrich_poi_media_fields
+    return enrich_poi_media_fields(db, enrich_poi_point_fields(db, _enrich_link_fields(db, poi)))
 
 
 @router.post("/pois/", response_model=schemas.PointOfInterest, status_code=201)
@@ -227,6 +229,15 @@ def autosave_poi(
     # from the merged snapshot is safe); sync them as rows before commit.
     from shared.poi_points import POINT_FIELDS as _POINT_FIELDS, sync_point_rows as _sync_point_rows
     _point_values = {k: filtered.pop(k) for k in list(filtered) if k in _POINT_FIELDS}
+
+    # Task 2.5: stop writing the legacy photo columns (images table wins) and
+    # contact_info (main_contact_* columns win). Drop them from the autosave
+    # payload so they are never setattr'd onto their retained legacy columns.
+    # (amenities.payment_methods is stripped by apply_phase1_computed below.)
+    from shared.poi_media import LEGACY_PHOTO_FIELDS as _LEGACY_PHOTO_FIELDS
+    from shared.poi_contact_payments import LEGACY_CONTACT_FIELD as _LEGACY_CONTACT_FIELD
+    for _k in (*_LEGACY_PHOTO_FIELDS, _LEGACY_CONTACT_FIELD):
+        filtered.pop(_k, None)
 
     # Build a merged snapshot so the computed helper can read current values.
     merged: Dict[str, Any] = {c.name: getattr(poi, c.name) for c in poi.__table__.columns}

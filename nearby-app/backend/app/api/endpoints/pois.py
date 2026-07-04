@@ -379,6 +379,16 @@ def _serialize_detail_response(db: Session, db_poi, images: list):
     from shared.poi_points import enrich_poi_point_fields
     enrich_poi_point_fields(db, db_poi)
 
+    # Task 2.5: featured_image / photos / gallery_photos are derived from the
+    # images table (the single source of truth); the retained legacy columns are
+    # no longer written. Reconstruct all three onto the ORM instance from the
+    # already-loaded ``images`` list (via set_committed_value — never dirties the
+    # session) so the registry flat fields and the legacy/shadow reads reflect
+    # images, not the stale columns. The frontend hero chain already prefers the
+    # images collection; this keeps featured_image (OG/SEO + cards) correct too.
+    from shared.poi_media import enrich_poi_media_fields
+    enrich_poi_media_fields(db, db_poi, images=images)
+
     if POI_SERIALIZER == "legacy":
         legacy_dict = _build_legacy_detail_dict(db, db_poi, images)
         return schemas.poi.POIDetail.model_validate(legacy_dict)
@@ -501,6 +511,12 @@ def api_get_nearby_pois(
             filtered_pairs.append((poi, distance))
     filtered_pairs = filtered_pairs[:8]
 
+    # Task 2.5: the card hero (featured_image) is derived from the images table
+    # (single source of truth) in ONE batched query rather than the retained,
+    # no-longer-written column. Attach it before serializing the cards.
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, [p for p, _ in filtered_pairs])
+
     # Format results with distance. Card body is built by the registry-driven
     # serialize_poi_card (public-only); the per-query distance is attached on top.
     results = []
@@ -559,6 +575,11 @@ def api_get_nearby_pois_by_id(
         facets=facet, payment=payment,
     )
     nearby_pois = _exclude_past_and_cancelled_events(nearby_pois, include_past=include_past_events)
+
+    # Task 2.5: attach the card hero (featured_image) from the images table in one
+    # batched query (the retained column is no longer written).
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, list(nearby_pois))
 
     # Convert location data for each POI. Card body is built by the registry-driven
     # serialize_poi_card (public-only); the per-query distance and the {id,name,slug}
@@ -839,6 +860,9 @@ def get_event_vendors(
         models.poi.PointOfInterest.id.in_(target_ids),
         models.poi.PointOfInterest.publication_status == "published",
     ).all()
+    # Task 2.5: vendor thumbnails read featured_image, now derived from images.
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, vendor_pois)
     vendor_map = {vp.id: vp for vp in vendor_pois}
 
     results = []
@@ -899,6 +923,9 @@ def get_event_sponsors(
             models.poi.PointOfInterest.id.in_(linked_ids),
             models.poi.PointOfInterest.publication_status == "published",
         ).all()
+        # Task 2.5: sponsor thumbnails read featured_image, now derived from images.
+        from shared.poi_media import attach_hero_images
+        attach_hero_images(db, sponsor_pois)
         sponsor_map = {str(sp.id): sp for sp in sponsor_pois}
 
     results = []

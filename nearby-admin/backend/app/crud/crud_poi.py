@@ -163,6 +163,10 @@ def apply_phase1_computed(poi: dict) -> dict:
     compute_inclusive_playground(poi)
     compute_icon_booleans(poi)
     apply_sponsor_rule(poi)
+    # Task 2.5: payment_methods column wins — never persist a duplicate copy under
+    # amenities.payment_methods (runs in create/update/autosave via this helper).
+    from shared.poi_contact_payments import strip_amenities_payment_methods
+    strip_amenities_payment_methods(poi)
     return poi
 
 
@@ -335,7 +339,14 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
         'parking_lot_photo', 'parking_photos', 'rental_photos',
         'playground_photos', 'trailhead_photo', 'trail_exit_photo'
     }
-    poi_data = poi.model_dump(exclude={'location', 'business', 'park', 'trail', 'event', 'category_ids', 'main_category_id'} | deprecated_photo_fields)
+    # Task 2.5: one representation per concept — the write path stops writing the
+    # legacy photo columns (images table wins) and contact_info (main_contact_*
+    # columns win). Dropping them here means they are never persisted from the
+    # payload; reads derive featured_image/photos/gallery_photos from images.
+    from shared.poi_media import LEGACY_PHOTO_FIELDS
+    from shared.poi_contact_payments import LEGACY_CONTACT_FIELD
+    one_rep_stripped = set(LEGACY_PHOTO_FIELDS) | {LEGACY_CONTACT_FIELD}
+    poi_data = poi.model_dump(exclude={'location', 'business', 'park', 'trail', 'event', 'category_ids', 'main_category_id'} | deprecated_photo_fields | one_rep_stripped)
 
     # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, NOT as
     # JSONB. Pull the top-level link fields out of poi_data so they are never
@@ -531,6 +542,15 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
         'playground_photos', 'trailhead_photo', 'trail_exit_photo'
     ]
     for field in deprecated_photo_fields:
+        update_data.pop(field, None)
+
+    # Task 2.5: stop writing the legacy photo columns (images table wins) and
+    # contact_info (main_contact_* columns win). Popping them here (partial-update
+    # safe) means a field absent from the request is left untouched, and a field
+    # present is dropped rather than persisted to its retained legacy column.
+    from shared.poi_media import LEGACY_PHOTO_FIELDS
+    from shared.poi_contact_payments import LEGACY_CONTACT_FIELD
+    for field in (*LEGACY_PHOTO_FIELDS, LEGACY_CONTACT_FIELD):
         update_data.pop(field, None)
 
     # Sanitize HTML content in the update data

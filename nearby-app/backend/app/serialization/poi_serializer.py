@@ -357,9 +357,12 @@ _CARD_SCHEMA_KEYS = frozenset(
 # guard allows exactly these to be absent from ``_CARD_SCHEMA_KEYS``.
 DOCUMENTED_CARD_EXCLUSIONS = frozenset(
     {
-        # ``images:main`` would require eager-loading the images relation per
-        # nearby result; the card renders no <img> and uses the flat
-        # ``featured_image`` URL already carried on the poi row for any hero.
+        # ``main_image`` (the images:main image[] collection) is not a card key.
+        # Task 2.5 made the images table the single source of truth for photos, so
+        # the card hero now comes from ``featured_image`` DERIVED from the main
+        # image via ``shared.poi_media.attach_hero_images`` — one batched query per
+        # nearby/card response (no per-result eager-load of the images relation).
+        # The card still renders a single hero URL, not the image[] collection.
         "main_image",
     }
 )
