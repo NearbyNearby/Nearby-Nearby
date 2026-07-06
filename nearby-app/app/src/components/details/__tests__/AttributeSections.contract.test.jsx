@@ -157,11 +157,10 @@ describe('AttributeSections contract — value rendering', () => {
       email: 'hello@example.com',                   // email -> EmailRow
       payment_methods: ['Cash', 'Credit Cards'],    // multi -> ChipList
       cell_service: 'Good',                         // enum -> EnumPill
-      icon_free_wifi: true,                          // boolean true -> pill
-      icon_pet_friendly: false,                      // boolean false -> skipped
+      byob_allowed: true,                            // boolean true -> pill
+      available_for_rent: false,                     // boolean false -> skipped
       pricing_details: '',                           // richtext empty -> skipped
-      arrival_methods: [],                           // multi empty -> skipped
-      other_socials: {},                             // dict empty -> skipped
+      gift_cards: [],                                // multi empty -> skipped
     };
     renderSections(poi);
 
@@ -171,10 +170,10 @@ describe('AttributeSections contract — value rendering', () => {
     expect(screen.getByText('Credit Cards')).toBeInTheDocument();
     expect(screen.getByText('Good')).toBeInTheDocument();
 
-    // Boolean true renders a positive pill (icon_free_wifi label)
-    const wifiEntry = allEntries().find((e) => e.key === 'icon_free_wifi');
-    const wifiLabel = wifiEntry.label || 'Icon Free Wifi';
-    expect(screen.getByText(wifiLabel)).toBeInTheDocument();
+    // Boolean true renders a positive pill (byob_allowed label)
+    const byobEntry = allEntries().find((e) => e.key === 'byob_allowed');
+    const byobLabel = byobEntry.label || 'Byob Allowed';
+    expect(screen.getByText(byobLabel)).toBeInTheDocument();
   });
 
   it('renders nothing when poi has no non-empty auto fields', () => {

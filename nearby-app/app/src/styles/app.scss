@@ -12930,6 +12930,13 @@ input, button, textarea, select {
   color: $blue2;
 }
 
+.poi_status_message {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  color: $nn_slate;
+}
+
 .poi_page_title {
   font-size: 30px;
   padding-bottom: 10px;

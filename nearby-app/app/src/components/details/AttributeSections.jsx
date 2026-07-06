@@ -54,8 +54,12 @@ function renderField(entry, poi) {
  *   renders in a hand-built ("bespoke-style") section, so AttributeSections must
  *   NOT render them again. The registry still drives everything else; this is the
  *   per-page "already covered" allowlist that prevents double-rendering.
+ * @param {boolean}  [props.bare] render only the AccSection list (no
+ *   poi_accordion_box wrapper, all sections closed) so the sections can live
+ *   INSIDE a detail page's existing accordion parent — one curated stack per
+ *   page (Barry's single-poi layout), not a second stack below it.
  */
-export default function AttributeSections({ poi, excludeKeys = [] }) {
+export default function AttributeSections({ poi, excludeKeys = [], bare = false }) {
   if (!poi || !poi.poi_type) return null;
 
   const exclude = new Set(excludeKeys);
@@ -74,18 +78,22 @@ export default function AttributeSections({ poi, excludeKeys = [] }) {
 
   if (renderedSections.length === 0) return null;
 
+  const sections = renderedSections.map(({ group, nodes }, idx) => (
+    <AccSection
+      key={group}
+      id={`attr_${group.replace(/\s+/g, '_').toLowerCase()}`}
+      title={group}
+      defaultOpen={!bare && idx === 0}
+      col1={nodes}
+    />
+  ));
+
+  if (bare) return <>{sections}</>;
+
   return (
     <div id="attribute_sections_box" className="poi_accordion_box">
       <div className="poi_accordion_parent accordionjs">
-        {renderedSections.map(({ group, nodes }, idx) => (
-          <AccSection
-            key={group}
-            id={`attr_${group.replace(/\s+/g, '_').toLowerCase()}`}
-            title={group}
-            defaultOpen={idx === 0}
-            col1={nodes}
-          />
-        ))}
+        {sections}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { MapPin, Navigation, Copy, Check, ExternalLink } from 'lucide-react';
 
 import {
   AccSection, ContentGroup, ChipList, QuickInfoRow, InfoPair,
-  POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox,
+  POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox, SocialLinksGroup, hasSocialLinks,
   hasVal, asArray, copyToClipboard, getCoordinates, getImages,
   isYes,
 } from './shared';
@@ -33,6 +33,11 @@ function buildSections(poi, helpers) {
     const outdoorOne = asArray(poi.outdoor_types).slice(0, 1);
 
     const col1 = [
+      hasVal(poi.teaser_paragraph) && (
+        <div className="acc_content_group" key="teaser">
+          <div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.teaser_paragraph) }} />
+        </div>
+      ),
       hasVal(poi.description_long) && (
         <div className="acc_content_group" key="desc">
           <div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_long) }} />
@@ -116,6 +121,14 @@ function buildSections(poi, helpers) {
       hasVal(poi.parking_types) && (
         <ContentGroup key="parking" title="Parking"><ChipList items={poi.parking_types} /></ContentGroup>
       ),
+      hasVal(poi.arrival_methods) && (
+        <ContentGroup key="arrival" title="Arrival"><ChipList items={poi.arrival_methods} /></ContentGroup>
+      ),
+      poi.expect_to_pay_parking === true && (
+        <ContentGroup key="paypark">
+          <div className="acc_content_text"><p>Expect to pay for parking.</p></div>
+        </ContentGroup>
+      ),
       hasVal(poi.parking_notes) && (
         <ContentGroup key="parking_notes">
           <div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.parking_notes) }} />
@@ -138,8 +151,16 @@ function buildSections(poi, helpers) {
     const col1 = [
       <InfoPair key="cost" title="Cost" value={cost} />,
       <InfoPair key="passes" title="Passes" value={passText} />,
+      hasVal(poi.pricing_details) && (
+        <ContentGroup key="pdetails" title="Pricing Details">
+          <div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pricing_details) }} />
+        </ContentGroup>
+      ),
     ].filter(Boolean);
     const col2 = [
+      hasVal(poi.payment_methods) && (
+        <ContentGroup key="paymeth" title="Payment Methods"><ChipList items={poi.payment_methods} /></ContentGroup>
+      ),
       hasVal(poi.discounts) && (
         <ContentGroup key="disc" title="Discounts">
           {Array.isArray(poi.discounts) ? (
@@ -212,11 +233,14 @@ function buildSections(poi, helpers) {
   }
 
   /* ALCOHOL + SMOKING */
-  if (hasVal(poi.alcohol_available) || hasVal(poi.alcohol_options) || hasVal(poi.smoking_options) || hasVal(poi.smoking_details) || hasVal(poi.alcohol_policy_details)) {
+  if (hasVal(poi.alcohol_available) || hasVal(poi.alcohol_options) || hasVal(poi.alcohol_availability) || poi.byob_allowed === true || hasVal(poi.alcohol_notes) || hasVal(poi.smoking_options) || hasVal(poi.smoking_details) || hasVal(poi.alcohol_policy_details)) {
     const col1 = [
       <InfoPair key="aa" title="Alcohol" value={poi.alcohol_available} />,
+      hasVal(poi.alcohol_availability) && <ContentGroup key="aav" title="Available"><ChipList items={poi.alcohol_availability} /></ContentGroup>,
       hasVal(poi.alcohol_options) && <ContentGroup key="ao" title="Alcohol Options"><ChipList items={poi.alcohol_options} /></ContentGroup>,
+      poi.byob_allowed === true && <ContentGroup key="byob"><div className="acc_content_text"><p>BYOB allowed.</p></div></ContentGroup>,
       hasVal(poi.alcohol_policy_details) && <ContentGroup key="apd"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.alcohol_policy_details) }} /></ContentGroup>,
+      hasVal(poi.alcohol_notes) && <ContentGroup key="an" title="Notes"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.alcohol_notes) }} /></ContentGroup>,
     ].filter(Boolean);
     const col2 = [
       hasVal(poi.smoking_options) && <ContentGroup key="so" title="Smoking"><ChipList items={poi.smoking_options} /></ContentGroup>,
@@ -310,7 +334,7 @@ function buildSections(poi, helpers) {
   }
 
   /* CONTACT */
-  if (hasVal(poi.website_url) || hasVal(poi.phone_number) || hasVal(poi.email)) {
+  if (hasVal(poi.website_url) || hasVal(poi.phone_number) || hasVal(poi.email) || hasSocialLinks(poi)) {
     const col1 = [
       hasVal(poi.phone_number) && (
         <ContentGroup key="ph" title="Phone"><div className="acc_list_group_1"><a href={`tel:${poi.phone_number}`}>{poi.phone_number}</a></div></ContentGroup>
@@ -325,6 +349,7 @@ function buildSections(poi, helpers) {
     ].filter(Boolean);
     const col2 = [
       hasVal(poi.email) && <ContentGroup key="em" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>,
+      hasSocialLinks(poi) && <SocialLinksGroup key="soc" poi={poi} />,
       <div className="acc_content_group" key="fb"><div className="acc_content_text"><a href="/feedback" className="pd-link">Questions or Feedback?</a></div></div>,
     ].filter(Boolean);
     if (col1.length || col2.length) out.push({ id: 'contact', title: 'Contact', col1, col2 });
@@ -391,7 +416,7 @@ export default function ParkDetail({ poi }) {
       statusVariant={_statusVariant || undefined}
       statusLabel={_statusLabel}
     >
-      {({ images: imgs, openLightbox }) => (
+      {({ images: imgs, openLightbox, autoSections }) => (
         <>
           <QuickInfoPhotosBox
             title={poi.description_short}
@@ -423,6 +448,7 @@ export default function ParkDetail({ poi }) {
               {sections.map((s) => (
                 <AccSection key={s.id} id={s.id} title={s.title} defaultOpen={!!s.defaultOpen} col1={s.col1} col2={s.col2} />
               ))}
+              {autoSections}
             </div>
           </div>
         </>

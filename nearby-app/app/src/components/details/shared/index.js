@@ -4,6 +4,7 @@ export { default as ChipList } from './ChipList';
 export { default as QuickInfoRow } from './QuickInfoRow';
 export { default as InfoPair } from './InfoPair';
 export { default as POIDetailLayout } from './POIDetailLayout';
+export { default as SocialLinksGroup, hasSocialLinks } from './SocialLinksGroup';
 export { default as QuickInfoPhotosBox } from './QuickInfoPhotosBox';
 export { default as AmenitiesBox } from './AmenitiesBox';
 export {

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 import {
-  AccSection, QuickInfoRow, QuickInfoPhotosBox,
+  AccSection, QuickInfoRow, QuickInfoPhotosBox, SocialLinksGroup, hasSocialLinks,
   hasVal, copyToClipboard, getCoordinates, getImages,
 } from './shared';
 import InfoRow from './InfoRow';
@@ -197,17 +197,24 @@ function EventDetail({ poi }) {
   /* ---- section renderers ---- */
   const renderAboutDetails = () => {
     const hasDesc = hasContent(poi.description_long);
+    const hasTeaser = hasContent(poi.teaser_paragraph);
     const recur = formatRecurrence(event);
     const hasOrganizer =
       hasContent(event?.organizer_name) ||
       hasContent(event?.organizer_email) ||
       hasContent(event?.organizer_phone) ||
       hasContent(event?.organizer_website);
-    if (!hasDesc && !recur && !hasOrganizer && !isCanceled && !hasContent(event?.status_explanation)) {
+    if (!hasDesc && !hasTeaser && !recur && !hasOrganizer && !isCanceled && !hasContent(event?.status_explanation)) {
       return null;
     }
     return (
       <>
+        {hasTeaser && (
+          <div
+            className="poi_description"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(poi.teaser_paragraph) }}
+          />
+        )}
         {hasDesc && (
           <div
             className="poi_description"
@@ -255,7 +262,7 @@ function EventDetail({ poi }) {
   };
 
   const renderVenue = () => {
-    if (!hasVenueSnapshot && !venueName) return null;
+    if (!hasVenueSnapshot && !venueName && !hasContent(poi.arrival_methods) && poi.expect_to_pay_parking !== true) return null;
     return (
       <>
         {venueName && <InfoRow label="Venue">{venueName}</InfoRow>}
@@ -268,6 +275,16 @@ function EventDetail({ poi }) {
               {parkingTypes.map((t, i) => <span key={i} className="poi_chip">{t}</span>)}
             </div>
           </InfoRow>
+        )}
+        {hasContent(poi.arrival_methods) && (
+          <InfoRow label="Arrival">
+            <div className="poi_chip_row">
+              {(Array.isArray(poi.arrival_methods) ? poi.arrival_methods : [poi.arrival_methods]).map((t, i) => <span key={i} className="poi_chip">{t}</span>)}
+            </div>
+          </InfoRow>
+        )}
+        {poi.expect_to_pay_parking === true && (
+          <InfoRow label="Parking Fees">Expect to pay for parking.</InfoRow>
         )}
         {hasContent(poi.parking_notes) && (
           <InfoRow label="Parking Notes">{poi.parking_notes}</InfoRow>
@@ -336,6 +353,7 @@ function EventDetail({ poi }) {
       hasContent(poi.playground_types) ||
       hasContent(poi.playground_surface_types) ||
       hasContent(poi.playground_age_groups) ||
+      hasContent(poi.playground_notes) ||
       poi.inclusive_playground === true;
     if (!hasAny) return null;
     return (
@@ -357,6 +375,11 @@ function EventDetail({ poi }) {
         )}
         {poi.inclusive_playground === true && (
           <InfoRow label="Inclusive Playground">Yes</InfoRow>
+        )}
+        {hasContent(poi.playground_notes) && (
+          <InfoRow label="Notes">
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(poi.playground_notes) }} />
+          </InfoRow>
         )}
         {Array.isArray(poi.playground_ada_checklist) && poi.playground_ada_checklist.length > 0 && (
           <InfoRow label="ADA">{poi.playground_ada_checklist.join(', ')}</InfoRow>
@@ -413,12 +436,25 @@ function EventDetail({ poi }) {
   };
 
   const renderAlcoholSmoking = () => {
-    if (!hasContent(poi.alcohol_available) && !hasContent(poi.smoking_options) && !hasContent(poi.smoking_details)) return null;
+    if (!hasContent(poi.alcohol_available) && !hasContent(poi.alcohol_availability) && poi.byob_allowed !== true && !hasContent(poi.alcohol_notes) && !hasContent(poi.smoking_options) && !hasContent(poi.smoking_details)) return null;
     return (
       <>
         {hasContent(poi.alcohol_available) && (
           <InfoRow label="Alcohol">
             {Array.isArray(poi.alcohol_available) ? poi.alcohol_available.join(', ') : poi.alcohol_available}
+          </InfoRow>
+        )}
+        {hasContent(poi.alcohol_availability) && (
+          <InfoRow label="Available">
+            {Array.isArray(poi.alcohol_availability) ? poi.alcohol_availability.join(', ') : poi.alcohol_availability}
+          </InfoRow>
+        )}
+        {poi.byob_allowed === true && (
+          <InfoRow label="BYOB">Allowed</InfoRow>
+        )}
+        {hasContent(poi.alcohol_notes) && (
+          <InfoRow label="Notes">
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(poi.alcohol_notes) }} />
           </InfoRow>
         )}
         {hasContent(poi.smoking_options) && (
@@ -477,10 +513,12 @@ function EventDetail({ poi }) {
     // double-rendering the same organizer fields.
     const hasAny =
       (Array.isArray(event?.organizer_socials) && event.organizer_socials.length > 0) ||
+      hasSocialLinks(poi) ||
       (event?.contact_organizer_toggle === true && hasContent(event?.organizer_email));
     if (!hasAny) return null;
     return (
       <>
+        {hasSocialLinks(poi) && <SocialLinksGroup poi={poi} />}
         {Array.isArray(event?.organizer_socials) && event.organizer_socials.length > 0 && (
           <InfoRow label="Socials">
             <div className="poi_chip_row">
@@ -612,7 +650,7 @@ function EventDetail({ poi }) {
         </div>
       }
     >
-      {({ images: imgs, openLightbox }) => (
+      {({ images: imgs, openLightbox, autoSections }) => (
         <>
           <QuickInfoPhotosBox
             title={hasContent(poi.description_short) ? poi.description_short : undefined}
@@ -634,6 +672,7 @@ function EventDetail({ poi }) {
                   {s.body}
                 </AccSection>
               ))}
+              {autoSections}
             </div>
           </div>
 
