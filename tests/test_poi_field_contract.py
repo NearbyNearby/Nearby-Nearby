@@ -91,6 +91,17 @@ def _expected_public_keys(poi_type):
         source = entry["source"]
         if source.startswith("images:"):
             continue
+        # Task 2.3: a points:<kind> field OWNED by a subtype table (access_points
+        # / trailhead_location live on trails) stays nested under the trail
+        # structural object, so it is excluded from the flat key set; the four
+        # POI-owned point fields stay flat. Mirrors structural_registry_keys_for.
+        if source.startswith("points:"):
+            from shared.poi_points import KIND_TO_FIELD, POINT_FIELDS
+            field = KIND_TO_FIELD.get(source.split(":", 1)[1])
+            if field is not None and POINT_FIELDS[field]["owner"] != "poi":
+                continue
+            keys.add(entry["key"])
+            continue
         prefix = source.split(".", 1)[0].split(":", 1)[0]
         if prefix in {"business", "park", "trail", "event"}:
             continue

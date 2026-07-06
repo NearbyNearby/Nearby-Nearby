@@ -27,24 +27,31 @@ class TestUpdateStringFields:
 
 class TestUpdateJsonbFields:
     def test_update_jsonb_fields(self, admin_client):
-        """Update hours, amenities, photos."""
+        """Update hours, amenities.
+
+        Task 2.5: the photos column is no longer written on update (the images
+        table is the single source of truth) — a photos value in the payload is
+        stripped, and the read derives photos from images. See
+        tests/test_one_representation.py.
+        """
         biz = create_business(admin_client, name="JSONB Update Biz")
         poi_id = biz["id"]
 
         new_hours = {"monday": {"open": "10:00", "close": "22:00"}}
         new_amenities = {"wifi": True, "parking": "paid"}
-        new_photos = {"featured": "https://new-photo.jpg"}
 
         resp = admin_client.put(f"/api/pois/{poi_id}", json={
             "hours": new_hours,
             "amenities": new_amenities,
-            "photos": new_photos,
+            "photos": {"featured": "https://new-photo.jpg"},
         })
         assert resp.status_code == 200
         data = resp.json()
         assert data["hours"]["monday"]["open"] == "10:00"
         assert data["amenities"]["wifi"] is True
-        assert data["photos"]["featured"] == "https://new-photo.jpg"
+        # photos is derived from images (none uploaded here), so the stripped
+        # payload value does NOT round-trip.
+        assert data["photos"] is None
 
 
 class TestUpdateListFields:

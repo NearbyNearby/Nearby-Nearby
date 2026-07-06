@@ -120,3 +120,12 @@ variable "rds_subnet_route_table_id" {
   type        = string
   description = "Route table ID used by the RDS subnets in the default VPC"
 }
+
+# Origin TLS rollout (Task 0.6). Two-stage: keep false to create the ACM cert and
+# emit its Cloudflare DNS validation records; flip to true (after the cert is ISSUED)
+# to add the ALB 443 listener and redirect port 80. See docs/infrastructure/origin-tls.md.
+variable "enable_https_listener" {
+  type        = bool
+  default     = false
+  description = "Stage 2 gate for origin TLS: create the ALB HTTPS (443) listener and redirect port 80. Requires the ACM cert to be ISSUED first."
+}

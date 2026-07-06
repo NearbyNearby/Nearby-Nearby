@@ -9,9 +9,43 @@ from typing import Dict, Any
 from app import models, schemas
 from app.crud.crud_category import get_category
 from app.utils.html_sanitizer import sanitize_poi_fields
+from app.utils.poi_revision import record_poi_revision
 from geoalchemy2.types import Geography
 from shared.constants.field_options import EVENT_STATUS_EXPLANATION_REQUIRED
+from shared.poi_geometry import geojson_to_wkt
 from shared.utils.event_status import validate_status_transition
+
+
+# Sentinel distinguishing "key absent from the update payload" (leave the column
+# untouched) from "key present with value null" (clear the column). Task 2.4.
+_UNSET = object()
+
+
+def _set_optional_geometries(db_obj, *, geom_line=None, geom_area=None,
+                             set_line=True, set_area=True):
+    """Validate + assign the Task 2.4 geom_line / geom_area columns.
+
+    Each geometry is a GeoJSON dict, None (clear the column), or is skipped
+    entirely when ``set_*`` is False (the field was absent from an update). A
+    valid dict becomes plain WKT (the column typmod tags SRID 4326, exactly like
+    ``location``); an invalid geometry raises HTTP 400.
+    """
+    if set_line:
+        if geom_line is None:
+            db_obj.geom_line = None
+        else:
+            try:
+                db_obj.geom_line = geojson_to_wkt(geom_line, "LineString")
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid geom_line: {exc}")
+    if set_area:
+        if geom_area is None:
+            db_obj.geom_area = None
+        else:
+            try:
+                db_obj.geom_area = geojson_to_wkt(geom_area, "Polygon")
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid geom_area: {exc}")
 
 
 def compute_icon_booleans(poi: dict) -> dict:
@@ -162,6 +196,10 @@ def apply_phase1_computed(poi: dict) -> dict:
     compute_inclusive_playground(poi)
     compute_icon_booleans(poi)
     apply_sponsor_rule(poi)
+    # Task 2.5: payment_methods column wins — never persist a duplicate copy under
+    # amenities.payment_methods (runs in create/update/autosave via this helper).
+    from shared.poi_contact_payments import strip_amenities_payment_methods
+    strip_amenities_payment_methods(poi)
     return poi
 
 
@@ -326,7 +364,7 @@ def get_pois_nearby(db: Session, *, poi_id: uuid.UUID, distance_km: float = 5.0,
     return nearby_pois
 
 
-def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
+def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
     # Create the POI with location
     # Exclude deprecated photo columns that have been moved to the Images table
     deprecated_photo_fields = {
@@ -334,7 +372,35 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
         'parking_lot_photo', 'parking_photos', 'rental_photos',
         'playground_photos', 'trailhead_photo', 'trail_exit_photo'
     }
-    poi_data = poi.model_dump(exclude={'location', 'business', 'park', 'trail', 'event', 'category_ids', 'main_category_id'} | deprecated_photo_fields)
+    # Task 2.5: one representation per concept — the write path stops writing the
+    # legacy photo columns (images table wins) and contact_info (main_contact_*
+    # columns win). Dropping them here means they are never persisted from the
+    # payload; reads derive featured_image/photos/gallery_photos from images.
+    from shared.poi_media import LEGACY_PHOTO_FIELDS
+    from shared.poi_contact_payments import LEGACY_CONTACT_FIELD
+    one_rep_stripped = set(LEGACY_PHOTO_FIELDS) | {LEGACY_CONTACT_FIELD}
+    poi_data = poi.model_dump(exclude={'location', 'geom_line', 'geom_area', 'business', 'park', 'trail', 'event', 'category_ids', 'main_category_id'} | deprecated_photo_fields | one_rep_stripped)
+
+    # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, NOT as
+    # JSONB. Pull the top-level link fields out of poi_data so they are never
+    # written to their JSONB columns; they are synced as edges once the POI (and
+    # any target POIs) exist. vendor_poi_links (event subtype) is pulled below.
+    from shared.relationship_links import LINK_FIELDS as _LINK_FIELDS, sync_link_edges as _sync_link_edges
+    _link_values = {
+        _f: poi_data.pop(_f, None)
+        for _f, _i in _LINK_FIELDS.items() if _i["owner"] == "poi"
+    }
+
+    # Task 2.3: point-geometry fields persist as poi_points rows, NOT as JSONB.
+    # Pull the top-level point fields out of poi_data so they are never written
+    # to their JSONB columns; they are synced as rows once the POI exists. The
+    # trail-owned point fields (access_points, trailhead_location) are pulled
+    # from trail_data below.
+    from shared.poi_points import POINT_FIELDS as _POINT_FIELDS, sync_point_rows as _sync_point_rows
+    _point_values = {
+        _f: poi_data.pop(_f, None)
+        for _f, _i in _POINT_FIELDS.items() if _i["owner"] == "poi"
+    }
 
     # Sanitize HTML content in the POI data
     poi_data = sanitize_poi_fields(poi_data)
@@ -353,10 +419,19 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
     # Set the location geometry
     db_poi.location = f'POINT({poi.location.coordinates[0]} {poi.location.coordinates[1]})'
 
+    # Task 2.4: optional line/area geometries. Validate the GeoJSON -> WKT (the
+    # column typmod tags SRID 4326, exactly like location above); invalid -> 400.
+    _set_optional_geometries(db_poi, geom_line=poi.geom_line, geom_area=poi.geom_area)
+
     # First save the POI to get an ID
     try:
         db.add(db_poi)
         db.flush()  # Get the ID without committing
+    except IntegrityError as e:
+        # A CHECK/constraint violation on a base column (e.g. a Task 2.6
+        # enum-like column) is a client error: surface it as 400, not 500.
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database integrity error: {e.orig}")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating POI: {e}")
@@ -416,10 +491,15 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
     elif poi.poi_type == 'TRAIL' and poi.trail:
         trail_data = poi.trail.model_dump()
         trail_data = sanitize_poi_fields({'trail': trail_data}).get('trail', {})
+        # Task 2.3: trail-owned point fields persist as poi_points rows, not JSONB.
+        _point_values['access_points'] = trail_data.pop('access_points', None)
+        _point_values['trailhead_location'] = trail_data.pop('trailhead_location', None)
         db_poi.trail = models.Trail(**trail_data)
     elif poi.poi_type == 'EVENT' and poi.event:
         event_data = poi.event.model_dump()
         event_data = sanitize_poi_fields({'event': event_data}).get('event', {})
+        # Task 2.1: vendor_poi_links is a link field — persist as edges, not JSONB.
+        _link_values['vendor_poi_links'] = event_data.pop('vendor_poi_links', None)
         # Duplicate prevention: check same venue + date + name
         venue_id = event_data.get('venue_poi_id')
         start_dt = event_data.get('start_datetime')
@@ -440,6 +520,17 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
 
     try:
         db.add(db_poi)
+        # Task 2.1: sync POI-to-POI link fields into poi_relationships edges,
+        # BEFORE the revision snapshot (so its relationship summary reflects the
+        # new edges) and INSIDE this try so a premature flush from an invalid FK
+        # (e.g. a bad venue_poi_id) surfaces as an IntegrityError -> 400, not 500.
+        for _f, _v in _link_values.items():
+            _sync_link_edges(db, db_poi.id, _f, _v)
+        # Task 2.3: sync point-geometry fields into poi_points rows (same txn).
+        for _f, _v in _point_values.items():
+            _sync_point_rows(db, db_poi.id, _f, _v)
+        # Append-only audit row, in the SAME transaction as the create (Task 1.1).
+        record_poi_revision(db, db_poi, 'create', user_id)
         db.commit()
         db.refresh(db_poi)
     except IntegrityError as e:
@@ -460,8 +551,31 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate):
     return db_poi
 
 
-def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.PointOfInterestUpdate) -> models.PointOfInterest:
+def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.PointOfInterestUpdate, user_id=None) -> models.PointOfInterest:
     update_data = obj_in.model_dump(exclude_unset=True)
+
+    # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, NOT as
+    # JSONB. Pop the top-level link fields that were provided in THIS request so
+    # they are never setattr'd onto their JSONB columns; sync them as edges below.
+    # A field absent from update_data is left untouched (partial-update safe).
+    from shared.relationship_links import LINK_FIELDS as _LINK_FIELDS, sync_link_edges as _sync_link_edges
+    _link_values = {
+        _f: update_data.pop(_f)
+        for _f, _i in _LINK_FIELDS.items()
+        if _i["owner"] == "poi" and _f in update_data
+    }
+
+    # Task 2.3: point-geometry fields persist as poi_points rows, NOT as JSONB.
+    # Pop the top-level point fields provided in THIS request so they are never
+    # setattr'd onto their JSONB columns; sync them as rows below. A field absent
+    # from update_data is left untouched (partial-update safe). The trail-owned
+    # point fields are popped from trail_data below.
+    from shared.poi_points import POINT_FIELDS as _POINT_FIELDS, sync_point_rows as _sync_point_rows
+    _point_values = {
+        _f: update_data.pop(_f)
+        for _f, _i in _POINT_FIELDS.items()
+        if _i["owner"] == "poi" and _f in update_data
+    }
 
     # Remove deprecated photo columns that have been moved to the Images table
     deprecated_photo_fields = [
@@ -470,6 +584,15 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
         'playground_photos', 'trailhead_photo', 'trail_exit_photo'
     ]
     for field in deprecated_photo_fields:
+        update_data.pop(field, None)
+
+    # Task 2.5: stop writing the legacy photo columns (images table wins) and
+    # contact_info (main_contact_* columns win). Popping them here (partial-update
+    # safe) means a field absent from the request is left untouched, and a field
+    # present is dropped rather than persisted to its retained legacy column.
+    from shared.poi_media import LEGACY_PHOTO_FIELDS
+    from shared.poi_contact_payments import LEGACY_CONTACT_FIELD
+    for field in (*LEGACY_PHOTO_FIELDS, LEGACY_CONTACT_FIELD):
         update_data.pop(field, None)
 
     # Sanitize HTML content in the update data
@@ -499,7 +622,21 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
         else:
             coords = location_data.coordinates
         db_obj.location = f'POINT({coords[0]} {coords[1]})'
-    
+
+    # Task 2.4: line/area geometry update (partial-update safe). A key present in
+    # update_data means the client sent it: a GeoJSON dict is validated -> WKT
+    # (invalid -> 400), an explicit null clears the column. A key absent is left
+    # untouched. Pop so it is never setattr'd onto the column as a raw dict below.
+    _geom_line = update_data.pop('geom_line', _UNSET)
+    _geom_area = update_data.pop('geom_area', _UNSET)
+    _set_optional_geometries(
+        db_obj,
+        geom_line=_geom_line if _geom_line is not _UNSET else None,
+        geom_area=_geom_area if _geom_area is not _UNSET else None,
+        set_line=_geom_line is not _UNSET,
+        set_area=_geom_area is not _UNSET,
+    )
+
     # Handle subtype updates
     # Note: db_obj.poi_type may be a POIType enum or a string depending on context
     poi_type_str = db_obj.poi_type.value if hasattr(db_obj.poi_type, 'value') else str(db_obj.poi_type)
@@ -522,6 +659,10 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
 
     if 'trail' in update_data and poi_type_str == 'TRAIL':
         trail_data = update_data.pop('trail')
+        # Task 2.3: trail-owned point fields persist as poi_points rows, not JSONB.
+        for _f in ('access_points', 'trailhead_location'):
+            if _f in trail_data:
+                _point_values[_f] = trail_data.pop(_f)
         if db_obj.trail:
             for key, value in trail_data.items():
                 setattr(db_obj.trail, key, value)
@@ -530,6 +671,9 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
 
     if 'event' in update_data and poi_type_str == 'EVENT':
         event_data = update_data.pop('event')
+        # Task 2.1: vendor_poi_links is a link field — persist as edges, not JSONB.
+        if 'vendor_poi_links' in event_data:
+            _link_values['vendor_poi_links'] = event_data.pop('vendor_poi_links')
         # Task 157: Date Change Guard
         date_changing = event_data.get('start_datetime') or event_data.get('end_datetime')
         current_status = getattr(db_obj.event, 'event_status', None) if db_obj.event else None
@@ -667,8 +811,22 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
 
     try:
         db.add(db_obj)
+        # Task 2.1: sync provided POI-to-POI link fields into poi_relationships
+        # edges (BEFORE the revision snapshot, in the same transaction).
+        for _f, _v in _link_values.items():
+            _sync_link_edges(db, db_obj.id, _f, _v)
+        # Task 2.3: sync provided point-geometry fields into poi_points rows.
+        for _f, _v in _point_values.items():
+            _sync_point_rows(db, db_obj.id, _f, _v)
+        # Append-only audit row, in the SAME transaction as the update (Task 1.1).
+        record_poi_revision(db, db_obj, 'update', user_id)
         db.commit()
         db.refresh(db_obj)
+    except IntegrityError as e:
+        # Mirror create_poi: a constraint violation (e.g. a Task 2.6 CHECK on an
+        # enum-like column, or a bad FK) is a client error, surface it as 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database integrity error: {e.orig}")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"An error occurred during update: {e}")
@@ -684,9 +842,12 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
     return db_obj
 
 
-def delete_poi(db: Session, poi_id: uuid.UUID):
+def delete_poi(db: Session, poi_id: uuid.UUID, user_id=None):
     db_poi = get_poi(db, poi_id)
     if db_poi:
+        # Snapshot BEFORE anything is removed. The revision (poi_id has no FK)
+        # must outlive the POI it describes (Task 1.1).
+        record_poi_revision(db, db_poi, 'delete', user_id)
         # First, delete all relationships that reference this POI
         from app.models.poi import POIRelationship
         relationships_to_delete = db.query(POIRelationship).filter(

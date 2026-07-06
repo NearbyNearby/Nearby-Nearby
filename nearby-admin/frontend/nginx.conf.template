@@ -4,6 +4,10 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Allow large multipart uploads (downloadable_map up to 50MB + overhead).
+    # nginx default is 1MB, which 413'd every photo >1MB in prod.
+    client_max_body_size 60m;
+
     # Gzip compression
     gzip on;
     gzip_vary on;

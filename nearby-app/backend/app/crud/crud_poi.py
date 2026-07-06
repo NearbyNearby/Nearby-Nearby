@@ -58,7 +58,54 @@ def get_poi(db: Session, poi_id: str):
 
     return poi
 
-def get_nearby_pois(db: Session, poi_id: str, radius_miles: float = 5.0):
+# Nearby facet filters (Task 2.2). Boolean facets map to the computed icon_*
+# columns (populated on write in admin, see nearby-admin compute_icon_booleans)
+# and the plain playground_available flag. `alcohol` and `kid_friendly` need
+# bespoke predicates; `payment` takes a value. All predicates use SQLAlchemy
+# parameter binding (never string interpolation) so user input can't reach SQL.
+#
+# NOTE: there is no icon_playground column; the playground flag is
+# playground_available. Unknown facet values are ignored (fail-soft).
+_BOOL_FACET_COLUMNS = {
+    'pet_friendly': 'icon_pet_friendly',
+    'restrooms': 'icon_public_restroom',
+    'wheelchair_accessible': 'icon_wheelchair_accessible',
+    'free_wifi': 'icon_free_wifi',
+    'playground': 'playground_available',
+}
+
+
+def _apply_nearby_facets(query, facets, payment):
+    """Compose facet predicates onto a nearby POI query. Returns the query."""
+    POI = models.poi.PointOfInterest
+    for facet in (facets or []):
+        column = _BOOL_FACET_COLUMNS.get(facet)
+        if column is not None:
+            query = query.filter(getattr(POI, column).is_(True))
+        elif facet == 'alcohol':
+            # "serves alcohol": any option set other than an explicit no.
+            # Known limitation: this also matches 'nearby' (alcohol available
+            # near, not at, the POI) and 'byob'. Semantics are debatable; tune
+            # the predicate here if stricter "served on premises" is wanted.
+            query = query.filter(
+                POI.alcohol_available.isnot(None),
+                POI.alcohol_available != 'no_alcohol',
+            )
+        elif facet == 'kid_friendly':
+            # ideal_for is a nested object of groups; kid-friendly == the
+            # age_group list contains "Families". Object containment recurses
+            # and array containment checks subset, so `@> {"age_group":["Families"]}`
+            # is the right predicate. .contains() emits parameterized `@>`.
+            query = query.filter(POI.ideal_for.contains({"age_group": ["Families"]}))
+        # any other facet token is ignored (fail-soft)
+    if payment:
+        # payment_methods is a flat JSONB array; `@> ["<value>"]` containment.
+        query = query.filter(POI.payment_methods.contains([payment]))
+    return query
+
+
+def get_nearby_pois(db: Session, poi_id: str, radius_miles: float = 5.0,
+                    facets=None, payment=None):
     from geoalchemy2.shape import to_shape
 
     origin_poi = db.query(models.poi.PointOfInterest).filter(models.poi.PointOfInterest.id == poi_id).first()
@@ -78,14 +125,16 @@ def get_nearby_pois(db: Session, poi_id: str, radius_miles: float = 5.0):
         f"ST_Distance(location::geography, ST_MakePoint({origin_lon}, {origin_lat})::geography)"
     )
 
-    nearby_pois_with_distance = db.query(
+    query = db.query(
         models.poi.PointOfInterest,
         distance_expr.label('distance_meters')
     ).filter(
         models.poi.PointOfInterest.id != poi_id,
         models.poi.PointOfInterest.publication_status == 'published',
         distance_expr <= radius_meters
-    ).order_by('distance_meters').all()
+    )
+    query = _apply_nearby_facets(query, facets, payment)
+    nearby_pois_with_distance = query.order_by('distance_meters').all()
 
     # The query returns tuples of (PointOfInterest, distance), so we need to format them.
     results = []

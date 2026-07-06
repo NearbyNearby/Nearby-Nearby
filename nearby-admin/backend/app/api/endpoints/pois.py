@@ -11,10 +11,42 @@ from app.database import get_db
 from app.core.security import get_current_user
 from app.core.permissions import require_admin_or_editor
 from app.utils.autosave_whitelist import AUTOSAVE_ALLOWED_FIELDS, AUTOSAVE_DENIED_FIELDS
+from app.utils.poi_revision import record_poi_revision
 from app.crud.crud_poi import apply_phase1_computed
 from app.schemas._coercers import coerce_empty_literals
 
 router = APIRouter()
+
+
+def _enrich_link_fields(db: Session, poi):
+    """Task 2.1: reconstruct the six POI-to-POI link fields from
+    poi_relationships edges onto the ORM instance so the admin response serializes
+    them from edges (they are no longer stored in JSONB). In-memory only — never
+    committed (get_db does not commit; any autoflush is rolled back on close)."""
+    if poi is None:
+        return poi
+    from shared.relationship_links import LINK_FIELDS, read_link_field_admin
+    for field, info in LINK_FIELDS.items():
+        value = read_link_field_admin(db, poi.id, field)
+        if info["owner"] == "event":
+            if getattr(poi, "event", None) is not None:
+                poi.event.vendor_poi_links = value
+        else:
+            setattr(poi, field, value)
+    return poi
+
+
+def _enrich_response_fields(db: Session, poi):
+    """Enrich an admin POI response: Task 2.1 link fields (from edges), Task 2.3
+    point fields (from poi_points), and Task 2.5 media fields (featured_image /
+    photos / gallery_photos derived from the images table) — all via
+    set_committed_value so the instance is never dirtied."""
+    if poi is None:
+        return poi
+    from shared.poi_points import enrich_poi_point_fields
+    from shared.poi_media import enrich_poi_media_fields
+    return enrich_poi_media_fields(db, enrich_poi_point_fields(db, _enrich_link_fields(db, poi)))
+
 
 @router.post("/pois/", response_model=schemas.PointOfInterest, status_code=201)
 def create_poi(
@@ -31,7 +63,8 @@ def create_poi(
     if poi.poi_type == 'EVENT' and poi.event is None:
         raise HTTPException(status_code=400, detail="Event data required for poi_type 'EVENT'")
 
-    return crud.create_poi(db=db, poi=poi)
+    result = crud.create_poi(db=db, poi=poi, user_id=getattr(current_user, 'id', None))
+    return _enrich_response_fields(db, result)
 
 
 def _coerce_poi_types(poi_type: Optional[List[str]]):
@@ -111,7 +144,7 @@ def read_poi(poi_id: uuid.UUID, db: Session = Depends(get_db)):
     db_poi = crud.get_poi(db, poi_id=poi_id)
     if db_poi is None:
         raise HTTPException(status_code=404, detail="Point of Interest not found")
-    return db_poi
+    return _enrich_response_fields(db, db_poi)
 
 
 @router.get("/pois/{poi_id}/nearby", response_model=List[schemas.PointOfInterest], summary="Find nearby POIs")
@@ -136,8 +169,8 @@ def update_poi(
     if not db_poi:
         raise HTTPException(status_code=404, detail="Point of Interest not found")
     
-    updated_poi = crud.update_poi(db=db, db_obj=db_poi, obj_in=poi_in)
-    return updated_poi
+    updated_poi = crud.update_poi(db=db, db_obj=db_poi, obj_in=poi_in, user_id=getattr(current_user, 'id', None))
+    return _enrich_response_fields(db, updated_poi)
 
 
 @router.delete("/pois/{poi_id}", response_model=schemas.PointOfInterest)
@@ -154,7 +187,7 @@ def delete_poi(
             "detail": "POI has been published; archive instead of deleting.",
             "action": "archive"
         })
-    db_poi = crud.delete_poi(db, poi_id=poi_id)
+    db_poi = crud.delete_poi(db, poi_id=poi_id, user_id=getattr(current_user, 'id', None))
     if db_poi is None:
         raise HTTPException(status_code=404, detail="Point of Interest not found")
     return db_poi
@@ -184,6 +217,27 @@ def autosave_poi(
         if k in AUTOSAVE_ALLOWED_FIELDS and k not in AUTOSAVE_DENIED_FIELDS
     }
     coerce_empty_literals(filtered, schemas.PointOfInterestUpdate)
+
+    # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, not
+    # JSONB. Pull any provided link fields out of the autosave payload so they are
+    # never setattr'd onto their JSONB columns; sync them as edges before commit.
+    from shared.relationship_links import LINK_FIELDS as _LINK_FIELDS, sync_link_edges as _sync_link_edges
+    _link_values = {k: filtered.pop(k) for k in list(filtered) if k in _LINK_FIELDS}
+
+    # Task 2.3: point-geometry fields persist as poi_points rows, not JSONB. Pull
+    # them out likewise (none of them feed apply_phase1_computed, so removing them
+    # from the merged snapshot is safe); sync them as rows before commit.
+    from shared.poi_points import POINT_FIELDS as _POINT_FIELDS, sync_point_rows as _sync_point_rows
+    _point_values = {k: filtered.pop(k) for k in list(filtered) if k in _POINT_FIELDS}
+
+    # Task 2.5: stop writing the legacy photo columns (images table wins) and
+    # contact_info (main_contact_* columns win). Drop them from the autosave
+    # payload so they are never setattr'd onto their retained legacy columns.
+    # (amenities.payment_methods is stripped by apply_phase1_computed below.)
+    from shared.poi_media import LEGACY_PHOTO_FIELDS as _LEGACY_PHOTO_FIELDS
+    from shared.poi_contact_payments import LEGACY_CONTACT_FIELD as _LEGACY_CONTACT_FIELD
+    for _k in (*_LEGACY_PHOTO_FIELDS, _LEGACY_CONTACT_FIELD):
+        filtered.pop(_k, None)
 
     # Build a merged snapshot so the computed helper can read current values.
     merged: Dict[str, Any] = {c.name: getattr(poi, c.name) for c in poi.__table__.columns}
@@ -232,6 +286,16 @@ def autosave_poi(
                 setattr(sub, k, merged[k])
                 break
 
+    # Task 2.1: sync any provided POI-to-POI link fields into edges (same txn).
+    for _f, _v in _link_values.items():
+        _sync_link_edges(db, poi.id, _f, _v)
+
+    # Task 2.3: sync any provided point-geometry fields into poi_points (same txn).
+    for _f, _v in _point_values.items():
+        _sync_point_rows(db, poi.id, _f, _v)
+
+    # Append-only audit row, in the SAME transaction as the autosave (Task 1.1).
+    record_poi_revision(db, poi, 'update', user_id=getattr(current_user, 'id', None))
     db.commit()
 
     # Best-effort embed-on-write (A7): AFTER the commit above, never before.
@@ -402,6 +466,9 @@ def reschedule_event(
     """
     from app.crud.crud_poi import generate_slug, ensure_unique_slug
     from geoalchemy2.shape import to_shape
+    from shared.relationship_links import LINK_FIELDS, clone_outbound_edges
+    from shared.poi_points import POINT_FIELDS, read_point_field, sync_point_rows
+    from shared.poi_media import LEGACY_PHOTO_FIELDS, clone_images
 
     db_poi = crud.get_poi(db, poi_id=poi_id)
     if not db_poi:
@@ -416,12 +483,25 @@ def reschedule_event(
     base_slug = generate_slug(db_poi.name, db_poi.address_city)
     new_slug = ensure_unique_slug(db, base_slug, exclude_id=None)
 
-    # Get columns to copy from POI (exclude id, slug, timestamps, relationships)
-    skip_cols = {'id', 'slug', 'created_at', 'last_updated', 'location'}
-    poi_data = {}
-    for col in models.PointOfInterest.__table__.columns:
-        if col.name not in skip_cols:
-            poi_data[col.name] = getattr(db_poi, col.name)
+    # Dead-weight legacy JSONB columns (Phase 2): the live data now lives in
+    # poi_relationships (links), poi_points (pins) and the images table (photos).
+    # Exclude them from the raw column copy so the clone does not carry stale JSONB
+    # dead data; the real edges / pins / photos are copied from those tables below.
+    poi_link_cols = {f for f, i in LINK_FIELDS.items() if i["owner"] == "poi"}
+    poi_point_cols = {f for f, i in POINT_FIELDS.items() if i["owner"] == "poi"}
+    dead_jsonb_cols = poi_link_cols | poi_point_cols | set(LEGACY_PHOTO_FIELDS)
+
+    # Get columns to copy from POI (exclude id, slug, timestamps, location, and the
+    # dead legacy JSONB columns above).
+    skip_cols = {'id', 'slug', 'created_at', 'last_updated', 'location'} | dead_jsonb_cols
+    poi_data = {
+        col.name: getattr(db_poi, col.name)
+        for col in models.PointOfInterest.__table__.columns
+        if col.name not in skip_cols
+    }
+    # Fix 1: a legacy '' in a CHECK-constrained enum column would trip the CHECK on
+    # the clone insert; coerce blank/whitespace -> NULL first.
+    coerce_empty_literals(poi_data, schemas.PointOfInterestUpdate)
 
     new_poi = models.PointOfInterest(id=new_poi_id, slug=new_slug, **poi_data)
 
@@ -434,12 +514,15 @@ def reschedule_event(
     db.add(new_poi)
     db.flush()
 
-    # Clone event fields
-    event_skip = {'poi_id'}
-    event_data = {}
-    for col in models.Event.__table__.columns:
-        if col.name not in event_skip:
-            event_data[col.name] = getattr(db_poi.event, col.name)
+    # Clone event fields (exclude poi_id and the event-owned legacy link column
+    # vendor_poi_links — those vendor links are copied as edges below).
+    event_link_cols = {f for f, i in LINK_FIELDS.items() if i["owner"] == "event"}
+    event_skip = {'poi_id'} | event_link_cols
+    event_data = {
+        col.name: getattr(db_poi.event, col.name)
+        for col in models.Event.__table__.columns
+        if col.name not in event_skip
+    }
 
     # Override with new dates and status
     event_data['start_datetime'] = body.new_start_datetime
@@ -456,6 +539,26 @@ def reschedule_event(
     # Update original event status
     db_poi.event.event_status = 'Rescheduled'
     db_poi.event.new_event_link = str(new_poi_id)
+
+    # Fix 2: copy the source POI's edges / pins / photos onto the clone. These live
+    # in poi_relationships / poi_points / images now, not the JSONB columns excluded
+    # above, so the raw column copy alone would silently drop every vendor link,
+    # other link kind, parking/restroom/playground/payphone pin, and photo. Same
+    # transaction, BEFORE the revision snapshot so it captures the complete clone
+    # (the snapshot's relationship summary reads the copied edges).
+    clone_outbound_edges(db, poi_id, new_poi_id)
+    for field, info in POINT_FIELDS.items():
+        if info["owner"] != "poi":
+            continue  # trail-owned pins never apply to an EVENT
+        sync_point_rows(db, new_poi_id, field, read_point_field(db, poi_id, field))
+    clone_images(db, poi_id, new_poi_id)
+
+    # Append-only audit rows for both sides of the reschedule, in the SAME
+    # transaction (Task 1.1): the cloned event is a create, the original is an
+    # update (status -> Rescheduled).
+    uid = getattr(current_user, 'id', None)
+    record_poi_revision(db, new_poi, 'create', user_id=uid)
+    record_poi_revision(db, db_poi, 'update', user_id=uid)
 
     db.commit()
     db.refresh(new_poi)

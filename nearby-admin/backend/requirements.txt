@@ -16,7 +16,8 @@ bleach
 python-dateutil
 
 # Image processing
-Pillow
+Pillow==12.3.0
+pillow-heif==1.4.0
 aiofiles
 
 # Cloud storage

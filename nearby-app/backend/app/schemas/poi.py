@@ -32,6 +32,10 @@ class Park(BaseModel):
     
 class Trail(BaseModel):
     length_text: Optional[str] = None
+    # Task 2.4: derived from geom_line via ST_Length(geography), attached by
+    # enrich_trail_length on the detail path. None when the trail has no line;
+    # length_text remains the display fallback.
+    length_miles: Optional[float] = None
     difficulty: Optional[str] = None
     route_type: Optional[str] = None
     # Issue #63 / #64 — Trailhead + Access Points consolidation.

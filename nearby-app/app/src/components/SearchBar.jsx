@@ -62,7 +62,12 @@ const SearchBar = forwardRef(function SearchBar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debounced search API call
+  // Debounced search API call.
+  // nearbyPoiIds is a dependency so the nearby-mode intersection is recomputed
+  // when the nearby set changes under an active query (e.g. removing a facet or
+  // widening the radius grows the set): without it the previously-emitted
+  // filtered ids stay computed against the old, narrower set and the newly-in-
+  // range matches would be wrongly hidden until the user re-typed.
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       if (searchQuery.trim().length > 0) {
@@ -74,7 +79,7 @@ const SearchBar = forwardRef(function SearchBar({
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery, selectedType]);
+  }, [searchQuery, selectedType, nearbyPoiIds]);
 
   const fetchSearchResults = async (query) => {
     setIsLoading(true);

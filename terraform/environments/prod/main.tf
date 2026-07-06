@@ -88,6 +88,10 @@ module "alb" {
   vpc_id                = module.networking.vpc_id
   public_subnet_ids     = module.networking.public_subnet_ids
   alb_security_group_id = module.networking.alb_security_group_id
+
+  # Origin TLS (Task 0.6). false = stage 1 (ACM cert + validation records only);
+  # true = stage 2 (443 listener live, port 80 redirects). See docs/infrastructure/origin-tls.md.
+  enable_https_listener = var.enable_https_listener
 }
 
 # --- ECS ---
@@ -146,6 +150,22 @@ module "ecs" {
   create_github_oidc       = false
   github_oidc_provider_arn = "arn:aws:iam::487615743990:oidc-provider/token.actions.githubusercontent.com"
   ecr_repository_arns      = values(module.ecr.repository_arns)
+}
+
+# --- Nightly logical DB backup (pg_dump -> versioned S3, Glacier lifecycle) ---
+module "backup" {
+  source = "../../modules/backup"
+
+  project        = var.project
+  environment    = var.environment
+  aws_region     = var.aws_region
+  aws_account_id = var.aws_account_id
+
+  cluster_arn           = module.ecs.cluster_arn
+  private_subnet_ids    = module.networking.private_subnet_ids
+  ecs_security_group_id = module.networking.ecs_security_group_id
+
+  ssm_database_url_arn = module.secrets.database_url_arn
 }
 
 # --- VPC Peering (ECS VPC ↔ Default VPC where RDS lives) ---

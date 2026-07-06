@@ -222,6 +222,12 @@ def _apply_venue_inheritance(db: Session, poi_dict: dict, event) -> dict:
     if not venue_poi:
         return poi_dict
 
+    # Task 2.3: the inheritable parking_locations / toilet_locations now live in
+    # poi_points; reconstruct them onto the venue instance (set_committed_value,
+    # never dirties) so inheritance reads real data, not the stale JSONB columns.
+    from shared.poi_points import enrich_poi_point_fields
+    enrich_poi_point_fields(db, venue_poi)
+
     from shared.utils.venue_inheritance import resolve_venue_inheritance
 
     venue_data = {
@@ -364,6 +370,32 @@ def _serialize_detail_response(db: Session, db_poi, images: list):
       leaves at its default), corrupting the structural shape.
     * shadow   -> build BOTH, log the diff at WARNING, RETURN legacy unchanged.
     """
+    # Task 2.3: point-geometry fields live in poi_points now; the retained JSONB
+    # columns are stale. Reconstruct all six onto the ORM instance (via
+    # set_committed_value — never dirties the session) so the nested ``trail``
+    # structural object (access_points / trailhead_location — what TrailDetail.jsx
+    # renders) and the legacy/shadow flat reads reflect poi_points. The registry
+    # path additionally reads the four flat fields via its ``points:`` source.
+    from shared.poi_points import enrich_poi_point_fields
+    enrich_poi_point_fields(db, db_poi)
+
+    # Task 2.5: featured_image / photos / gallery_photos are derived from the
+    # images table (the single source of truth); the retained legacy columns are
+    # no longer written. Reconstruct all three onto the ORM instance from the
+    # already-loaded ``images`` list (via set_committed_value — never dirties the
+    # session) so the registry flat fields and the legacy/shadow reads reflect
+    # images, not the stale columns. The frontend hero chain already prefers the
+    # images collection; this keeps featured_image (OG/SEO + cards) correct too.
+    from shared.poi_media import enrich_poi_media_fields
+    enrich_poi_media_fields(db, db_poi, images=images)
+
+    # Task 2.4: derive the trail's length_miles from geom_line (ST_Length over
+    # geography) and attach it to the nested trail object. length_text stays the
+    # display fallback when no line exists (length_miles is then None). One indexed
+    # single-row query; detail path only (no N+1 on list/card responses).
+    from shared.poi_geometry import enrich_trail_length
+    enrich_trail_length(db, db_poi)
+
     if POI_SERIALIZER == "legacy":
         legacy_dict = _build_legacy_detail_dict(db, db_poi, images)
         return schemas.poi.POIDetail.model_validate(legacy_dict)
@@ -486,6 +518,12 @@ def api_get_nearby_pois(
             filtered_pairs.append((poi, distance))
     filtered_pairs = filtered_pairs[:8]
 
+    # Task 2.5: the card hero (featured_image) is derived from the images table
+    # (single source of truth) in ONE batched query rather than the retained,
+    # no-longer-written column. Attach it before serializing the cards.
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, [p for p, _ in filtered_pairs])
+
     # Format results with distance. Card body is built by the registry-driven
     # serialize_poi_card (public-only); the per-query distance is attached on top.
     results = []
@@ -525,10 +563,30 @@ def api_get_nearby_pois_by_id(
     poi_id: uuid.UUID,
     radius_miles: float = Query(5.0, description="Search radius in miles"),
     include_past_events: bool = Query(False, description="Include past events in results"),
+    facet: Optional[List[str]] = Query(
+        None,
+        description="Repeatable attribute facet: pet_friendly, restrooms, "
+        "wheelchair_accessible, free_wifi, playground, alcohol, kid_friendly",
+    ),
+    payment: Optional[str] = Query(
+        None, description="Filter to POIs accepting this payment method (e.g. Cash)"
+    ),
     db: Session = Depends(get_db),
 ):
-    nearby_pois = crud.crud_poi.get_nearby_pois(db, poi_id=str(poi_id), radius_miles=radius_miles)
+    # Facets compose with radius + publication gating in SQL. The search-within-
+    # nearby path (SearchBar) intersects hybrid-search results against this
+    # already-facet-filtered id set client-side, so facets flow through search
+    # without touching the global hybrid-search endpoint.
+    nearby_pois = crud.crud_poi.get_nearby_pois(
+        db, poi_id=str(poi_id), radius_miles=radius_miles,
+        facets=facet, payment=payment,
+    )
     nearby_pois = _exclude_past_and_cancelled_events(nearby_pois, include_past=include_past_events)
+
+    # Task 2.5: attach the card hero (featured_image) from the images table in one
+    # batched query (the retained column is no longer written).
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, list(nearby_pois))
 
     # Convert location data for each POI. Card body is built by the registry-driven
     # serialize_poi_card (public-only); the per-query distance and the {id,name,slug}
@@ -783,50 +841,44 @@ def get_event_vendors(
     poi_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
-    """Resolve vendor_poi_links JSONB to published POI summaries."""
-    from sqlalchemy.orm import joinedload
+    """Resolve event vendor links to published POI summaries.
 
-    poi = db.query(models.poi.PointOfInterest).options(
-        joinedload(models.poi.PointOfInterest.event)
-    ).filter(
+    Task 2.1: vendor links now live in the ``poi_relationships`` edge table
+    (relationship_type ``vendor``, source = the event POI); the per-vendor
+    ``vendor_type`` is carried in the edge's ``meta``. The response shape is
+    unchanged from the legacy vendor_poi_links JSONB path.
+    """
+    poi = db.query(models.poi.PointOfInterest).filter(
         models.poi.PointOfInterest.id == poi_id,
         models.poi.PointOfInterest.publication_status == "published",
     ).first()
     if not poi:
         raise HTTPException(status_code=404, detail="POI not found")
 
-    event = poi.event
-    if not event:
+    edges = db.query(models.poi.POIRelationship).filter(
+        models.poi.POIRelationship.source_poi_id == poi.id,
+        models.poi.POIRelationship.relationship_type == "vendor",
+    ).all()
+    if not edges:
         return []
 
-    vendor_links = event.vendor_poi_links
-    if not vendor_links or not isinstance(vendor_links, list):
-        return []
-
-    # Collect vendor POI IDs
-    vendor_poi_ids = [
-        v["poi_id"] for v in vendor_links
-        if isinstance(v, dict) and v.get("poi_id")
-    ]
-    if not vendor_poi_ids:
-        return []
-
-    # Fetch published vendor POIs
+    target_ids = [e.target_poi_id for e in edges]
     vendor_pois = db.query(models.poi.PointOfInterest).filter(
-        models.poi.PointOfInterest.id.in_(vendor_poi_ids),
+        models.poi.PointOfInterest.id.in_(target_ids),
         models.poi.PointOfInterest.publication_status == "published",
     ).all()
-
-    vendor_map = {str(vp.id): vp for vp in vendor_pois}
+    # Task 2.5: vendor thumbnails read featured_image, now derived from images.
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, vendor_pois)
+    vendor_map = {vp.id: vp for vp in vendor_pois}
 
     results = []
-    for link in vendor_links:
-        if not isinstance(link, dict) or not link.get("poi_id"):
-            continue
-        vp = vendor_map.get(link["poi_id"])
+    for edge in edges:
+        vp = vendor_map.get(edge.target_poi_id)
         if not vp:
             continue
         poi_type = vp.poi_type.value if hasattr(vp.poi_type, 'value') else vp.poi_type
+        meta = edge.meta or {}
         results.append({
             "id": str(vp.id),
             "name": vp.name,
@@ -834,7 +886,7 @@ def get_event_vendors(
             "poi_type": poi_type,
             "address_city": vp.address_city,
             "featured_image": vp.featured_image,
-            "vendor_type": link.get("vendor_type"),
+            "vendor_type": meta.get("vendor_type"),
         })
 
     return results
@@ -878,6 +930,9 @@ def get_event_sponsors(
             models.poi.PointOfInterest.id.in_(linked_ids),
             models.poi.PointOfInterest.publication_status == "published",
         ).all()
+        # Task 2.5: sponsor thumbnails read featured_image, now derived from images.
+        from shared.poi_media import attach_hero_images
+        attach_hero_images(db, sponsor_pois)
         sponsor_map = {str(sp.id): sp for sp in sponsor_pois}
 
     results = []

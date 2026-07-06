@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import Column, String, TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from ..database import Base
+from ..database import FormsBase as Base
 
 class WaitlistEntry(Base):
     __tablename__ = "waitlist"

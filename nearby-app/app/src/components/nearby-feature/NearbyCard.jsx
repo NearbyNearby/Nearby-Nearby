@@ -36,10 +36,13 @@ function hasAmenity(values) {
 
 function getAmenities(poi) {
   const amenities = [];
-  if (hasAmenity(poi.public_toilets))  amenities.push({ icon: <RestroomIcon />, title: 'Public Restrooms', key: 'restroom' });
-  // wheelchair amenity icon removed — wheelchair_accessible column dropped (Issue #45 PR2 Migration B)
-  if (hasAmenity(poi.wifi_options))    amenities.push({ icon: <WifiIcon />,     title: 'WiFi Available',   key: 'wifi' });
-  if (hasAmenity(poi.pet_options))     amenities.push({ icon: <PetIcon />,      title: 'Pet Friendly',     key: 'pet' });
+  // Prefer the registry computed icon_* booleans (card fields); fall back to the
+  // loose array heuristic so we never drop an amenity that already showed.
+  const has = (iconBool, values) => iconBool === true || hasAmenity(values);
+  if (has(poi.icon_public_restroom, poi.public_toilets))  amenities.push({ icon: <RestroomIcon />,   title: 'Public Restrooms',    key: 'restroom' });
+  if (poi.icon_wheelchair_accessible === true)            amenities.push({ icon: <WheelchairIcon />, title: 'Wheelchair Accessible', key: 'wheelchair' });
+  if (has(poi.icon_free_wifi, poi.wifi_options))          amenities.push({ icon: <WifiIcon />,       title: 'WiFi Available',      key: 'wifi' });
+  if (has(poi.icon_pet_friendly, poi.pet_options))        amenities.push({ icon: <PetIcon />,        title: 'Pet Friendly',        key: 'pet' });
   return amenities;
 }
 
@@ -93,6 +96,10 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
   const isBusiness = poiType === 'business';
 
   const distance = formatDistance(poi.distance_meters);
+
+  // Event start comes from the flat card field (registry card:true); fall back to
+  // the nested event object for callers that pass a full detail payload.
+  const eventStart = poi.start_datetime || poi.event?.start_datetime;
 
   // Coordinates for dawn/dusk-aware status (GeoJSON order: [lng, lat])
   const _poiCoords = poi?.location?.coordinates;
@@ -222,7 +229,7 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
       )}
 
       {/* Past event badge for Scheduled events whose date has passed */}
-      {isEvent && poi.event?.start_datetime && new Date(poi.event.start_datetime) < new Date() && poi.event?.event_status === 'Scheduled' && (
+      {isEvent && eventStart && new Date(eventStart) < new Date() && poi.event?.event_status === 'Scheduled' && (
         <span className="nearby-card__status-badge nearby-card__status-badge--past">Past</span>
       )}
 
@@ -234,7 +241,7 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
       )}
 
       {/* Event-specific: Date */}
-      {isEvent && poi.event?.start_datetime && (
+      {isEvent && eventStart && (
         <div className="nearby-card__event-date">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -242,7 +249,7 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
             <line x1="8" y1="2" x2="8" y2="6"/>
             <line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
-          <span>{formatEventDate(poi.event.start_datetime)}</span>
+          <span>{formatEventDate(eventStart)}</span>
         </div>
       )}
 
@@ -263,15 +270,15 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
           </div>
         )}
 
-        {/* Trail-specific: Length and difficulty */}
+        {/* Trail-specific: Length and difficulty (flat card fields, nested fallback) */}
         {isTrail && (
           <div className="nearby-card__trail-info">
-            {poi.trail?.length_miles && (
-              <span className="nearby-card__trail-length">{poi.trail.length_miles} mi</span>
+            {(poi.length_text || poi.trail?.length_miles) && (
+              <span className="nearby-card__trail-length">{poi.length_text || `${poi.trail.length_miles} mi`}</span>
             )}
-            {poi.trail?.difficulty && (
-              <span className={`nearby-card__trail-difficulty nearby-card__trail-difficulty--${poi.trail.difficulty.toLowerCase()}`}>
-                {poi.trail.difficulty}
+            {(poi.difficulty || poi.trail?.difficulty) && (
+              <span className={`nearby-card__trail-difficulty nearby-card__trail-difficulty--${(poi.difficulty || poi.trail?.difficulty).toLowerCase()}`}>
+                {poi.difficulty || poi.trail?.difficulty}
               </span>
             )}
           </div>

@@ -90,3 +90,40 @@ describe('NearbyCard — event status badges', () => {
     expect(screen.getByText('2.0 mi')).toBeInTheDocument();
   });
 });
+
+// Task 1.4: the nearby card serializer now emits these registry card:true fields
+// as FLAT keys (not nested under trail/event). The card must read them flat.
+describe('NearbyCard — flat registry card fields (Task 1.4)', () => {
+  it('renders trail length_text and difficulty from flat card fields', () => {
+    const poi = {
+      id: 't1', name: 'Blue Trail', poi_type: 'TRAIL', distance_meters: 1609,
+      length_text: '2.5 miles', difficulty: 'Easy',
+    };
+    render(<NearbyCard poi={poi} {...defaultProps} />);
+
+    expect(screen.getByText('2.5 miles')).toBeInTheDocument();
+    expect(screen.getByText('Easy')).toBeInTheDocument();
+  });
+
+  it('renders the wheelchair amenity icon from icon_wheelchair_accessible', () => {
+    const poi = {
+      id: 'b1', name: 'Cafe', poi_type: 'BUSINESS', distance_meters: 100,
+      icon_wheelchair_accessible: true,
+    };
+    render(<NearbyCard poi={poi} {...defaultProps} />);
+
+    expect(screen.getByTitle('Wheelchair Accessible')).toBeInTheDocument();
+  });
+
+  it('renders event date from a flat start_datetime (no nested event object)', () => {
+    const poi = {
+      id: 'e1', name: 'Future Fest', poi_type: 'EVENT', distance_meters: 100,
+      start_datetime: '2030-06-01T10:00:00',
+    };
+    render(<NearbyCard poi={poi} {...defaultProps} />);
+
+    // formatEventDate → locale "Jun 1"; a future date shows no Past badge.
+    expect(screen.getByText(/Jun/i)).toBeInTheDocument();
+    expect(screen.queryByText('Past')).not.toBeInTheDocument();
+  });
+});
