@@ -8323,7 +8323,7 @@ input, button, textarea, select {
   opacity: 0;
   transition: opacity 0.2s ease;
 }
-:hover > .map-scroll-hint {
+.leaflet-container:hover .map-scroll-hint {
   opacity: 1;
 }
 
