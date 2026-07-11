@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EventDetail from '../EventDetail';
@@ -141,20 +141,24 @@ describe('EventDetail', () => {
     expect(dateLine).toHaveTextContent('Jun');
   });
 
-  // --- B2: Cost is no longer surfaced (design gap) ---
+  // --- B2: Cost renders as an InfoRow inside About + Details ---
 
-  it('does not render a COST & TICKETS section or a "Free" cost label', () => {
+  it('renders a "Free" cost row and still no COST & TICKETS accordion', () => {
     renderDetail({ event: { cost_type: 'free' } });
-    // hidden per the POI Accordion show/hide doc: cost only fed the stubbed
-    // QuickInfoPhotosBox, so there is no cost accordion and no cost label.
+    // Cost lives as an InfoRow in About + Details (the old COST & TICKETS
+    // accordion stays gone).
     expect(screen.queryByRole('button', { name: /cost & tickets/i, hidden: true })).not.toBeInTheDocument();
-    expect(screen.queryByText('Free')).not.toBeInTheDocument();
+    expect(screen.getByText('Free', { hidden: true })).toBeInTheDocument();
   });
 
-  it('does not render a price label (event cost is invisible in the redesign)', () => {
+  it('renders a single price as $N in the cost row', () => {
     renderDetail({ event: { cost_type: 'single_price', price: 25 } });
-    // hidden per the POI Accordion show/hide doc: event cost has no render target.
-    expect(screen.queryByText('$25')).not.toBeInTheDocument();
+    expect(screen.getByText('$25', { hidden: true })).toBeInTheDocument();
+  });
+
+  it('renders a cost range as $min - $max in the cost row', () => {
+    renderDetail({ event: { cost_type: 'range', cost_min: 10, cost_max: 40 } });
+    expect(screen.getByText('$10 - $40', { hidden: true })).toBeInTheDocument();
   });
 
   it('renders a single ticket link as a clickable GET TICKETS anchor', () => {
@@ -190,17 +194,16 @@ describe('EventDetail', () => {
     expect(screen.getByText('555-1234')).toBeInTheDocument();
   });
 
-  // --- B2: Venue (link dropped in redesign) ---
+  // --- B2: Venue link ---
 
-  it('venue name renders as plain text even when venue_poi_id exists', () => {
+  it('venue name links to the venue POI when venue_poi_id exists', () => {
     renderDetail({
       event: { venue_name: 'Grand Hall', venue_poi_id: 'venue-abc-123' },
     });
-    // The venue link was dropped in the accordion redesign: renderVenue shows the
-    // venue name as plain InfoRow text, never an anchor, even with a venue_poi_id.
-    const names = screen.getAllByText('Grand Hall', { hidden: true });
-    expect(names.length).toBeGreaterThan(0);
-    expect(screen.queryByRole('link', { name: /grand hall/i, hidden: true })).not.toBeInTheDocument();
+    // The Venue InfoRow links to the venue POI page; the header venue line
+    // stays plain text so there is exactly one link.
+    const venueLink = screen.getByRole('link', { name: /grand hall/i, hidden: true });
+    expect(venueLink).toHaveAttribute('href', '/poi/venue-abc-123');
   });
 
   it('venue name shows as plain text when no venue_poi_id', () => {
@@ -286,5 +289,26 @@ describe('EventDetail', () => {
     // poi.address_street is no longer read here). Panel is closed but in the DOM.
     const addr = screen.getByText(/123 Main St/, { hidden: true });
     expect(addr).toBeInTheDocument();
+  });
+
+  // --- Accordion group: first section opens on load, single-open thereafter ---
+
+  it('opens the first accordion on load and keeps the rest closed', () => {
+    renderDetail({ pet_options: ['Dogs'] });
+    // Default fixture has organizer info, so About + Details is the first
+    // visible section and claims the initial open slot.
+    const about = screen.getByRole('button', { name: /about \+ details/i });
+    const pets = screen.getByRole('button', { name: /pet policy/i, hidden: true });
+    expect(about).toHaveAttribute('aria-expanded', 'true');
+    expect(pets).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('opening another accordion closes the initially open one', () => {
+    renderDetail({ pet_options: ['Dogs'] });
+    const about = screen.getByRole('button', { name: /about \+ details/i });
+    const pets = screen.getByRole('button', { name: /pet policy/i, hidden: true });
+    fireEvent.click(pets);
+    expect(pets).toHaveAttribute('aria-expanded', 'true');
+    expect(about).toHaveAttribute('aria-expanded', 'false');
   });
 });

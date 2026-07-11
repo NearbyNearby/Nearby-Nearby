@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccordionGroup } from './accordionGroupContext';
 
 // Stable, unique DOM id per accordion, derived from its title so the SAME
@@ -15,12 +15,19 @@ export default function AccSection({ title, defaultOpen = false, col1, col2, chi
   const hasC1 = col1 && (Array.isArray(col1) ? col1.some(Boolean) : true);
   const hasC2 = col2 && (Array.isArray(col2) ? col2.some(Boolean) : true);
   const hasChildren = children && (Array.isArray(children) ? children.some(Boolean) : true);
-
-  if (!hasC1 && !hasC2 && !hasChildren) return null;
+  const visible = hasC1 || hasC2 || hasChildren;
 
   const slug = accSlug(title);
   const sectionId = `poi_acc_${slug}`;
   const panelId = `acc_panel_${slug}`;
+
+  // Inside a group, the first visible section claims the initial open slot
+  // (claimInitial is first-wins, so later sections and re-renders are no-ops).
+  useEffect(() => {
+    if (group && visible) group.claimInitial(sectionId);
+  }, [group, visible, sectionId]);
+
+  if (!visible) return null;
   // Single-open when inside an AccordionGroup; otherwise self-managed.
   const open = group ? group.openId === sectionId : localOpen;
   const toggleOpen = () => (group ? group.toggle(sectionId) : setLocalOpen((o) => !o));

@@ -206,7 +206,7 @@ function EventDetail({ poi }) {
       hasContent(event?.organizer_email) ||
       hasContent(event?.organizer_phone) ||
       hasContent(event?.organizer_website);
-    if (!hasDesc && !hasTeaser && !recur && !hasOrganizer && !isCanceled && !hasContent(event?.status_explanation)) {
+    if (!hasDesc && !hasTeaser && !recur && !hasOrganizer && !costLabel && !isCanceled && !hasContent(event?.status_explanation)) {
       return null;
     }
     return (
@@ -223,6 +223,7 @@ function EventDetail({ poi }) {
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(poi.description_long) }}
           />
         )}
+        {costLabel && <InfoRow label="Cost">{costLabel}</InfoRow>}
         {recur && <InfoRow label="Repeats">{recur}</InfoRow>}
         {isCanceled && hasContent(event?.cancellation_paragraph) && (
           <div className="ed-cancellation" role="alert">
@@ -267,7 +268,13 @@ function EventDetail({ poi }) {
     if (!hasVenueSnapshot && !venueName && !hasContent(poi.arrival_methods) && poi.expect_to_pay_parking !== true) return null;
     return (
       <>
-        {venueName && <InfoRow label="Venue">{venueName}</InfoRow>}
+        {venueName && (
+          <InfoRow label="Venue">
+            {event?.venue_poi_id
+              ? <a href={`/poi/${event.venue_poi_id}`}>{venueName}</a>
+              : venueName}
+          </InfoRow>
+        )}
         {!hideExact && hasContent(venueAddrStr) && (
           <InfoRow label="Address">{venueAddrStr}</InfoRow>
         )}
