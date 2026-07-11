@@ -4,7 +4,7 @@ import { MapPin, Navigation, Copy, Check, ExternalLink } from 'lucide-react';
 
 import {
   AccSection, ContentGroup, ChipList, QuickInfoRow,
-  POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox,
+  POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox, SocialLinksGroup, hasSocialLinks,
   hasVal, asArray, copyToClipboard, getImages,
 } from './shared';
 import HoursDisplay from '../common/HoursDisplay';
@@ -85,8 +85,12 @@ export default function TrailDetail({ poi }) {
 
   /* ── Accordion section definitions ── */
   const aboutCol1 = [
+    hasVal(poi.teaser_paragraph) && <ContentGroup key="teaser"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.teaser_paragraph) }} /></ContentGroup>,
     hasVal(poi.description_long) && <ContentGroup key="desc" title="About"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_long) }} /></ContentGroup>,
-    hasVal(poi.outdoor_types) && <ContentGroup key="ot" title="Outdoor Types"><ChipList items={poi.outdoor_types} /></ContentGroup>,
+    // Per doc: Trail About pulls Outdoor Features as NATURAL FEATURES only.
+    hasVal(poi.natural_features) && <ContentGroup key="nf" title="Natural Features"><ChipList items={poi.natural_features.map((f) => (typeof f === 'string' ? f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : f))} /></ContentGroup>,
+    // Per doc: "Categories + Discovery" for a trail = its Trail Experience categories.
+    hasVal(poi.categories) && <ContentGroup key="te" title="Trail Experience"><ChipList items={poi.categories} /></ContentGroup>,
     ig && Object.entries(ig).filter(([k]) => k !== '_legacy').map(([group, items]) =>
       Array.isArray(items) && items.length > 0 && (
         <ContentGroup key={group} title={group.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}><ChipList items={items} /></ContentGroup>
@@ -136,6 +140,8 @@ export default function TrailDetail({ poi }) {
 
   const addrCol2 = [
     hasVal(poi.parking_types) && <ContentGroup key="parking" title="Parking"><ChipList items={poi.parking_types} /></ContentGroup>,
+    hasVal(poi.arrival_methods) && <ContentGroup key="arrival" title="Arrival"><ChipList items={poi.arrival_methods} /></ContentGroup>,
+    poi.expect_to_pay_parking === true && <ContentGroup key="paypark"><div className="acc_content_text"><p>Expect to pay for parking.</p></div></ContentGroup>,
     hasVal(poi.parking_notes) && <ContentGroup key="pnotes"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.parking_notes) }} /></ContentGroup>,
     hasVal(poi.accessible_parking_details) && <ContentGroup key="adaparking" title="ADA Accessible Parking"><ChipList items={poi.accessible_parking_details} /></ContentGroup>,
   ].filter(Boolean);
@@ -178,14 +184,25 @@ export default function TrailDetail({ poi }) {
     ),
   ].filter(Boolean);
 
+  // Accordions hidden per the POI Accordion show/hide doc. Trail keeps About+Hours,
+  // Address+Parking, Trail Guide, Public Restrooms, Pet Policy, Contact.
+  // (Pricing + Passes hidden for now — Pittsboro trails/parks are free.)
+  const HIDDEN_ACCORDIONS = new Set(['mobility', 'drone', 'locally_history', 'pricing']);
   const sections = [
     (aboutCol1.length || aboutCol2.length) && { id: 'about_hours', title: 'About + Hours', defaultOpen: true, col1: aboutCol1, col2: aboutCol2 },
     (addrCol1.length || addrCol2.length) && { id: 'address_parking', title: 'Address + Parking', col1: addrCol1, col2: addrCol2 },
     hasTrailGuide && { id: 'trail_guide', title: 'Trail Guide', col1: trailGuideCol1, col2: trailGuideCol2 },
-    (hasVal(trail.cost) || hasVal(trail.pass_info) || hasVal(poi.discounts)) && {
+    (hasVal(trail.cost) || hasVal(trail.pass_info) || hasVal(poi.discounts) || hasVal(poi.pricing_details) || hasVal(poi.payment_methods)) && {
       id: 'pricing', title: 'Pricing + Passes',
-      col1: [hasVal(trail.cost) && <ContentGroup key="cost" title="Cost"><div className="acc_content_text">{trail.cost}</div></ContentGroup>, hasVal(trail.pass_info) && <ContentGroup key="pass" title="Passes"><div className="acc_content_text">{trail.pass_info}</div></ContentGroup>].filter(Boolean),
-      col2: [hasVal(poi.discounts) && <ContentGroup key="disc" title="Discounts"><div className="acc_content_text">{typeof poi.discounts === 'string' ? <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.discounts) }} /> : <ChipList items={poi.discounts} />}</div></ContentGroup>].filter(Boolean),
+      col1: [
+        hasVal(trail.cost) && <ContentGroup key="cost" title="Cost"><div className="acc_content_text">{trail.cost}</div></ContentGroup>,
+        hasVal(trail.pass_info) && <ContentGroup key="pass" title="Passes"><div className="acc_content_text">{trail.pass_info}</div></ContentGroup>,
+        hasVal(poi.pricing_details) && <ContentGroup key="pdetails" title="Pricing Details"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pricing_details) }} /></ContentGroup>,
+      ].filter(Boolean),
+      col2: [
+        hasVal(poi.payment_methods) && <ContentGroup key="paymeth" title="Payment Methods"><ChipList items={poi.payment_methods} /></ContentGroup>,
+        hasVal(poi.discounts) && <ContentGroup key="disc" title="Discounts"><div className="acc_content_text">{typeof poi.discounts === 'string' ? <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.discounts) }} /> : <ChipList items={poi.discounts} />}</div></ContentGroup>,
+      ].filter(Boolean),
     },
     (hasVal(poi.public_toilets) || hasVal(poi.toilet_description)) && {
       id: 'restrooms', title: 'Public Restrooms',
@@ -203,9 +220,12 @@ export default function TrailDetail({ poi }) {
       col1: [hasVal(poi.pet_options) && <ContentGroup key="po" title="Pets"><ChipList items={poi.pet_options} /></ContentGroup>, hasVal(poi.pet_policy) && <ContentGroup key="pp" title="Policy"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pet_policy) }} /></ContentGroup>].filter(Boolean),
       col2: [<div className="acc_content_group" key="sa"><ServiceAnimalAlert /></div>],
     },
-    hasVal(poi.drone_policy) && {
+    (hasVal(poi.drone_policy) || hasVal(poi.drone_usage)) && {
       id: 'drone', title: 'Drone Policy',
-      col1: [<ContentGroup key="dp" title="Drone Policy"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.drone_policy) }} /></ContentGroup>], col2: [],
+      col1: [
+        hasVal(poi.drone_usage) && <ContentGroup key="du" title="Drone Usage"><div className="acc_content_text"><p>{Array.isArray(poi.drone_usage) ? poi.drone_usage.join(', ') : poi.drone_usage}</p></div></ContentGroup>,
+        hasVal(poi.drone_policy) && <ContentGroup key="dp" title="Drone Policy"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.drone_policy) }} /></ContentGroup>,
+      ].filter(Boolean), col2: [],
     },
     (hasVal(poi.history_paragraph) || hasVal(poi.community_impact)) && {
       id: 'locally_history', title: 'Locally Found + History',
@@ -216,15 +236,18 @@ export default function TrailDetail({ poi }) {
         hasVal(poi.community_impact) && <ContentGroup key="ci" title="Community Impact"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.community_impact) }} /></ContentGroup>,
       ].filter(Boolean),
     },
-    (hasVal(poi.website_url) || hasVal(poi.phone_number) || hasVal(poi.email)) && {
+    (hasVal(poi.website_url) || hasVal(poi.phone_number) || hasVal(poi.email) || hasSocialLinks(poi)) && {
       id: 'contact', title: 'Contact',
       col1: [
         hasVal(poi.phone_number) && <ContentGroup key="ph" title="Phone"><div className="acc_list_group_1"><a href={`tel:${poi.phone_number}`}>{poi.phone_number}</a></div></ContentGroup>,
         hasVal(poi.website_url) && <ContentGroup key="web" title="Website"><div className="acc_list_group_1"><a href={poi.website_url.startsWith('http') ? poi.website_url : `https://${poi.website_url}`} target="_blank" rel="noopener noreferrer">{poi.website_url}</a></div></ContentGroup>,
       ].filter(Boolean),
-      col2: [hasVal(poi.email) && <ContentGroup key="em" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>].filter(Boolean),
+      col2: [
+        hasVal(poi.email) && <ContentGroup key="em" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>,
+        hasSocialLinks(poi) && <SocialLinksGroup key="soc" poi={poi} />,
+      ].filter(Boolean),
     },
-  ].filter(Boolean);
+  ].filter(Boolean).filter((s) => !HIDDEN_ACCORDIONS.has(s.id));
 
   return (
     <>
@@ -255,7 +278,7 @@ export default function TrailDetail({ poi }) {
           <div id="accordion_1_box" className="poi_accordion_box">
             <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
               {sections.map((s) => (
-                <AccSection key={s.id} id={s.id} title={s.title} defaultOpen={!!s.defaultOpen} col1={s.col1} col2={s.col2} />
+                <AccSection key={s.id} title={s.title} defaultOpen={false} col1={s.col1} col2={s.col2} />
               ))}
             </div>
           </div>

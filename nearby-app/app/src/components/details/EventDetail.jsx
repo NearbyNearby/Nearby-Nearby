@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 import {
-  AccSection, QuickInfoRow, QuickInfoPhotosBox,
+  AccSection, QuickInfoRow, QuickInfoPhotosBox, SocialLinksGroup, hasSocialLinks,
   hasVal, copyToClipboard, getCoordinates, getImages,
 } from './shared';
 import InfoRow from './InfoRow';
@@ -23,8 +23,10 @@ import { getDisplayableLocation } from '../../utils/getDisplayableLocation';
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-const EVENT_DISCLAIMER =
-  'While we work to keep event information current and accurate, details may change. We recommend confirming directly with event organizers before making plans.';
+const EVENT_DISCLAIMER = [
+  'While we work to keep event information current and accurate, details may change.',
+  'We recommend confirming directly with event organizers before making plans.',
+];
 
 const hasContent = (v) => {
   if (v === null || v === undefined || v === '') return false;
@@ -197,23 +199,31 @@ function EventDetail({ poi }) {
   /* ---- section renderers ---- */
   const renderAboutDetails = () => {
     const hasDesc = hasContent(poi.description_long);
+    const hasTeaser = hasContent(poi.teaser_paragraph);
     const recur = formatRecurrence(event);
     const hasOrganizer =
       hasContent(event?.organizer_name) ||
       hasContent(event?.organizer_email) ||
       hasContent(event?.organizer_phone) ||
       hasContent(event?.organizer_website);
-    if (!hasDesc && !recur && !hasOrganizer && !isCanceled && !hasContent(event?.status_explanation)) {
+    if (!hasDesc && !hasTeaser && !recur && !hasOrganizer && !costLabel && !isCanceled && !hasContent(event?.status_explanation)) {
       return null;
     }
     return (
       <>
+        {hasTeaser && (
+          <div
+            className="poi_description"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(poi.teaser_paragraph) }}
+          />
+        )}
         {hasDesc && (
           <div
             className="poi_description"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(poi.description_long) }}
           />
         )}
+        {costLabel && <InfoRow label="Cost">{costLabel}</InfoRow>}
         {recur && <InfoRow label="Repeats">{recur}</InfoRow>}
         {isCanceled && hasContent(event?.cancellation_paragraph) && (
           <div className="ed-cancellation" role="alert">
@@ -255,10 +265,16 @@ function EventDetail({ poi }) {
   };
 
   const renderVenue = () => {
-    if (!hasVenueSnapshot && !venueName) return null;
+    if (!hasVenueSnapshot && !venueName && !hasContent(poi.arrival_methods) && poi.expect_to_pay_parking !== true) return null;
     return (
       <>
-        {venueName && <InfoRow label="Venue">{venueName}</InfoRow>}
+        {venueName && (
+          <InfoRow label="Venue">
+            {event?.venue_poi_id
+              ? <a href={`/poi/${event.venue_poi_id}`}>{venueName}</a>
+              : venueName}
+          </InfoRow>
+        )}
         {!hideExact && hasContent(venueAddrStr) && (
           <InfoRow label="Address">{venueAddrStr}</InfoRow>
         )}
@@ -268,6 +284,16 @@ function EventDetail({ poi }) {
               {parkingTypes.map((t, i) => <span key={i} className="poi_chip">{t}</span>)}
             </div>
           </InfoRow>
+        )}
+        {hasContent(poi.arrival_methods) && (
+          <InfoRow label="Arrival">
+            <div className="poi_chip_row">
+              {(Array.isArray(poi.arrival_methods) ? poi.arrival_methods : [poi.arrival_methods]).map((t, i) => <span key={i} className="poi_chip">{t}</span>)}
+            </div>
+          </InfoRow>
+        )}
+        {poi.expect_to_pay_parking === true && (
+          <InfoRow label="Parking Fees">Expect to pay for parking.</InfoRow>
         )}
         {hasContent(poi.parking_notes) && (
           <InfoRow label="Parking Notes">{poi.parking_notes}</InfoRow>
@@ -336,6 +362,7 @@ function EventDetail({ poi }) {
       hasContent(poi.playground_types) ||
       hasContent(poi.playground_surface_types) ||
       hasContent(poi.playground_age_groups) ||
+      hasContent(poi.playground_notes) ||
       poi.inclusive_playground === true;
     if (!hasAny) return null;
     return (
@@ -357,6 +384,11 @@ function EventDetail({ poi }) {
         )}
         {poi.inclusive_playground === true && (
           <InfoRow label="Inclusive Playground">Yes</InfoRow>
+        )}
+        {hasContent(poi.playground_notes) && (
+          <InfoRow label="Notes">
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(poi.playground_notes) }} />
+          </InfoRow>
         )}
         {Array.isArray(poi.playground_ada_checklist) && poi.playground_ada_checklist.length > 0 && (
           <InfoRow label="ADA">{poi.playground_ada_checklist.join(', ')}</InfoRow>
@@ -413,12 +445,25 @@ function EventDetail({ poi }) {
   };
 
   const renderAlcoholSmoking = () => {
-    if (!hasContent(poi.alcohol_available) && !hasContent(poi.smoking_options) && !hasContent(poi.smoking_details)) return null;
+    if (!hasContent(poi.alcohol_available) && !hasContent(poi.alcohol_availability) && poi.byob_allowed !== true && !hasContent(poi.alcohol_notes) && !hasContent(poi.smoking_options) && !hasContent(poi.smoking_details)) return null;
     return (
       <>
         {hasContent(poi.alcohol_available) && (
           <InfoRow label="Alcohol">
             {Array.isArray(poi.alcohol_available) ? poi.alcohol_available.join(', ') : poi.alcohol_available}
+          </InfoRow>
+        )}
+        {hasContent(poi.alcohol_availability) && (
+          <InfoRow label="Available">
+            {Array.isArray(poi.alcohol_availability) ? poi.alcohol_availability.join(', ') : poi.alcohol_availability}
+          </InfoRow>
+        )}
+        {poi.byob_allowed === true && (
+          <InfoRow label="BYOB">Allowed</InfoRow>
+        )}
+        {hasContent(poi.alcohol_notes) && (
+          <InfoRow label="Notes">
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(poi.alcohol_notes) }} />
           </InfoRow>
         )}
         {hasContent(poi.smoking_options) && (
@@ -477,10 +522,12 @@ function EventDetail({ poi }) {
     // double-rendering the same organizer fields.
     const hasAny =
       (Array.isArray(event?.organizer_socials) && event.organizer_socials.length > 0) ||
+      hasSocialLinks(poi) ||
       (event?.contact_organizer_toggle === true && hasContent(event?.organizer_email));
     if (!hasAny) return null;
     return (
       <>
+        {hasSocialLinks(poi) && <SocialLinksGroup poi={poi} />}
         {Array.isArray(event?.organizer_socials) && event.organizer_socials.length > 0 && (
           <InfoRow label="Socials">
             <div className="poi_chip_row">
@@ -559,7 +606,12 @@ function EventDetail({ poi }) {
     { id: 'sponsors', title: 'Sponsors', defaultOpen: false, render: renderSponsors },
   ];
 
+  // Accordions hidden per the POI Accordion show/hide doc. Events keep only
+  // About+Details, Venue Address+Parking, Public Restrooms, Pet Policy, Contact.
+  // Restore one by removing its id from this set.
+  const HIDDEN_ACCORDIONS = new Set(['vendors', 'playground', 'mobility', 'drone', 'alcohol_smoking', 'rentals', 'locally_found', 'sponsors']);
   const sections = ALL_SECTIONS
+    .filter((s) => !HIDDEN_ACCORDIONS.has(s.id))
     .map((s) => ({ ...s, body: s.render() }))
     .filter((s) => s.body != null);
 
@@ -630,14 +682,16 @@ function EventDetail({ poi }) {
           <div id="accordion_1_box" className="poi_accordion_box">
             <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
               {sections.map((s) => (
-                <AccSection key={s.id} id={s.id} title={s.title} defaultOpen={allOpen || s.defaultOpen}>
+                <AccSection key={s.id} title={s.title} defaultOpen={allOpen}>
                   {s.body}
                 </AccSection>
               ))}
             </div>
           </div>
 
-          <div className="ed-disclaimer">{EVENT_DISCLAIMER}</div>
+          <div className="ed-disclaimer">
+            {EVENT_DISCLAIMER.map((sentence, i) => <p key={i}>{sentence}</p>)}
+          </div>
 
           {ticketsOpen && (
             <div className="ed-modal-backdrop" onClick={() => setTicketsOpen(false)}>

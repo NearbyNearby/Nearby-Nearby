@@ -250,6 +250,18 @@ This rule ensures data integrity and prevents accidental modifications to live p
 
 **Always run the apps, scripts, migrations, and tests inside Docker — never directly on the host** (no Python venv; only a partial `node_modules`).
 
+This includes frontend tests and builds. Do NOT run `npx vitest` / `npx vite build` on the host, even if a host `node_modules` happens to work. Host runs are unreproducible and hide platform-specific breakage (example: macOS is case-insensitive, so a host build can pass or fail differently than the Linux Docker build that actually ships). Use the compose `frontend` service:
+
+```bash
+cd nearby-app
+docker compose -f docker-compose.dev.yml run --rm frontend npx vitest run
+docker compose -f docker-compose.dev.yml run --rm frontend npx vite build
+```
+
+`docker compose run` does NOT rebuild an existing image. After any `package.json` change (or if a dependency seems missing in the container), rebuild first: `docker compose -f docker-compose.dev.yml build frontend`.
+
+Known exception: the root `tests/` Python integration suite has no runner container yet (`tests/docker-compose.test.yml` only provides PostGIS + MinIO), so `pytest` runs from the host `.venv-test` against those containers. That is the only tooling allowed on the host.
+
 ---
 
 ## Production Deployment (AWS ECS Fargate)

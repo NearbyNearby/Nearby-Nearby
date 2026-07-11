@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EventDetail from '../EventDetail';
@@ -41,21 +41,28 @@ vi.mock('dompurify', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Always-future so scheduled-event fixtures never age into the past. Any
+// assertion on formatted date text is derived from this same constant.
+const NEXT_JUNE = `${new Date().getFullYear() + 1}-06-01`;
+
 function buildPoi(overrides = {}) {
+  // Pull `event` out so the top-level spread of the remaining overrides can't
+  // clobber the merged event object (which would drop the default start/end dates).
+  const { event: eventOverrides, ...rest } = overrides;
   return {
     id: 'test-id',
     name: 'Test Event',
     poi_type: 'EVENT',
     status: 'Fully Open',
+    location: { type: 'Point', coordinates: [-79.1, 35.7] },
+    ...rest,
     event: {
-      start_datetime: '2026-06-01T10:00:00',
-      end_datetime: '2026-06-01T18:00:00',
+      start_datetime: `${NEXT_JUNE}T10:00:00`,
+      end_datetime: `${NEXT_JUNE}T18:00:00`,
       event_status: 'Scheduled',
       organizer_name: 'Test Org',
-      ...overrides.event,
+      ...eventOverrides,
     },
-    location: { type: 'Point', coordinates: [-79.1, 35.7] },
-    ...overrides,
   };
 }
 
@@ -97,75 +104,70 @@ describe('EventDetail', () => {
     expect(banner).toHaveTextContent('Postponed');
   });
 
-  it('status row shows event_status value (not poi.status)', () => {
-    // When event_status is set, the STATUS: row should show event_status
+  it('event status comes from event.event_status, not poi.status', () => {
+    // The status banner is driven by event.event_status; poi.status ("Fully Open")
+    // is the separate operational status and must not stand in as the event status.
     renderDetail({ status: 'Fully Open', event: { event_status: 'Postponed' } });
-    // The status value span in the header row should contain Postponed (not "Fully Open")
-    const statusValue = document.querySelector('.poi-detail__status-value');
-    expect(statusValue).toHaveTextContent('Postponed');
+    const banner = screen.getByTestId('event-status-banner');
+    expect(banner).toHaveTextContent('Postponed');
+    expect(banner).not.toHaveTextContent('Fully Open');
   });
 
-  // --- B1: Canceled event hides date/time ---
+  // --- B1: Canceled event presentation ---
 
-  it('canceled event hides date badge', () => {
+  it('canceled event shows the cancellation paragraph', () => {
     renderDetail({
-      event: {
-        event_status: 'Canceled',
-        start_datetime: '2026-06-01T10:00:00',
-      },
+      event: { event_status: 'Canceled', cancellation_paragraph: 'This event has been canceled.' },
     });
-    // The date badge (sponsor-badge) should not be present for canceled events
-    const dateBadge = document.querySelector('.poi-detail__sponsor-badge');
-    expect(dateBadge).not.toBeInTheDocument();
+    // Canceled events surface the organizer's cancellation note (in the header
+    // subtitle and again inside the About + Details accordion panel).
+    const notes = screen.getAllByText('This event has been canceled.', { hidden: true });
+    expect(notes.length).toBeGreaterThan(0);
   });
 
-  it('canceled event hides quick-info date row', () => {
-    renderDetail({
-      event: {
-        event_status: 'Canceled',
-        start_datetime: '2026-06-01T10:00:00',
-      },
-    });
-    // The formatted date text (e.g., "June 1, 2026") should not appear in the quick-info section
-    // The start_datetime should be hidden when canceled
-    expect(screen.queryByText(/June 1, 2026/i)).not.toBeInTheDocument();
+  it('does not render the quick-info photos box', () => {
+    renderDetail({ event: { event_status: 'Canceled' } });
+    // hidden per the POI Accordion show/hide doc: QuickInfoPhotosBox renders null,
+    // so the old quick-info rows (Cost/Pets/Best For) and date box never appear.
+    expect(document.getElementById('poi_quick_info_photos_box')).toBeNull();
   });
 
-  it('scheduled event shows date badge and quick info date', () => {
-    renderDetail({
-      event: {
-        event_status: 'Scheduled',
-        start_datetime: '2026-06-01T10:00:00',
-      },
-    });
-    // Date badge
-    const dateBadge = document.querySelector('.poi-detail__sponsor-badge');
-    expect(dateBadge).toBeInTheDocument();
-    // Quick info shows the date
-    expect(screen.getByText(/June 1, 2026/i)).toBeInTheDocument();
+  it('scheduled event shows the formatted date/time line in the header', () => {
+    renderDetail({ event: { event_status: 'Scheduled' } });
+    // formatEventDateTime renders as the header main-category (e.g. "Jun 1st • 10am-6pm").
+    const dateLine = document.querySelector('.poi_page_main_category');
+    expect(dateLine).toBeInTheDocument();
+    expect(dateLine).toHaveTextContent('10am-6pm');
+    expect(dateLine).toHaveTextContent('Jun');
   });
 
-  // --- B2: COST & TICKETS section ---
+  // --- B2: Cost renders as an InfoRow inside About + Details ---
 
-  it('renders "Free" in COST & TICKETS when cost_type is "free"', () => {
+  it('renders a "Free" cost row and still no COST & TICKETS accordion', () => {
     renderDetail({ event: { cost_type: 'free' } });
-    // Accordion button for the section
-    expect(screen.getByRole('button', { name: /cost & tickets/i })).toBeInTheDocument();
-    expect(screen.getByText('Free')).toBeInTheDocument();
+    // Cost lives as an InfoRow in About + Details (the old COST & TICKETS
+    // accordion stays gone).
+    expect(screen.queryByRole('button', { name: /cost & tickets/i, hidden: true })).not.toBeInTheDocument();
+    expect(screen.getByText('Free', { hidden: true })).toBeInTheDocument();
   });
 
-  it('renders price in COST & TICKETS when cost is set and cost_type is "single_price"', () => {
-    renderDetail({ event: { cost_type: 'single_price' }, cost: '$25' });
-    expect(screen.getByText('$25')).toBeInTheDocument();
+  it('renders a single price as $N in the cost row', () => {
+    renderDetail({ event: { cost_type: 'single_price', price: 25 } });
+    expect(screen.getByText('$25', { hidden: true })).toBeInTheDocument();
   });
 
-  it('ticket URL renders as clickable link', () => {
+  it('renders a cost range as $min - $max in the cost row', () => {
+    renderDetail({ event: { cost_type: 'range', cost_min: 10, cost_max: 40 } });
+    expect(screen.getByText('$10 - $40', { hidden: true })).toBeInTheDocument();
+  });
+
+  it('renders a single ticket link as a clickable GET TICKETS anchor', () => {
     renderDetail({
-      event: { cost_type: 'free' },
-      ticket_link: 'https://tickets.example.com',
+      event: { ticket_links: [{ platform: 'Eventbrite', url: 'https://tickets.example.com' }] },
     });
-    // Accordion content is hidden (display:none) initially; use hidden:true to find it
-    const link = screen.getByRole('link', { name: /buy tickets/i, hidden: true });
+    // ticket_links (array of {platform, url}) replaced the old singular ticket_link;
+    // a single link renders a GET TICKETS header button as an anchor.
+    const link = screen.getByRole('link', { name: /get tickets/i });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute('href', 'https://tickets.example.com');
   });
@@ -194,17 +196,14 @@ describe('EventDetail', () => {
 
   // --- B2: Venue link ---
 
-  it('venue name links to venue POI when venue_poi_id exists', () => {
+  it('venue name links to the venue POI when venue_poi_id exists', () => {
     renderDetail({
-      event: {
-        venue_name: 'Grand Hall',
-        venue_poi_id: 'venue-abc-123',
-      },
+      event: { venue_name: 'Grand Hall', venue_poi_id: 'venue-abc-123' },
     });
-    // Accordion content is initially hidden; use hidden:true
+    // The Venue InfoRow links to the venue POI page; the header venue line
+    // stays plain text so there is exactly one link.
     const venueLink = screen.getByRole('link', { name: /grand hall/i, hidden: true });
-    expect(venueLink).toBeInTheDocument();
-    expect(venueLink).toHaveAttribute('href', expect.stringContaining('venue-abc-123'));
+    expect(venueLink).toHaveAttribute('href', '/poi/venue-abc-123');
   });
 
   it('venue name shows as plain text when no venue_poi_id', () => {
@@ -223,10 +222,11 @@ describe('EventDetail', () => {
 
   // --- B2: Description HTML rendering ---
 
-  it('renders description_long as HTML content (not escaped text)', () => {
+  it('renders description_long as HTML inside the About + Details accordion', () => {
     renderDetail({ description_long: '<strong>Bold text</strong> in description.' });
-    // The strong element should be rendered, not shown as raw HTML string
-    const strong = document.querySelector('.poi-detail__description-box strong');
+    // The old .poi-detail__description-box is gone; long description now renders as
+    // sanitized HTML in the About + Details accordion (closed on load, still in DOM).
+    const strong = document.querySelector('.poi_description strong');
     expect(strong).toBeInTheDocument();
     expect(strong).toHaveTextContent('Bold text');
   });
@@ -240,22 +240,22 @@ describe('EventDetail', () => {
     expect(screen.getByText('Dogs on leash only.')).toBeInTheDocument();
   });
 
-  it('renders drone_policy as HTML (not escaped text)', () => {
+  it('does not render drone policy (Drone accordion hidden per doc)', () => {
     renderDetail({ drone_usage: ['Allowed'], drone_policy: '<p>FAA rules apply.</p>' });
-    expect(screen.queryByText('<p>FAA rules apply.</p>')).not.toBeInTheDocument();
-    expect(screen.getByText('FAA rules apply.')).toBeInTheDocument();
+    // hidden per the POI Accordion show/hide doc: events drop the Drone Policy accordion.
+    expect(screen.queryByText('FAA rules apply.')).not.toBeInTheDocument();
   });
 
-  it('renders rental_info as HTML (not escaped text)', () => {
+  it('does not render rental info (Rentals accordion hidden per doc)', () => {
     renderDetail({ available_for_rent: true, rental_info: '<p>Contact us to book.</p>' });
-    expect(screen.queryByText('<p>Contact us to book.</p>')).not.toBeInTheDocument();
-    expect(screen.getByText('Contact us to book.')).toBeInTheDocument();
+    // hidden per the POI Accordion show/hide doc: events drop the Rentals accordion.
+    expect(screen.queryByText('Contact us to book.')).not.toBeInTheDocument();
   });
 
-  it('renders community_impact as HTML (not escaped text)', () => {
+  it('does not render community impact (Locally Found accordion hidden per doc)', () => {
     renderDetail({ community_impact: '<p>Supports local charities.</p>' });
-    expect(screen.queryByText('<p>Supports local charities.</p>')).not.toBeInTheDocument();
-    expect(screen.getByText('Supports local charities.')).toBeInTheDocument();
+    // hidden per the POI Accordion show/hide doc: events drop the Locally Found + History accordion.
+    expect(screen.queryByText('Supports local charities.')).not.toBeInTheDocument();
   });
 
   // --- General rendering ---
@@ -270,19 +270,45 @@ describe('EventDetail', () => {
     expect(screen.getByTestId('nearby-section')).toBeInTheDocument();
   });
 
-  it('renders description_short as subtitle', () => {
+  it('does not render description_short as subtitle', () => {
     renderDetail({ description_short: 'A great outdoor event.' });
-    expect(screen.getByText('A great outdoor event.')).toBeInTheDocument();
+    // hidden per the POI Accordion show/hide doc: description_short only fed the
+    // stubbed QuickInfoPhotosBox, so the subtitle no longer appears.
+    expect(screen.queryByText('A great outdoor event.')).not.toBeInTheDocument();
   });
 
-  it('renders address in quick info when address_street is set', () => {
-    renderDetail({ address_street: '123 Main St' });
-    // Address appears in the quick-info section (visible) and possibly in the accordion
-    const addressItems = screen.getAllByText('123 Main St');
-    // At least the quick-info item should be present
-    expect(addressItems.length).toBeGreaterThan(0);
-    // The quick-info item should be visible (not in a hidden panel)
-    const quickInfoItem = document.querySelector('.poi-detail__info-item .poi-detail__info-text');
-    expect(quickInfoItem).toHaveTextContent('123 Main St');
+  it('renders the venue address in the Venue Address + Parking accordion', () => {
+    renderDetail({
+      event: {
+        venue_address_street: '123 Main St',
+        venue_address_city: 'Pittsboro',
+        venue_address_state: 'NC',
+      },
+    });
+    // Event address comes from the event.venue_address_* snapshot fields (top-level
+    // poi.address_street is no longer read here). Panel is closed but in the DOM.
+    const addr = screen.getByText(/123 Main St/, { hidden: true });
+    expect(addr).toBeInTheDocument();
+  });
+
+  // --- Accordion group: first section opens on load, single-open thereafter ---
+
+  it('opens the first accordion on load and keeps the rest closed', () => {
+    renderDetail({ pet_options: ['Dogs'] });
+    // Default fixture has organizer info, so About + Details is the first
+    // visible section and claims the initial open slot.
+    const about = screen.getByRole('button', { name: /about \+ details/i });
+    const pets = screen.getByRole('button', { name: /pet policy/i, hidden: true });
+    expect(about).toHaveAttribute('aria-expanded', 'true');
+    expect(pets).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('opening another accordion closes the initially open one', () => {
+    renderDetail({ pet_options: ['Dogs'] });
+    const about = screen.getByRole('button', { name: /about \+ details/i });
+    const pets = screen.getByRole('button', { name: /pet policy/i, hidden: true });
+    fireEvent.click(pets);
+    expect(pets).toHaveAttribute('aria-expanded', 'true');
+    expect(about).toHaveAttribute('aria-expanded', 'false');
   });
 });

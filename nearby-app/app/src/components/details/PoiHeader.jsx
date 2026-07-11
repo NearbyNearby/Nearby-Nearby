@@ -242,6 +242,13 @@ export default function PoiHeader({
     statusWordColor = '#7A4E00';
     statusTopText = 'Opens Soon';
   }
+  // Barry's poi_status slot is the admin-set OPERATIONAL status ("Fully Open",
+  // "Temporarily Closed", ...). Prefer it when present; the hours-derived word
+  // above is only a fallback for POIs without one.
+  const opStatus = typeof poi?.status === 'string' && poi.status.trim() ? poi.status.trim() : null;
+  if (opStatus) statusTopText = opStatus;
+  const statusMessage =
+    typeof poi?.status_message === 'string' && poi.status_message.trim() ? poi.status_message.trim() : null;
   const _statusSpace = statusLabel ? statusLabel.indexOf(' ') : -1;
   const statusLead = statusLabel ? (_statusSpace === -1 ? statusLabel : statusLabel.slice(0, _statusSpace)) : '';
   const statusRest = statusLabel && _statusSpace !== -1 ? statusLabel.slice(_statusSpace) : '';
@@ -259,6 +266,9 @@ export default function PoiHeader({
 
           {statusTopText && (
             <div className="poi_status">{statusTopText}</div>
+          )}
+          {statusMessage && (
+            <div className="poi_status_message">{statusMessage}</div>
           )}
 
           <div className="poi_intro">

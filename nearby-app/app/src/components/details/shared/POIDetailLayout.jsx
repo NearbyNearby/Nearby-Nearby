@@ -6,9 +6,12 @@ import PhotoLightbox from '../PhotoLightbox';
 import HeroBanner from '../HeroBanner';
 import SuggestEditOverlay from '../SuggestEditOverlay';
 import PoiHeader from '../PoiHeader';
+import AccordionGroup from './AccordionGroup';
 import DirectionsModal from '../../common/DirectionsModal';
-import AttributeSections from '../AttributeSections';
-import { bespokeAutoKeysFor } from '../widgets/bespokeCoverage';
+// Auto-dump sections (Core Information / Business Details / Pricing / Metadata)
+// hidden per the POI Accordion show/hide doc — see the commented render below.
+// import AttributeSections from '../AttributeSections';
+// import { bespokeAutoKeysFor } from '../widgets/bespokeCoverage';
 
 import { getDisplayableLocation } from '../../../utils/getDisplayableLocation';
 import { isPaidTier } from '../../../utils/poiTier';
@@ -125,16 +128,18 @@ export default function POIDetailLayout({
 
       <main id="main_content" className="pb50px">
         <div className="wrapper_default">
-          {typeof children === 'function'
-            ? children({ images, openLightbox, paid, displayLoc, coords, copiedCoords })
-            : children}
+          {/* Single-open accordions: only one POI accordion open at a time */}
+          <AccordionGroup>
+            {typeof children === 'function'
+              ? children({ images, openLightbox, paid, displayLoc, coords, copiedCoords })
+              : children}
+          </AccordionGroup>
 
-          {/* Registry-driven auto fields: renders every public render==="auto"
-              field for this POI type below the bespoke sections. render!=="auto"
-              fields are excluded by groupsFor; auto fields a detail page already
-              renders in a curated section are excluded via bespokeAutoKeysFor so
-              nothing is double-rendered. */}
-          <AttributeSections poi={poi} excludeKeys={bespokeAutoKeysFor(poi?.poi_type)} />
+          {/* Registry-driven auto fields (Core Information / Business Details /
+              Pricing / Metadata) hidden per the POI Accordion show/hide doc so
+              only the bespoke, doc-specified accordions show. Restore by
+              uncommenting this line and the two imports at the top of the file.
+              <AttributeSections poi={poi} excludeKeys={bespokeAutoKeysFor(poi?.poi_type)} /> */}
         </div>
       </main>
 

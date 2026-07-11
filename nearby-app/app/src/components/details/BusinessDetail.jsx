@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 import {
   AccSection, ContentGroup, ChipList, QuickInfoRow,
-  POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox,
+  POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox, SocialLinksGroup, hasSocialLinks,
   hasVal, asArray, getImages,
 } from './shared';
 import HoursDisplay from '../common/HoursDisplay';
@@ -52,16 +52,24 @@ export default function BusinessDetail({ poi }) {
     IDEAL_FOR_GROUPS.forEach(({ key }) => { const arr = ideal[key]; if (Array.isArray(arr) && arr.length) parts.push(...arr); });
     return parts.length ? parts.join(', ') : null;
   })();
-  const costLabel = poi?.business?.price_range || poi?.price_range_per_person || null;
+  const costLabel = poi?.business?.price_range || poi?.price_range_per_person || poi?.pricing || null;
   const parkingLabel = Array.isArray(poi?.parking_types) && poi.parking_types.length > 0 ? poi.parking_types.join(', ') : null;
 
   const amenitiesFlat = useMemo(() => {
     const a = poi?.amenities;
-    if (!a || typeof a !== 'object') return [];
     const out = [];
-    Object.values(a).forEach((v) => {
-      if (Array.isArray(v)) v.forEach((x) => hasVal(x) && out.push(typeof x === 'object' ? (x.name || x.label || '') : String(x)));
-    });
+    if (a && typeof a === 'object') {
+      Object.values(a).forEach((v) => {
+        if (Array.isArray(v)) v.forEach((x) => hasVal(x) && out.push(typeof x === 'object' ? (x.name || x.label || '') : String(x)));
+      });
+    }
+    // Server-computed icon booleans (same labels AmenityPillStrip paints on
+    // the other detail pages' amenity boxes).
+    if (poi?.icon_public_restroom) out.push('Public Restroom');
+    if (poi?.icon_free_wifi) out.push('Wi-Fi Access');
+    if (poi?.icon_wheelchair_accessible) out.push('Wheelchair Accessible');
+    if (poi?.icon_pet_friendly) out.push('Pet Friendly');
+    if (poi?.playground_available) out.push('Playgrounds');
     return Array.from(new Set(out.filter(Boolean)));
   }, [poi]);
 
@@ -71,20 +79,6 @@ export default function BusinessDetail({ poi }) {
     ? [poi.address_street, poi.address_city, poi.address_state, poi.address_zip].filter(Boolean).join(', ')
     : null;
   const alcoholLabel = poi?.alcohol_available ? (ALCOHOL_LABELS[poi.alcohol_available] || poi.alcohol_available) : null;
-
-  const socialLinks = (() => {
-    const out = [];
-    const s = poi?.social_media;
-    if (s && typeof s === 'object') {
-      Object.entries(s).forEach(([key, val]) => {
-        if (hasVal(val)) {
-          const url = typeof val === 'string' ? val : (val.url || val.link);
-          if (url) out.push({ label: key.charAt(0).toUpperCase() + key.slice(1), url });
-        }
-      });
-    }
-    return out;
-  })();
 
   const menuLinks = poi?.menu_link ? [{ title: 'Menu', url: poi.menu_link }] : null;
   const buildLinkGroup = (title, items) => {
@@ -101,6 +95,7 @@ export default function BusinessDetail({ poi }) {
 
   /* ── Accordion sections ──────────────────────────────────────── */
   const aboutCol1 = [
+    hasVal(poi?.teaser_paragraph) && <ContentGroup key="teaser"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.teaser_paragraph) }} /></ContentGroup>,
     hasVal(poi?.description_long) && <ContentGroup key="desc"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_long) }} /></ContentGroup>,
     Array.isArray(poi?.categories) && poi.categories.length > 0 && <ContentGroup key="cats" title="Categories"><ChipList items={poi.categories.map((c) => c.name || c.label || '')} /></ContentGroup>,
     goodForLabel && (
@@ -138,9 +133,23 @@ export default function BusinessDetail({ poi }) {
       </div>
     </ContentGroup>
   )] : [];
+  // Entry notes belong with the address (how to find / get in the door).
+  if (hasVal(poi?.business_entry_notes)) {
+    addrCol1.push(
+      <ContentGroup key="entry" title="Entry Notes">
+        <div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.business_entry_notes) }} />
+      </ContentGroup>
+    );
+  }
 
   const addrCol2 = [
     hasVal(poi?.parking_types) && <ContentGroup key="parking" title="Parking"><ChipList items={poi.parking_types} /></ContentGroup>,
+    hasVal(poi?.arrival_methods) && <ContentGroup key="arrival" title="Arrival"><ChipList items={poi.arrival_methods} /></ContentGroup>,
+    poi?.expect_to_pay_parking === true && (
+      <ContentGroup key="paypark">
+        <div className="acc_content_text"><p>Expect to pay for parking.</p></div>
+      </ContentGroup>
+    ),
     hasVal(poi?.parking_notes) && (
       <ContentGroup key="pnotes">
         <div className="acc_content_text"><p>{poi.parking_notes}</p></div>
@@ -150,9 +159,12 @@ export default function BusinessDetail({ poi }) {
 
   const pricingCol1 = [
     hasVal(costLabel) && <ContentGroup key="price" title="Average Price"><div className="acc_content_text">{costLabel}</div></ContentGroup>,
-    hasVal(poi?.description_pricing) && <ContentGroup key="pricing" title="Pricing Details"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_pricing) }} /></ContentGroup>,
+    // NOTE: the API field is pricing_details (description_pricing never existed
+    // on the wire — it silently rendered nothing).
+    hasVal(poi?.pricing_details) && <ContentGroup key="pricing" title="Pricing Details"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pricing_details) }} /></ContentGroup>,
   ].filter(Boolean);
   const pricingCol2 = [
+    hasVal(poi?.payment_methods) && <ContentGroup key="paymeth" title="Payment Methods"><ChipList items={poi.payment_methods} /></ContentGroup>,
     hasVal(poi?.discounts) && (
       <ContentGroup key="disc" title="Discounts + Offers">
         <div className="acc_content_text"><ul>{asArray(poi.discounts).map((d, i) => <li key={i}>{typeof d === 'object' ? (d.title || d.label || d.name || '') : d}</li>)}</ul></div>
@@ -161,11 +173,19 @@ export default function BusinessDetail({ poi }) {
   ].filter(Boolean);
 
   const menuCol1 = [buildLinkGroup('Menu', menuLinks), buildLinkGroup('Reservations', poi?.reservation_links)].filter(Boolean);
-  const menuCol2 = [buildLinkGroup('Delivery + Takeout', poi?.delivery_links)].filter(Boolean);
+  const menuCol2 = [
+    buildLinkGroup('Delivery + Takeout', poi?.delivery_links),
+    buildLinkGroup('Online Ordering', poi?.online_ordering_links),
+    buildLinkGroup('Appointments', poi?.appointment_links),
+  ].filter(Boolean);
 
   const alcSmokCol1 = [
     hasVal(alcoholLabel) && <ContentGroup key="alc" title="Alcohol"><div className="acc_content_text">{alcoholLabel}</div></ContentGroup>,
+    hasVal(poi?.alcohol_availability) && <ContentGroup key="alcav" title="Available"><ChipList items={poi.alcohol_availability} /></ContentGroup>,
+    hasVal(poi?.alcohol_options) && <ContentGroup key="alcopt" title="Options"><ChipList items={poi.alcohol_options} /></ContentGroup>,
+    poi?.byob_allowed === true && <ContentGroup key="byob"><div className="acc_content_text"><p>BYOB allowed.</p></div></ContentGroup>,
     hasVal(poi?.alcohol_policy_details) && <ContentGroup key="alcp" title="Alcohol Policy"><div className="acc_content_text">{poi.alcohol_policy_details}</div></ContentGroup>,
+    hasVal(poi?.alcohol_notes) && <ContentGroup key="alcn" title="Notes"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.alcohol_notes) }} /></ContentGroup>,
   ].filter(Boolean);
   const alcSmokCol2 = [
     hasVal(poi?.smoking_options) && <ContentGroup key="smokeopt" title="Smoking"><ChipList items={poi.smoking_options} /></ContentGroup>,
@@ -197,6 +217,7 @@ export default function BusinessDetail({ poi }) {
   ].filter(Boolean);
   const playgroundCol2 = [
     hasVal(poi?.playground_age_groups) && <ContentGroup key="pag" title="Age Groups"><ChipList items={poi.playground_age_groups} /></ContentGroup>,
+    hasVal(poi?.playground_notes) && <ContentGroup key="pgn" title="Notes"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.playground_notes) }} /></ContentGroup>,
     poi?.inclusive_playground === true && hasVal(poi?.playground_ada_checklist) && <ContentGroup key="pad" title="Inclusive Playground Checklist"><ChipList items={poi.playground_ada_checklist} /></ContentGroup>,
   ].filter(Boolean);
 
@@ -206,18 +227,18 @@ export default function BusinessDetail({ poi }) {
   ].filter(Boolean);
   const contactCol2 = [
     hasVal(poi?.email) && <ContentGroup key="email" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>,
-    socialLinks.length > 0 && (
-      <ContentGroup key="soc" title="Social Media">
-        <div className="acc_list_group_1">{socialLinks.map((s, i) => <a key={i} href={s.url} target="_blank" rel="noreferrer">{s.label}</a>)}</div>
-      </ContentGroup>
-    ),
+    hasSocialLinks(poi) && <SocialLinksGroup key="soc" poi={poi} />,
   ].filter(Boolean);
 
   // Single section list. The server tier-gates the underlying fields, so
   // free-tier listings naturally have empty Menu/Alcohol/Playground sections
   // and those sections self-hide via the empty-column filter below.
+  // Accordions hidden per the POI Accordion show/hide doc. The builders above
+  // are kept intact; to restore an accordion, remove its key from this set.
+  const HIDDEN_ACCORDIONS = new Set(['menu', 'alc', 'wc', 'play']);
+
   const ALL_SECTIONS = [
-    { key: 'about', title: 'About + Details', open: true, col1: aboutCol1, col2: aboutCol2 },
+    { key: 'about', title: 'About + Hours', open: true, col1: aboutCol1, col2: aboutCol2 },
     { key: 'addr', title: 'Address + Parking', open: true, col1: addrCol1, col2: addrCol2 },
     { key: 'price', title: 'Pricing + Offers', open: false, col1: pricingCol1, col2: pricingCol2 },
     { key: 'menu', title: 'Menu + Ordering', open: false, col1: menuCol1, col2: menuCol2 },
@@ -228,7 +249,7 @@ export default function BusinessDetail({ poi }) {
     { key: 'play', title: 'Playground', open: false, col1: playgroundCol1, col2: playgroundCol2 },
     { key: 'contact', title: 'Contact', open: false, col1: contactCol1, col2: contactCol2 },
   ];
-  const sections = ALL_SECTIONS.filter((s) => s.col1.length > 0 || s.col2.length > 0);
+  const sections = ALL_SECTIONS.filter((s) => !HIDDEN_ACCORDIONS.has(s.key) && (s.col1.length > 0 || s.col2.length > 0));
 
   return (
     <>
@@ -264,7 +285,7 @@ export default function BusinessDetail({ poi }) {
             <div id="accordion_1_box" className="poi_accordion_box">
               <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
                 {sections.map((s) => (
-                  <AccSection key={s.key} title={s.title} defaultOpen={s.open} col1={s.col1.length > 0 ? s.col1 : null} col2={s.col2.length > 0 ? s.col2 : null} />
+                  <AccSection key={s.key} title={s.title} defaultOpen={false} col1={s.col1.length > 0 ? s.col1 : null} col2={s.col2.length > 0 ? s.col2 : null} />
                 ))}
               </div>
             </div>

@@ -210,11 +210,13 @@ GROUP_ORDER = {
     "Parking": 90,
     "Accessibility": 100,
     "Restrooms": 110,
-    "Alcohol & Smoking": 120,
+    # NOTE: rendered accordion titles — keep Barry's "X + Y" title style
+    # (nn-templates/single-poi-page-01.html) rather than "&".
+    "Alcohol + Smoking": 120,
     "Pets": 130,
     "Playground": 140,
     "Outdoor Features": 150,
-    "Hunting & Fishing": 160,
+    "Hunting + Fishing": 160,
     "Trail Details": 170,
     "Trailhead & Access": 180,
     "Event Details": 190,
@@ -224,6 +226,7 @@ GROUP_ORDER = {
     "Memberships": 230,
     "Community": 240,
     "Images & Media": 250,
+    "Maps + Guides": 255,
     "Disaster Response": 260,
     "Admin Only": 270,
     "Metadata": 280,
@@ -234,7 +237,7 @@ _GROUPS_RAW = {
     "Core Information": [
         "poi_type", "name", "slug", "teaser_paragraph", "description_short",
         "description_long", "history_paragraph", "status", "status_message",
-        "is_verified", "is_disaster_hub", "lat_long_most_accurate",
+        "is_verified", "lat_long_most_accurate",
         "listing_type", "is_sponsor", "sponsor_level", "primary_type_id",
         "publication_status", "has_been_published",
     ],
@@ -259,7 +262,7 @@ _GROUPS_RAW = {
     ],
     "Pricing": [
         "cost", "pricing_details", "discounts", "payment_methods",
-        "cost_type",
+        "cost_type", "price_range",
     ],
     "Menu & Ordering": [
         "menu_photos", "menu_link", "delivery_links", "reservation_links",
@@ -279,7 +282,7 @@ _GROUPS_RAW = {
         "accessible_restroom_details",
         "payphone_locations",
     ],
-    "Alcohol & Smoking": [
+    "Alcohol + Smoking": [
         "alcohol_options", "alcohol_policy_details", "alcohol_available",
         "alcohol_availability", "byob_allowed", "alcohol_notes",
         "smoking_options", "smoking_details",
@@ -297,7 +300,7 @@ _GROUPS_RAW = {
         "outdoor_types", "things_to_do", "birding_wildlife", "drone_usage",
         "drone_policy", "drone_usage_policy",
     ],
-    "Hunting & Fishing": [
+    "Hunting + Fishing": [
         "hunting_fishing_allowed", "hunting_types", "fishing_allowed",
         "fishing_types", "licenses_required", "hunting_fishing_info",
     ],
@@ -340,11 +343,17 @@ _GROUPS_RAW = {
     ],
     "Community": [
         "service_locations", "locally_found_at", "article_links",
-        "community_impact", "organization_memberships", "price_range",
+        "community_impact", "organization_memberships",
+        # a disaster-hub designation is community info, not a "Core
+        # Information" row (kills the junk Core Information accordion)
+        "is_disaster_hub",
     ],
     "Images & Media": [
-        "featured_image", "gallery_photos", "photos", "downloadable_maps",
+        "featured_image", "gallery_photos", "photos",
         "business_entry_notes", "park_entry_notes",
+    ],
+    "Maps + Guides": [
+        "downloadable_maps",
     ],
     "Disaster Response": [
         "compliance",
@@ -615,8 +624,27 @@ RENDER_BESPOKE = {
     # location sublists rendered bespoke (lat/long aware)
     "parking_locations", "toilet_locations", "playground_locations",
     "payphone_locations", "access_points",
-    # hero / gallery imagery
-    "featured_image",
+    # hero / gallery imagery; photos / gallery_photos / menu_photos are flat
+    # projections of the poi.images gallery already painted by
+    # QuickInfoPhotosBox + PhotoLightbox on every detail page
+    "featured_image", "photos", "gallery_photos", "menu_photos",
+    # operational status painted in the PoiHeader poi_status slot (Barry's
+    # single-poi template); status_message renders directly under it
+    "status", "status_message",
+    # teaser painted as the intro line of every About accordion
+    "teaser_paragraph",
+    # "Last updated <date>" line painted by PoiHeader
+    "last_updated",
+    # server-computed amenity icon booleans + playground flag painted by the
+    # AmenitiesBox/AmenityPillStrip pill row on every detail page
+    "icon_public_restroom", "icon_free_wifi", "icon_wheelchair_accessible",
+    "icon_pet_friendly", "playground_available",
+    # social handles painted by SocialLinksGroup inside every Contact accordion
+    "instagram_username", "facebook_username", "x_username",
+    "tiktok_username", "linkedin_username", "other_socials",
+    # arrival / entry / parking-fee facts painted inside every Address +
+    # Parking accordion (business_entry_notes is BUSINESS-only)
+    "arrival_methods", "expect_to_pay_parking", "business_entry_notes",
     # appointment / booking surfaced inside the bespoke HoursDisplay panel on
     # every detail page (Business/Trail/Park/Generic/Event) — not a standalone row.
     "appointment_booking_url", "hours_but_appointment_required",
@@ -626,17 +654,9 @@ RENDER_BESPOKE = {
 # DOWNGRADED_TO_AUTO: keys the render audit proposed as "bespoke" but which no
 # detail component actually paints (verified against bespoke_covered + a source
 # grep). Auto-rendering is safer than letting them silently disappear.
-#   teaser_paragraph     - no component reads it (QuickInfoPhotosBox uses
-#                          description_short as its title)
-#   status, status_message - PoiHeader derives open/closed from `hours`, not
-#                          from these business-status columns
-#   menu_photos          - not read anywhere in the detail components
-#   gallery_photos, photos - not read anywhere (gallery_images image[] is the
-#                          real gallery source)
 #   recurrence_end_date  - feeds recurrence logic but is not rendered as a row
 DOWNGRADED_TO_AUTO = {
-    "teaser_paragraph", "status", "status_message", "menu_photos",
-    "gallery_photos", "photos", "recurrence_end_date",
+    "recurrence_end_date",
 }
 # RENDER_HIDDEN: public-audience fields that must never be a display row —
 # internal routing/moderation/workflow flags, raw coordinates that only feed the
@@ -651,6 +671,11 @@ RENDER_HIDDEN = {
     # internal display-control toggle (hides exact location on the map); it is a
     # moderation flag, not a user-facing attribute row.
     "dont_display_location",
+    # system timestamp — workflow metadata, never a display row (last_updated
+    # IS displayed, by PoiHeader — see RENDER_BESPOKE).
+    "created_at",
+    # what3words is backend-only per spec (#41) — never rendered publicly.
+    "what3words_address",
     # Task 2.1: event vendors are rendered by the dedicated EventVendors component
     # (via /pois/{id}/vendors), not the generic auto field-row — hide the flat
     # vendor_poi_links row to avoid a double render.
