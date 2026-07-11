@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import NearbyCard from '../NearbyCard.jsx';
 
+// Always-future so scheduled-event fixtures never age into the past.
+const NEXT_JUNE = `${new Date().getFullYear() + 1}-06-01`;
+
 function buildPoi(overrides = {}) {
   return {
     id: 'test-id',
@@ -9,7 +12,7 @@ function buildPoi(overrides = {}) {
     poi_type: 'EVENT',
     distance_meters: 1609,
     event: {
-      start_datetime: '2026-06-01T10:00:00',
+      start_datetime: `${NEXT_JUNE}T10:00:00`,
       event_status: 'Scheduled',
       ...overrides.event,
     },
@@ -60,7 +63,7 @@ describe('NearbyCard — event status badges', () => {
   });
 
   it('does NOT show a status badge for a scheduled future event', () => {
-    const poi = buildPoi({ event: { start_datetime: '2026-06-01T10:00:00', event_status: 'Scheduled' } });
+    const poi = buildPoi({ event: { start_datetime: `${NEXT_JUNE}T10:00:00`, event_status: 'Scheduled' } });
     render(<NearbyCard poi={poi} {...defaultProps} />);
 
     expect(screen.queryByText('Canceled')).not.toBeInTheDocument();
@@ -69,7 +72,7 @@ describe('NearbyCard — event status badges', () => {
   });
 
   it('renders event date normally for a scheduled event', () => {
-    const poi = buildPoi({ event: { start_datetime: '2026-06-01T10:00:00', event_status: 'Scheduled' } });
+    const poi = buildPoi({ event: { start_datetime: `${NEXT_JUNE}T10:00:00`, event_status: 'Scheduled' } });
     render(<NearbyCard poi={poi} {...defaultProps} />);
 
     // The date is rendered via formatEventDate; check for "Jun" which will be in any locale-formatted Jun 1
