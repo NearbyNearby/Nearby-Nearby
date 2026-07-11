@@ -124,7 +124,7 @@ export default function GenericDetail({ poi }) {
         statusVariant={_statusVariant || undefined}
         statusLabel={_statusLabel}
       >
-        {({ images: imgs, openLightbox, autoSections }) => (
+        {({ images: imgs, openLightbox }) => (
           <>
             <QuickInfoPhotosBox
               title={hasVal(poi.description_short) ? poi.description_short : undefined}
@@ -151,7 +151,6 @@ export default function GenericDetail({ poi }) {
                     col1={s.col1.length > 0 ? s.col1 : null}
                     col2={s.col2.length > 0 ? s.col2 : null} />
                 ))}
-                {autoSections}
               </div>
             </div>
           </>

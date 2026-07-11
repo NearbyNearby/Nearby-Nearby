@@ -404,9 +404,16 @@ export default function ParkDetail({ poi }) {
   const costValue = poi.park?.cost || poi.cost || (poi.listing_type === 'free' ? 'Free' : null);
   const petSummary = asArray(poi.pet_options).join(', ');
 
+  // Accordions hidden per the POI Accordion show/hide doc. Park keeps About+Hours,
+  // Address+Parking, Public Restrooms, Playground, Pet Policy, Contact.
+  // (Pricing + Passes hidden for now — Pittsboro parks are free.)
+  const HIDDEN_ACCORDIONS = new Set([
+    'pricing_passes', 'mobility_access', 'drone_policy', 'alcohol_smoking',
+    'night_sky', 'birding_wildlife', 'hunting_fishing', 'rentals', 'locally_history',
+  ]);
   const sections = buildSections(poi, {
     displayLoc, handleDirections, handleCopyAddress, handleCopyCoords, copiedAddress, copiedCoords,
-  });
+  }).filter((s) => !HIDDEN_ACCORDIONS.has(s.id));
 
   return (
     <>
@@ -416,7 +423,7 @@ export default function ParkDetail({ poi }) {
       statusVariant={_statusVariant || undefined}
       statusLabel={_statusLabel}
     >
-      {({ images: imgs, openLightbox, autoSections }) => (
+      {({ images: imgs, openLightbox }) => (
         <>
           <QuickInfoPhotosBox
             title={poi.description_short}
@@ -446,9 +453,8 @@ export default function ParkDetail({ poi }) {
           <div id="accordion_1_box" className="poi_accordion_box">
             <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
               {sections.map((s) => (
-                <AccSection key={s.id} id={s.id} title={s.title} defaultOpen={!!s.defaultOpen} col1={s.col1} col2={s.col2} />
+                <AccSection key={s.id} title={s.title} defaultOpen={false} col1={s.col1} col2={s.col2} />
               ))}
-              {autoSections}
             </div>
           </div>
         </>

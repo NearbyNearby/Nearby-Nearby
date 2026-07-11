@@ -23,8 +23,10 @@ import { getDisplayableLocation } from '../../utils/getDisplayableLocation';
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-const EVENT_DISCLAIMER =
-  'While we work to keep event information current and accurate, details may change. We recommend confirming directly with event organizers before making plans.';
+const EVENT_DISCLAIMER = [
+  'While we work to keep event information current and accurate, details may change.',
+  'We recommend confirming directly with event organizers before making plans.',
+];
 
 const hasContent = (v) => {
   if (v === null || v === undefined || v === '') return false;
@@ -597,7 +599,12 @@ function EventDetail({ poi }) {
     { id: 'sponsors', title: 'Sponsors', defaultOpen: false, render: renderSponsors },
   ];
 
+  // Accordions hidden per the POI Accordion show/hide doc. Events keep only
+  // About+Details, Venue Address+Parking, Public Restrooms, Pet Policy, Contact.
+  // Restore one by removing its id from this set.
+  const HIDDEN_ACCORDIONS = new Set(['vendors', 'playground', 'mobility', 'drone', 'alcohol_smoking', 'rentals', 'locally_found', 'sponsors']);
   const sections = ALL_SECTIONS
+    .filter((s) => !HIDDEN_ACCORDIONS.has(s.id))
     .map((s) => ({ ...s, body: s.render() }))
     .filter((s) => s.body != null);
 
@@ -650,7 +657,7 @@ function EventDetail({ poi }) {
         </div>
       }
     >
-      {({ images: imgs, openLightbox, autoSections }) => (
+      {({ images: imgs, openLightbox }) => (
         <>
           <QuickInfoPhotosBox
             title={hasContent(poi.description_short) ? poi.description_short : undefined}
@@ -668,15 +675,16 @@ function EventDetail({ poi }) {
           <div id="accordion_1_box" className="poi_accordion_box">
             <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
               {sections.map((s) => (
-                <AccSection key={s.id} id={s.id} title={s.title} defaultOpen={allOpen || s.defaultOpen}>
+                <AccSection key={s.id} title={s.title} defaultOpen={allOpen}>
                   {s.body}
                 </AccSection>
               ))}
-              {autoSections}
             </div>
           </div>
 
-          <div className="ed-disclaimer">{EVENT_DISCLAIMER}</div>
+          <div className="ed-disclaimer">
+            {EVENT_DISCLAIMER.map((sentence, i) => <p key={i}>{sentence}</p>)}
+          </div>
 
           {ticketsOpen && (
             <div className="ed-modal-backdrop" onClick={() => setTicketsOpen(false)}>
