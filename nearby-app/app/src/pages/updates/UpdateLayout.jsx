@@ -4,11 +4,11 @@ import { Link } from 'react-router-dom';
 // (page_header_style_1 / wrapper_default / main_content_padding) with the
 // post's date, title, and excerpt in the header, the post image screened into
 // that header, the post body (children), and an "All Updates" button at the end.
-function UpdateLayout({ title, dateLabel, excerpt, image, children }) {
+function UpdateLayout({ title, dateLabel, excerpt, image, imageAlt, children }) {
   return (
     <>
       <header className={`page_header_style_1${image ? ' update_header_hero' : ''}`}>
-        {image && <img className="update_header_image" src={image} alt="" />}
+        {image && <img className="update_header_image" src={image} alt={imageAlt || ''} />}
         <div className="wrapper_default update_header">
           {dateLabel && <p className="update_meta">{dateLabel}</p>}
           <h1 className="page_title">{title}</h1>
