@@ -26,6 +26,7 @@ import SuggestEvent from './pages/SuggestEvent';
 import EventsCalendar from './pages/EventsCalendar';
 import DisasterNetwork from './pages/DisasterNetwork';
 import Help from './pages/Help';
+import Sitemap from './pages/Sitemap';
 import Updates from './pages/Updates';
 import { updates } from './data/updates';
 
@@ -69,6 +70,7 @@ function App() {
           <Route path="/events-calendar" element={<EventsCalendar />} />
           <Route path="/disaster-network" element={<DisasterNetwork />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/sitemap" element={<Sitemap />} />
           {/* Updates (blog) — index + one route per post from the registry */}
           <Route path="/updates" element={<Updates />} />
           {updates.map(post => (
