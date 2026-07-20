@@ -165,7 +165,8 @@ export default function Footer() {
             <ul className="list_footer">
               <li><Link to="/">Home</Link></li>
               <li><Link to="/explore">Explore</Link></li>
-              <li><Link to="/help">Help / FAQ's</Link></li>
+              {/* Hidden until the Help / FAQ page has real content (#129). Restore this line to bring it back. */}
+              {/* <li><Link to="/help">Help / FAQ's</Link></li> */}
               <li><Link to="/suggest-event">Suggest an Event</Link></li>
               <li><Link to="/disaster-network">Disaster Network</Link></li>
             </ul>
