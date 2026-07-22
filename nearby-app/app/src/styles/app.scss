@@ -3562,6 +3562,7 @@ section,
   border: 1px solid #ccc;
   border-radius: 4px;
   cursor: pointer;
+  color: var(--nn-dark);
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
   transition: all 0.2s ease;
@@ -3624,6 +3625,7 @@ section,
   border: none;
   text-align: left;
   cursor: pointer;
+  color: var(--nn-dark);
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
   transition: background 0.2s ease;
@@ -3685,6 +3687,8 @@ section,
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
+  color: var(--nn-dark);
+  -webkit-text-fill-color: var(--nn-dark);
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
 
@@ -3712,6 +3716,7 @@ section,
   border: 1px solid #ccc;
   border-radius: 4px;
   cursor: pointer;
+  color: var(--nn-dark);
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
   transition: all 0.2s ease;
@@ -3768,6 +3773,7 @@ section,
   border: none;
   text-align: left;
   cursor: pointer;
+  color: var(--nn-dark);
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
   transition: background 0.2s ease;
