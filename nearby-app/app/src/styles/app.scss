@@ -1560,11 +1560,14 @@ ul + h5 {
   justify-content: center;
   align-items: center;
 
+  .overlay_content {
+    min-width: 300px;
+  }
 }
 
 .nav_overlay_box {
-  width: 90%;
-  max-width: 800px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
 
   @media (min-width: 1200px) {
@@ -8379,7 +8382,7 @@ $color_hint: #3c3c3c;
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--gray-a);
+  color: var(--nn-teal1);
   display: flex;
   align-items: center;
   pointer-events: none;
@@ -8573,7 +8576,7 @@ $color_hint: #3c3c3c;
   padding: 12px 16px;
   border-top: 1px solid var(--gray-d);
   color: var(--nn-teal2);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease;
@@ -8811,10 +8814,11 @@ $color_hint: #3c3c3c;
   left: 20px;
   top: 50%;
   transform: translateY(-50%);
-  color: gray;
+  color: var(--nn-teal1);
   pointer-events: none;
   display: flex;
   align-items: center;
+  z-index: 2; /* sit above SearchBar's relatively-positioned white input, which otherwise paints over the icon */
 
   @media(min-width:600px) {
     
@@ -14997,7 +15001,7 @@ margin-top: 6px;
 
 .search_container .search-bar-input__icon {
   left: 20px;
-  color: $nn_purple1;
+  color: var(--nn-teal1);
 }
 
 .search_container .search-bar-input input {

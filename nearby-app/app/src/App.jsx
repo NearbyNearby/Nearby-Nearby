@@ -25,7 +25,7 @@ import ClaimBusiness from './pages/ClaimBusiness';
 import SuggestEvent from './pages/SuggestEvent';
 import EventsCalendar from './pages/EventsCalendar';
 import DisasterNetwork from './pages/DisasterNetwork';
-import Help from './pages/Help';
+// import Help from './pages/Help'; // #129: Help page hidden from the site (kept for future re-enable)
 import Updates from './pages/Updates';
 import { updates } from './data/updates';
 
@@ -68,7 +68,8 @@ function App() {
           <Route path="/suggest-place" element={<Navigate to="/claim-business" replace />} />
           <Route path="/events-calendar" element={<EventsCalendar />} />
           <Route path="/disaster-network" element={<DisasterNetwork />} />
-          <Route path="/help" element={<Help />} />
+          {/* #129: /help route hidden from the site — kept (commented) for future re-enable */}
+          {/* <Route path="/help" element={<Help />} /> */}
           {/* Updates (blog) — index + one route per post from the registry */}
           <Route path="/updates" element={<Updates />} />
           {updates.map(post => (

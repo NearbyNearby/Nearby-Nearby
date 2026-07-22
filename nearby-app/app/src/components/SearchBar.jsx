@@ -12,6 +12,7 @@ const SearchBar = forwardRef(function SearchBar({
   onSearch = null,       // callback fired on Enter (no dropdown selection) or search button
   selectedType = null,   // optional POI type filter (e.g. "BUSINESS")
   initialQuery = '',     // pre-fill query
+  showSuggestions = true, // when false, no fuzzy dropdown — text entry + Enter/Search only (#114)
   inputId,
 }, ref) {
   const [searchQuery, setSearchQuery] = useState(initialQuery);
@@ -69,6 +70,8 @@ const SearchBar = forwardRef(function SearchBar({
   // filtered ids stay computed against the old, narrower set and the newly-in-
   // range matches would be wrongly hidden until the user re-typed.
   useEffect(() => {
+    // #114: overlay search passes showSuggestions=false — no fuzzy dropdown at all.
+    if (!showSuggestions) return;
     const delayDebounce = setTimeout(() => {
       if (searchQuery.trim().length > 0) {
         fetchSearchResults(searchQuery);
@@ -79,7 +82,7 @@ const SearchBar = forwardRef(function SearchBar({
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery, selectedType, nearbyPoiIds]);
+  }, [searchQuery, selectedType, nearbyPoiIds, showSuggestions]);
 
   const fetchSearchResults = async (query) => {
     setIsLoading(true);
@@ -191,7 +194,7 @@ const SearchBar = forwardRef(function SearchBar({
         />
       </div>
       <SearchDropdown
-        visible={showDropdown}
+        visible={showDropdown && showSuggestions}
         anchorEl={inputRef.current}
         isLoading={isLoading}
         results={searchResults}
