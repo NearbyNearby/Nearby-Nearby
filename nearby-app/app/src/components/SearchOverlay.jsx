@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Search } from 'lucide-react';
 import Overlay from './Overlay';
 import SearchBar from './SearchBar';
 
@@ -46,11 +47,7 @@ export default function SearchOverlay({ isOpen, onClose, panelRef }) {
             </label>
             <div className="search_input_wrapper">
               <span className="search_icon" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 25" xmlns="http://www.w3.org/2000/svg" style={{fillRule:'evenodd',clipRule:'evenodd',strokeLinejoin:'round',strokeMiterlimit:2}}>
-                  <g transform="matrix(0.0468773,0,0,0.0468773,0,0)">
-                    <path d="M416,208C416,253.9 401.1,296.3 376,330.7L502.6,457.4C515.1,469.9 515.1,490.2 502.6,502.7C490.1,515.2 469.8,515.2 457.3,502.7L330.7,376C296.3,401.2 253.9,416 208,416C93.1,416 0,322.9 0,208C0,93.1 93.1,0 208,0C322.9,0 416,93.1 416,208ZM208,352C287.5,352 352,287.5 352,208C352,128.5 287.5,64 208,64C128.5,64 64,128.5 64,208C64,287.5 128.5,352 208,352Z" style={{fill:'rgb(86,37,86)',fillRule:'nonzero'}}/>
-                  </g>
-                </svg>
+                <Search size={20} />
               </span>
               <SearchBar
                 ref={searchBarRef}

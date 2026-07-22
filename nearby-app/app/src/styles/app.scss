@@ -8373,7 +8373,7 @@ $color_hint: #3c3c3c;
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--gray-a);
+  color: var(--nn-teal1);
   display: flex;
   align-items: center;
   pointer-events: none;
@@ -8805,10 +8805,11 @@ $color_hint: #3c3c3c;
   left: 20px;
   top: 50%;
   transform: translateY(-50%);
-  color: gray;
+  color: var(--nn-teal1);
   pointer-events: none;
   display: flex;
   align-items: center;
+  z-index: 2; /* sit above SearchBar's relatively-positioned white input, which otherwise paints over the icon */
 
   @media(min-width:600px) {
     
@@ -14991,7 +14992,7 @@ margin-top: 6px;
 
 .search_container .search-bar-input__icon {
   left: 20px;
-  color: $nn_purple1;
+  color: var(--nn-teal1);
 }
 
 .search_container .search-bar-input input {
