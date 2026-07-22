@@ -57,6 +57,7 @@ export default function SearchOverlay({ isOpen, onClose, panelRef }) {
                 inputId="one_search"
                 placeholder="What's nearby? Search for locations or interests..."
                 onSearch={handleSearch}
+                showSuggestions={false}
               />
             </div>
             <button type="submit" className="button btn_search">Search</button>

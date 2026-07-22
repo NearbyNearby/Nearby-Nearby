@@ -1560,11 +1560,14 @@ ul + h5 {
   justify-content: center;
   align-items: center;
 
+  .overlay_content {
+    min-width: 300px;
+  }
 }
 
 .nav_overlay_box {
-  width: 90%;
-  max-width: 800px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
 
   @media (min-width: 1200px) {
@@ -8567,7 +8570,7 @@ $color_hint: #3c3c3c;
   padding: 12px 16px;
   border-top: 1px solid var(--gray-d);
   color: var(--nn-teal2);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease;
