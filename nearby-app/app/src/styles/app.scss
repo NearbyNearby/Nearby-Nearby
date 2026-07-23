@@ -3607,10 +3607,18 @@ section,
   border: 1px solid #ccc;
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
+  min-width: 230px;
+  max-width: 230px;
   z-index: 1000;
   padding: 8px 0;
 
+  /* #136: on mobile, anchor to the button's right edge and cap width so the
+     dropdown (and the date field's calendar icon) stay inside the viewport */
+  @media (max-width: 640px) {
+    left: auto;
+    right: 0;
+    max-width: calc(100vw - 24px);
+  }
 }
 
 .dropdown_show_event_options[hidden] {
@@ -3676,22 +3684,74 @@ section,
 }
 
 .date_dropdown_date_label span {
-  display: block;
+  display: flex;
   margin-bottom: 6px;
   font-weight: 500;
 
 }
 
 .date_dropdown_date_input {
+  position: relative;
   width: 100%;
-  padding: 8px;
+  min-width: 0;    /* date inputs have an intrinsic min width; without this width:100% can't shrink and the field overflows the dropdown */
+  max-width: 100%;
+  padding: 10px 38px 10px 12px; /* right room for the calendar icon */
   border: 1px solid #ccc;
   border-radius: 4px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 15px; /* 16px avoids iOS focus-zoom and renders the placeholder reliably */
+  /* #136: iOS rendered this as a blank grey box. Force a white field with dark,
+     left-aligned text so the mm/dd/yyyy placeholder shows like desktop, and add a
+     custom calendar icon so iOS gets one too (iOS omits the native indicator). */
+  background-color: #fff;
   color: var(--nn-dark);
   -webkit-text-fill-color: var(--nn-dark);
-  font-family: 'Poppins', sans-serif;
-  font-size: 14px;
+  min-height: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%231A2128' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px 18px;
+}
 
+/* Left-align the value/placeholder that iOS renders in the shadow DOM */
+.date_dropdown_date_input::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+/* Make the WHOLE field open the picker on click: stretch the (invisible) native
+   indicator across the field. Fixes desktop, where only the tiny native icon was
+   clickable; our custom calendar icon shows underneath as the visual. */
+.date_dropdown_date_input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* #136: iOS Safari renders NOTHING for an empty date input (no placeholder).
+   So we overlay our own "mm/dd/yyyy" span when the field is empty (React state),
+   and hide the native empty placeholder on desktop so it doesn't double up. */
+.date_dropdown_date_field {
+  position: relative;
+  display: block;
+}
+.date_dropdown_date_ph {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999; /* browser-like placeholder grey */
+  font-size: 16px;
+  font-family: 'Poppins', sans-serif;
+  pointer-events: none; /* clicks pass through to the input/picker */
+}
+.date_dropdown_date_input.is-empty {
+  color: transparent;
+  -webkit-text-fill-color: transparent; /* hide native empty placeholder (desktop) */
 }
 
 .date_dropdown_date_input:focus {

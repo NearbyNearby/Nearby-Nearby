@@ -389,13 +389,16 @@ function NearbySection({ currentPOI }) {
                       <div className="date_dropdown_custom">
                         <label className="date_dropdown_date_label">
                           <span>Pick a date</span>
-                          <input
-                            type="date"
-                            className="date_dropdown_date_input"
-                            value={selectedDate}
-                            min={getDatePresets().today}
-                            onChange={(e) => { setSelectedDate(e.target.value); setDateOpen(false); }}
-                          />
+                          <span className="date_dropdown_date_field">
+                            <input
+                              type="date"
+                              className={`date_dropdown_date_input${selectedDate ? '' : ' is-empty'}`}
+                              value={selectedDate}
+                              min={getDatePresets().today}
+                              onChange={(e) => { setSelectedDate(e.target.value); setDateOpen(false); }}
+                            />
+                            {!selectedDate && <span className="date_dropdown_date_ph" aria-hidden="true">mm/dd/yyyy</span>}
+                          </span>
                         </label>
                       </div>
                     </div>
