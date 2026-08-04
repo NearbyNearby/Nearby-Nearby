@@ -3105,7 +3105,27 @@ section,
 }
 
 //--- single update post header + body ---
+// Post image screened into the purple header. Scoped to .update_header_hero so
+// other pages using .page_header_style_1 are untouched.
+.update_header_hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.update_header_image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .06;
+  pointer-events: none;
+}
+
 .update_header {
+  position: relative;
+  z-index: 1;
   text-align: left;
 }
 
@@ -3119,17 +3139,6 @@ section,
 
 .update_excerpt {
   margin-top: 14px;
-}
-
-.update_featured_image {
-  margin: 0 0 35px 0;
-
-  img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-  }
 }
 
 .update_inline_image {

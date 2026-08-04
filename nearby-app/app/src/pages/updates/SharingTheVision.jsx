@@ -6,6 +6,7 @@ function SharingTheVision() {
       title="Sharing the Vision of Nearby Nearby: Featured Speaker at Two Chatham County Networking Events"
       dateLabel="May 24, 2024"
       image="/media/featured-image-sharing-the-vision-of-nearby-nearby-featured-speaker-at-two-chatham-county-networking-events-01.webp"
+      imageAlt="An illustrated small town main street with local shops, cafe tables, and people walking along the sidewalk in autumn."
       excerpt={"This past month, Rhonda Jean, founder and CEO of Nearby Nearby, had the exciting opportunity to serve as the featured speaker at two major networking events in Chatham County."}
     >
       <p>These events marked the first time the vision of Nearby Nearby was shared publicly before Dualboot took over to build the wireframe, and the response from local business owners and community members was overwhelmingly positive.</p>

@@ -6,6 +6,7 @@ function FromInnovationToImpact() {
       title="From Innovation to Impact: The Evolution of Nearby Nearby and Our Vision for the Future"
       dateLabel="May 24, 2024"
       image="/media/featured-image-from-innovation-to-impact-the-evolution-of-nearby-nearby-and-our-vision-for-the-future-01.webp"
+      imageAlt="An illustrated map covered in numbered purple location pins, with a large gold star pin at the center."
       excerpt={"For too long, rural businesses, events, and local services have struggled—not because they aren’t valuable, but because they aren’t visible. Information is scattered, word-of-mouth only goes so far, and major platforms overlook…"}
     >
       <h2 className="title_style_3">For Rural Communities, Connection is Everything</h2>

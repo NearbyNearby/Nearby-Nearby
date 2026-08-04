@@ -6,6 +6,7 @@ function LookingAhead2025() {
       title="Looking Ahead through 2025: Strengthening Rural Connections and Opportunities"
       dateLabel="January 22, 2025"
       image="/media/featured-image-looking-ahead-through-2025-strengthening-rural-connections-and-opportunities-01.webp"
+      imageAlt="An aerial view of farmland at sunset, with red barns, grain silos, and a straight country road running to the horizon."
       excerpt={"In 2025, Nearby Nearby is set to amplify its impact and capabilities, focusing on how we can better serve rural communities—not just as a local discovery platform connecting residents, visitors, and businesses through our…"}
     >
       <p><strong>In 2025, Nearby Nearby is set to amplify its impact and capabilities, focusing on how we can better serve rural communities—not just as a local discovery platform connecting residents, visitors, and businesses through our patent-pending One Search feature, but as the first platform purpose-built for rural America. </strong>Our goal is to go beyond discovery, connecting rural entrepreneurs and businesses with the entrepreneurial ecosystems and resources that already exist to support them, acting as a bridge to link everyone together.</p>
