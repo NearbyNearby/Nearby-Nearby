@@ -12364,6 +12364,11 @@ margin-top: 0;
   grid-gap: 0;
   position: relative;
   cursor: pointer;
+  // Cards in a row are stretched to equal height by the parent grid. Without
+  // this, the auto rows stretch too and spread the content apart on cards with
+  // fewer lines (an Event has no hours row, so it sprawled). Keep content
+  // packed at the top and let the leftover height sit at the bottom.
+  align-content: start;
 
   @media(min-width:600px) {
     
@@ -12631,6 +12636,10 @@ margin-top: 0;
   gap: 35px;
   justify-content: flex-start;
   align-items: stretch;
+  // The column fills the fixed height of #map_results_layout_1 (800px+ at
+  // 1200px up). Without this the auto rows stretch to share that height, so a
+  // short result set (Events, Trails) produced very tall cards.
+  align-content: start;
   position: relative;
   z-index: 0;
   padding: 35px 5%;
