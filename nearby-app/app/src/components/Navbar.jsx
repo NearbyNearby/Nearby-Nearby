@@ -129,9 +129,10 @@ export default function Navbar({ navOverlay, searchOverlay }) {
                       &#9662;
                     </button>
                     <ul role="menu" className={`aaa_menu_1_sub_menu${moreOpen ? ' aaa_menu_open' : ''}`}>
-                      <li role="none" className="aaa_menu_1_list_item">
+                      {/* Hidden until the Help / FAQ page has real content (#129). Restore this block to bring it back. */}
+                      {/* <li role="none" className="aaa_menu_1_list_item">
                         <Link role="menuitem" to="/help" className="aaa_menu_1_link" onClick={navOverlay.close}>Help / FAQ's</Link>
-                      </li>
+                      </li> */}
                       <li role="none" className="aaa_menu_1_list_item">
                         <Link role="menuitem" to="/contact" className="aaa_menu_1_link" onClick={navOverlay.close}>Contact</Link>
                       </li>

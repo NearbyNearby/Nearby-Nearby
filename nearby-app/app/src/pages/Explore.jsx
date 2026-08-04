@@ -569,9 +569,10 @@ export default function Explore() {
                       <div className="date_dropdown_custom">
                         <label className="date_dropdown_date_label">
                           <span>Pick a date</span>
+                          <span className="date_dropdown_date_field">
                           <input
                             type="date"
-                            className="date_dropdown_date_input"
+                            className={`date_dropdown_date_input${customDate ? '' : ' is-empty'}`}
                             value={customDate}
                             onChange={(e) => {
                               setCustomDate(e.target.value);
@@ -579,6 +580,8 @@ export default function Explore() {
                               setDateOpen(false);
                             }}
                           />
+                          {!customDate && <span className="date_dropdown_date_ph" aria-hidden="true">mm/dd/yyyy</span>}
+                          </span>
                         </label>
                       </div>
                     </div>

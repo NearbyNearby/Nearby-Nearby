@@ -10,6 +10,7 @@ export default function useOverlay(id, { focusTargetId = null, skipDesktop = fal
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef(null);
   const triggerRef = useRef(null);
+  const hasOpenedRef = useRef(false); // stays false until first opened — prevents focusing the trigger on initial mount
 
   const open = useCallback(() => {
     if (skipDesktop && window.innerWidth >= 1200) return;
@@ -45,10 +46,13 @@ export default function useOverlay(id, { focusTargetId = null, skipDesktop = fal
   // Focus management
   useEffect(() => {
     if (!isOpen) {
-      // Restore focus to trigger on close
-      if (triggerRef.current) triggerRef.current.focus();
+      // Restore focus to the trigger on close — but ONLY after the overlay has
+      // been opened at least once. Otherwise this fires on the initial mount
+      // (isOpen starts false) and leaves a focus ring on the trigger by default.
+      if (hasOpenedRef.current && triggerRef.current) triggerRef.current.focus();
       return;
     }
+    hasOpenedRef.current = true;
 
     const timer = setTimeout(() => {
       if (focusTargetId) {

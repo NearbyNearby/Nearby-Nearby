@@ -21,6 +21,13 @@ export default function DirectionsModal({ isOpen, onClose, poiName, coords, poi 
 
   const dontDisplay = poi?.dont_display_location;
 
+  const primaryCategory =
+    poi?.main_category?.name ||
+    poi?.categories?.find(c => c.is_main)?.category?.name ||
+    poi?.categories?.[0]?.category?.name ||
+    poi?.categories?.[0]?.name ||
+    null;
+
   /* ── URL builders ── */
   const buildUrl = (service) => {
     if (coords && !dontDisplay) {
@@ -95,6 +102,10 @@ export default function DirectionsModal({ isOpen, onClose, poiName, coords, poi 
         </button>
 
         <h3 className="directions-modal__title">{poiName}</h3>
+
+        {primaryCategory && (
+          <p className="directions-modal__category">{primaryCategory}</p>
+        )}
 
         {/* Address display — show city/state only when exact is hidden */}
         {dontDisplay ? (
