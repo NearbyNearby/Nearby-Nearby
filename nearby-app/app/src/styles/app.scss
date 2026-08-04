@@ -165,7 +165,10 @@ $client-bg-color: $nn_gold;
 // ── Overlay system variables (moved from styles/nn/overlay.scss) ──
 // ─── Variables ──────────────────────────────────────
 // Brand / theme
-$color-primary:           #1a1a2e;
+// NOTE: named $overlay-color-primary, not $color-primary, because Sass treats
+// `-` and `_` as the same character in identifiers — $color-primary would
+// silently overwrite the $color_primary defined above in this same block.
+$overlay-color-primary:   #1a1a2e;
 $color-active-bg:         hsla(350, 75%, 40%, 1);   // AAA-safe active state
 $color-active-text:       hsla(0, 0%, 100%, 1);
 
@@ -6037,7 +6040,7 @@ body.overlay_lock {
   h1 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: $color-primary;
+    color: $overlay-color-primary;
     letter-spacing: -0.02em;
   }
 
@@ -7410,6 +7413,11 @@ body.overlay_lock {
   min-height: 100vh;
   background: $color_bg;
   padding: 60px 20px 80px;
+  // Clear the fixed mobile nav bar so the bottom of the form isn't hidden
+  // behind it. Below 1200px the nav is fixed to the viewport bottom.
+  @media (max-width: 1199px) {
+    padding-bottom: calc(80px + $mobile_nav_height);
+  }
 }
 
 .form_page__container {
@@ -11407,6 +11415,10 @@ transition: transform .2s;
   font-weight: bold;
 }
 
+.poi_quick_info_single_info {
+  color: $nn_gray;
+}
+
 .poi_photos {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -13070,9 +13082,6 @@ margin-top: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  @media (max-width: 1199px) {
-    padding-bottom: calc(80px + $mobile_nav_height);
-  }
 }
 
 
