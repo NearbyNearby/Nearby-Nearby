@@ -8,6 +8,10 @@ function accSlug(title) {
   return (title || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
+// Matches the scrollOffset used by Barry's original nn-templates/inc/accordion.js
+// (its openSection() scrolls the newly-opened section to this far from the top).
+const SCROLL_OFFSET = 120;
+
 export default function AccSection({ title, defaultOpen = false, col1, col2, children }) {
   const group = useAccordionGroup();
   const [localOpen, setLocalOpen] = useState(!!defaultOpen);
@@ -30,8 +34,27 @@ export default function AccSection({ title, defaultOpen = false, col1, col2, chi
   if (!visible) return null;
   // Single-open when inside an AccordionGroup; otherwise self-managed.
   const open = group ? group.openId === sectionId : localOpen;
-  const toggleOpen = () => (group ? group.toggle(sectionId) : setLocalOpen((o) => !o));
   const useColumns = hasC1 || hasC2;
+
+  // Only user-initiated opens scroll (matches original: the initial auto-open
+  // via claimInitial above never scrolls, since the page just loaded at top).
+  const toggleOpen = () => {
+    const willOpen = !open;
+    if (group) group.toggle(sectionId); else setLocalOpen((o) => !o);
+    if (willOpen) {
+      // Wait a frame for the panel's display change to actually reflow before
+      // measuring its position, then scroll it to the same offset from the
+      // top Barry's original template used.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el = document.getElementById(sectionId);
+          if (!el) return;
+          const top = el.getBoundingClientRect().top + window.pageYOffset;
+          window.scrollTo({ top: top - SCROLL_OFFSET, behavior: 'smooth' });
+        });
+      });
+    }
+  };
 
   return (
     <div id={sectionId} className={`acc_section${open ? ' acc_active' : ''}`}>
