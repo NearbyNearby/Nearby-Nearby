@@ -6,6 +6,7 @@ function RuralSmallTownAmerica() {
       title="Rural and Small Town America Deserves Better. Here Is What We Have Been Doing About It."
       dateLabel="June 5, 2026"
       image="/media/featured-image-rural-and-small-town-america-deserves-better-here-is-what-we-have-been-doing-about-it-01.webp"
+      imageAlt="The Nearby Nearby app showing a map of central North Carolina with numbered listing pins, filter controls, and nearby business cards."
       excerpt={"On America’s 250th birthday, we are bringing community, independence, and resilience to the places that have always embodied those values and have too often been left to do it alone."}
     >
       <p>The last time we posted here, we were talking about what 2025 was going to look like for Nearby Nearby. What we did not know then was just how much ground we were about to cover, how many rooms we were about to walk into, and how many things we were about to learn, or the amazing mentors that would step up and guide our path.</p>

@@ -6,6 +6,7 @@ function JoinsCedGroAccelerator() {
       title="Nearby Nearby Joins the CED GRO Accelerator: Driving Innovation in Tech"
       dateLabel="May 24, 2024"
       image="/media/featured-image-nearby-nearby-joins-the-ced-gro-accelerator-driving-innovation-in-tech-01.webp"
+      imageAlt="A hand holding a phone that displays a map with location pins, with blurred storefronts in the background."
       excerpt={"We are thrilled to announce that Nearby Nearby has been selected as one of the eight high-potential startups in the Council for Entrepreneurial Development GRO Accelerator program, an exciting opportunity to drive innovation and…"}
     >
       <p>We are part of the eighth cohort, which includes seven technology companies and one medical device company, each chosen for their potential to make a significant impact in their respective industries.</p>

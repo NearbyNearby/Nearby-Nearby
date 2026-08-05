@@ -6,6 +6,7 @@ function RuralAmericaWasNeverBroken() {
       title="Rural America Was Never Broken—It’s Just Been Overlooked"
       dateLabel="February 27, 2025"
       image="/media/featured-image-rural-america-was-never-broken-its-just-been-overlooked-01.webp"
+      imageAlt="A weathered wooden barn with an American flag on its side, lit by golden morning light above a small town main street."
       excerpt={"Rural America isn’t struggling because it’s incapable—it’s struggling because it’s been made invisible. The businesses, services, and events that fuel small towns aren’t failing due to a lack of quality or effort; they’re facing…"}
     >
       <p>For decades, the conversation around rural America has been framed as a problem to solve. The assumption? That rural communities are struggling because they’re behind, that they need fixing, that they should be more like urban centers to thrive.</p>

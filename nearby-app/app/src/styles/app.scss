@@ -178,7 +178,10 @@ $client-bg-color: $nn_gold;
 // ── Overlay system variables (moved from styles/nn/overlay.scss) ──
 // ─── Variables ──────────────────────────────────────
 // Brand / theme
-$color-primary:           #1a1a2e;
+// NOTE: named $overlay-color-primary, not $color-primary, because Sass treats
+// `-` and `_` as the same character in identifiers — $color-primary would
+// silently overwrite the $color_primary defined above in this same block.
+$overlay-color-primary:   #1a1a2e;
 $color-active-bg:         hsla(350, 75%, 40%, 1);   // AAA-safe active state
 $color-active-text:       hsla(0, 0%, 100%, 1);
 
@@ -3115,7 +3118,27 @@ section,
 }
 
 //--- single update post header + body ---
+// Post image screened into the purple header. Scoped to .update_header_hero so
+// other pages using .page_header_style_1 are untouched.
+.update_header_hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.update_header_image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .06;
+  pointer-events: none;
+}
+
 .update_header {
+  position: relative;
+  z-index: 1;
   text-align: left;
 }
 
@@ -3129,17 +3152,6 @@ section,
 
 .update_excerpt {
   margin-top: 14px;
-}
-
-.update_featured_image {
-  margin: 0 0 35px 0;
-
-  img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-  }
 }
 
 .update_inline_image {
@@ -5962,7 +5974,7 @@ body.overlay_lock {
   h1 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: $color-primary;
+    color: $overlay-color-primary;
     letter-spacing: -0.02em;
   }
 
@@ -7335,6 +7347,11 @@ body.overlay_lock {
   min-height: 100vh;
   background: $color_bg;
   padding: 60px 20px 80px;
+  // Clear the fixed mobile nav bar so the bottom of the form isn't hidden
+  // behind it. Below 1200px the nav is fixed to the viewport bottom.
+  @media (max-width: 1199px) {
+    padding-bottom: calc(80px + $mobile_nav_height);
+  }
 }
 
 .form_page__container {
@@ -11299,6 +11316,10 @@ body.overlay_lock {
   }
 }
 
+.poi_quick_info_single_info {
+  color: $nn_gray;
+}
+
 .poi_photos {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -12291,6 +12312,11 @@ margin-top: 0;
   align-content: start;
   position: relative;
   cursor: pointer;
+  // Cards in a row are stretched to equal height by the parent grid. Without
+  // this, the auto rows stretch too and spread the content apart on cards with
+  // fewer lines (an Event has no hours row, so it sprawled). Keep content
+  // packed at the top and let the leftover height sit at the bottom.
+  align-content: start;
 
   @media(min-width:600px) {
     
@@ -12528,7 +12554,11 @@ margin-top: 0;
   grid-template-columns: 1fr;
   gap: 35px;
   justify-content: flex-start;
-  align-items: flex-start;
+  align-items: stretch;
+  // The column fills the fixed height of #map_results_layout_1 (800px+ at
+  // 1200px up). Without this the auto rows stretch to share that height, so a
+  // short result set (Events, Trails) produced very tall cards.
+  align-content: start;
   position: relative;
   z-index: 0;
   padding: 35px 5%;
@@ -12961,9 +12991,6 @@ margin-top: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  @media (max-width: 1199px) {
-    padding-bottom: calc(80px + $mobile_nav_height);
-  }
 }
 
 

@@ -177,7 +177,7 @@ export default function Footer() {
           <div className="end_item copyright_date">&copy; {new Date().getFullYear()} Nearby Nearby. Patent Pending.</div>
           <div className="end_item"><Link to="/privacy-policy">Privacy Policy</Link></div>
           <div className="end_item"><Link to="/terms-of-service">Terms &amp; Conditions</Link></div>
-          <div className="end_item"><a href="/sitemap.xml" target="_blank" rel="noopener noreferrer">Sitemap</a></div>
+          <div className="end_item"><Link to="/sitemap">Sitemap</Link></div>
         </div>
       </footer>
     </>

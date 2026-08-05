@@ -6,6 +6,7 @@ function DayOfServiceVolunteerFair() {
       title="A Day of Service: Chatham County Volunteer Fair"
       dateLabel="September 11, 2024"
       image="/media/featured-image-a-day-of-service-chatham-county-volunteer-fair-01.webp"
+      imageAlt="A speaker holding a microphone addresses a room of seated attendees at a community volunteer event in a local cafe."
       excerpt={"On September 11th, the Chatham County Community Engagement Task Force hosted a Day of Service, connecting 22 local organizations with over 60 attendees eager to volunteer. The event showcased various ways to serve the community.…"}
     >
       <p>On September 11th, the Chatham County Community Engagement Task Force—comprised of Chatham Literacy, Chatham Partnership for Children, Chatham County Aging Services, CORA, and Second Bloom—hosted a fantastic <a href="https://americorps.gov/serve/volunteer/911-day" target="_blank" rel="noopener noreferrer"><em>Day of Service</em></a> event at 79 West Co-working Space & Innovation Hub who also sponsored the event. The Volunteer Fair was a great success, bringing together 22 local organizations and over 60 attendees, all eager to learn how they can give back to the Chatham County community.</p>
