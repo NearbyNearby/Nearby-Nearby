@@ -89,7 +89,27 @@ Every inner page follows one structure (from `nn-templates/default-page-01.html`
 - Empty scaffolded `@media` blocks (see §2).
 - A stray `background-color: $gray7` on `#one_search_map_results` re-appearing after a merge — matches a documented specificity fix, not an accidental duplicate.
 
-## 10. General working style
+## 10. Status/badge colors — AAA accessibility
+
+- **Colored status badges/pills use white background + colored text + colored border (outline) — never a tinted/translucent colored background.** A colored fill behind colored text is much more likely to fail AAA contrast, especially at small badge font sizes. White background keeps contrast high and predictable regardless of which status color is used.
+  ```scss
+  // correct
+  .status-badge--closed {
+    background-color: #ffffff;
+    color: $red2;
+    border: 1px solid $red;
+  }
+
+  // wrong — tinted background, don't use
+  .status-badge--closed {
+    background-color: rgba($red, 0.1);
+    color: $red2;
+  }
+  ```
+- This mirrors the existing trail-difficulty badge pattern (`$trail_difficulty_easy_bg: #ffffff`, etc.) — that one already established the convention; apply it to any new status/badge work (e.g. the Hours holiday-status pills).
+- Applies to any semantic status coloring (open/closed/modified, difficulty, verified, etc.), not just one component.
+
+## 11. General working style
 
 - Barry authors CSS/SCSS live in VS Code while changes are also being made in the same repo — uncommitted `.scss` changes in the working tree should always be treated as his and preserved, never reverted or discarded without asking first.
 - Work accumulates on one local branch per "wave" of fixes so everything stays visible in the running app; commits/PRs get split out per-issue only once a wave is confirmed done — not continuously.
