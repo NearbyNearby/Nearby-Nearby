@@ -1,5 +1,6 @@
 import ContentGroup from './ContentGroup';
 import { hasVal } from './poiDetailUtils';
+import { SOCIAL_ICONS } from './SocialIcons';
 
 // Social handle -> profile URL. Values may already be full URLs (pass through).
 const PLATFORMS = [
@@ -45,13 +46,20 @@ export default function SocialLinksGroup({ poi }) {
   const links = getSocialLinks(poi);
   if (links.length === 0) return null;
   return (
-    <ContentGroup title="Social Media">
-      <div className="acc_list_group_1">
-        {links.map((l, i) =>
-          l.url
-            ? <a key={i} href={l.url} target="_blank" rel="noopener noreferrer">{l.label}</a>
-            : <span key={i}>{l.label}</span>
-        )}
+    <ContentGroup title="Follow Us">
+      <div className="poi_social_icon_row">
+        {links.map((l, i) => {
+          const platform = l.label.split(':')[0];
+          const Icon = SOCIAL_ICONS[platform];
+          const content = Icon ? <Icon /> : l.label;
+          return l.url ? (
+            <a key={i} className="poi_social_icon_link" href={l.url} target="_blank" rel="noopener noreferrer" title={platform} aria-label={platform}>
+              {content}
+            </a>
+          ) : (
+            <span key={i} className="poi_social_icon_link" title={platform} aria-label={platform}>{content}</span>
+          );
+        })}
       </div>
     </ContentGroup>
   );

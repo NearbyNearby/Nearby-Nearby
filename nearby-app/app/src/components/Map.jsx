@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -52,9 +52,18 @@ const createNumberedIcon = (number, isHighlighted = false) => {
 // Component to auto-fit bounds so all markers are visible
 function AutoFitBounds({ bounds, radiusMiles }) {
   const map = useMap();
+  const prevBoundsKeyRef = useRef(null);
 
   useEffect(() => {
     if (bounds && bounds.length > 0 && map) {
+      // `bounds` is rebuilt as a new array on every parent re-render (e.g. marker
+      // click highlight state), even when the actual coordinates haven't changed.
+      // Compare by value so we only re-fit when the bounds truly changed, not on
+      // every unrelated re-render (was resetting the user's zoom — #135).
+      const boundsKey = JSON.stringify(bounds);
+      if (boundsKey === prevBoundsKeyRef.current) return;
+      prevBoundsKeyRef.current = boundsKey;
+
       // Calculate maxZoom based on radius (for NearbySection) or default 15 (for Explore)
       let maxZoom = 15;
       if (radiusMiles) {
@@ -227,6 +236,7 @@ function Map({ currentPOI, nearbyPOIs = [], radiusMiles, onMarkerClick, highligh
               key={poi.id}
               position={coords}
               icon={createNumberedIcon(showNumber ? number : null, isHighlighted)}
+              riseOnHover={true}
               eventHandlers={{
                 click: () => {
                   if (onMarkerClick) {
@@ -238,14 +248,6 @@ function Map({ currentPOI, nearbyPOIs = [], radiusMiles, onMarkerClick, highligh
               <Popup className="custom-popup">
                 <div className="popup-content">
                   <strong>{poi.name}</strong>
-                  {poi.distance_meters && (
-                    <p className="popup-distance">
-                      {(poi.distance_meters / 1609.34).toFixed(1)} miles away
-                    </p>
-                  )}
-                  {poi.address_city && (
-                    <p className="popup-city">{poi.address_city}</p>
-                  )}
                 </div>
               </Popup>
             </Marker>

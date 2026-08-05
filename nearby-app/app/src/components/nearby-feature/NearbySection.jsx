@@ -208,7 +208,6 @@ function NearbySection({ currentPOI }) {
   };
 
   const handleMarkerClick = (poiId, index) => {
-    setHighlightedCardId(poiId);
     const poiIndex = filteredNearbyPOIs.findIndex(p => p.id === poiId);
     if (poiIndex !== -1) {
       const targetPage = Math.floor(poiIndex / itemsPerPage) + 1;
@@ -222,7 +221,12 @@ function NearbySection({ currentPOI }) {
         }
       }, 100);
     }
-    setTimeout(() => setHighlightedCardId(null), 3000);
+    // Wait for the scroll-into-view to finish before highlighting, so the
+    // highlight animation isn't already underway (or done) while the card
+    // is still off-screen.
+    const HIGHLIGHT_DELAY = 1200;
+    setTimeout(() => setHighlightedCardId(poiId), HIGHLIGHT_DELAY);
+    setTimeout(() => setHighlightedCardId(null), HIGHLIGHT_DELAY + 3000);
   };
 
   const handleDetailsClick = (poi) => {

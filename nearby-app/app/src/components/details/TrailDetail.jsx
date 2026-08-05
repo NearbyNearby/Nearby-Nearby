@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Navigation, Copy, Check, ExternalLink } from 'lucide-react';
+import { MapPin, Navigation, Copy, Check, ExternalLink, Globe, Phone } from 'lucide-react';
 
 import {
-  AccSection, ContentGroup, ChipList, QuickInfoRow,
+  AccSection, ContentGroup, ChipList, CategoryChipList, QuickInfoRow,
   POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox, SocialLinksGroup, hasSocialLinks,
   hasVal, asArray, copyToClipboard, getImages,
 } from './shared';
@@ -31,6 +31,8 @@ const cap = (s) => (typeof s === 'string' && s.length > 0 ? s[0].toUpperCase() +
 export default function TrailDetail({ poi }) {
   const [copiedCoords, setCopiedCoords] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
   const [directionsOpen, setDirectionsOpen] = useState(false);
 
   const displayLoc = getDisplayableLocation(poi);
@@ -58,13 +60,50 @@ export default function TrailDetail({ poi }) {
     if (!addr) return;
     if (await copyToClipboard(addr)) { setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2000); }
   };
+  const handleCopyPhone = async () => {
+    if (!poi.phone_number) return;
+    if (await copyToClipboard(poi.phone_number)) { setCopiedPhone(true); setTimeout(() => setCopiedPhone(false), 2000); }
+  };
+  const handleCopyEmail = async () => {
+    if (!poi.email) return;
+    if (await copyToClipboard(poi.email)) { setCopiedEmail(true); setTimeout(() => setCopiedEmail(false), 2000); }
+  };
+
+  const amenitiesFlat = useMemo(() => {
+    const a = poi?.amenities;
+    const out = [];
+    if (a && typeof a === 'object') {
+      Object.values(a).forEach((v) => {
+        if (Array.isArray(v)) v.forEach((x) => hasVal(x) && out.push(typeof x === 'object' ? (x.name || x.label || '') : String(x)));
+      });
+    }
+    // Server-computed icon booleans, shown as plain-text pills alongside the rest.
+    if (poi?.icon_public_restroom) out.push('Public Restroom');
+    if (poi?.icon_free_wifi) out.push('Wi-Fi Access');
+    if (poi?.icon_wheelchair_accessible) out.push('Wheelchair Accessible');
+    if (poi?.icon_pet_friendly) out.push('Pet Friendly');
+    if (poi?.playground_available || (Array.isArray(poi?.playground_types) && poi.playground_types.length > 0)) out.push('Playgrounds');
+    if (Array.isArray(poi?.parking_types) && poi.parking_types.length > 0) out.push('Parking Facilities');
+    return Array.from(new Set(out.filter(Boolean)));
+  }, [poi]);
 
   const subtitleParts = [];
   if (routeType && ROUTE_TYPE_LABELS[routeType]) subtitleParts.push(ROUTE_TYPE_LABELS[routeType]);
   else if (routeType) subtitleParts.push(routeType);
   if (trail.length_text) subtitleParts.push(trail.length_text);
-  if (trail.difficulty) subtitleParts.push(cap(trail.difficulty));
   const subtitleText = subtitleParts.join(', ');
+  const categoryName = poi?.categories?.[0]?.name || '';
+
+  const trailLevelInfo = (
+    <span className="poi_trail_level_row">
+      {subtitleText}
+      {trail.difficulty && (
+        <span className={`nearby-card__trail-difficulty nearby-card__trail-difficulty--${trail.difficulty.toLowerCase()}`}>
+          {cap(trail.difficulty)}
+        </span>
+      )}
+    </span>
+  );
 
   const _coords = poi?.location?.coordinates;
   const _lat = Array.isArray(_coords) ? _coords[1] : null;
@@ -79,7 +118,6 @@ export default function TrailDetail({ poi }) {
   const linkedParkId = trail.park_poi_id || linkedParkFromRel?.id || trailInParkRel?.target_poi_id || null;
   const linkedParkName = trail.park_name || trail.park?.name || linkedParkFromRel?.name || null;
 
-  const ig = (poi.ideal_for && typeof poi.ideal_for === 'object' && !Array.isArray(poi.ideal_for)) ? poi.ideal_for : null;
   const accessPoints = Array.isArray(trail.access_points) ? trail.access_points.filter(Boolean) : [];
   const hasTrailGuide = !!(trail.mile_markers || trail.trailhead_signage || trail.audio_guide_available || trail.qr_trail_guide || trail.trail_guide_notes || trail.trail_lighting || accessPoints.length > 0);
 
@@ -89,13 +127,8 @@ export default function TrailDetail({ poi }) {
     hasVal(poi.description_long) && <ContentGroup key="desc" title="About"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_long) }} /></ContentGroup>,
     // Per doc: Trail About pulls Outdoor Features as NATURAL FEATURES only.
     hasVal(poi.natural_features) && <ContentGroup key="nf" title="Natural Features"><ChipList items={poi.natural_features.map((f) => (typeof f === 'string' ? f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : f))} /></ContentGroup>,
-    // Per doc: "Categories + Discovery" for a trail = its Trail Experience categories.
-    hasVal(poi.categories) && <ContentGroup key="te" title="Trail Experience"><ChipList items={poi.categories} /></ContentGroup>,
-    ig && Object.entries(ig).filter(([k]) => k !== '_legacy').map(([group, items]) =>
-      Array.isArray(items) && items.length > 0 && (
-        <ContentGroup key={group} title={group.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}><ChipList items={items} /></ContentGroup>
-      )
-    ),
+    (subtitleText || trail.difficulty) && <ContentGroup key="level" title="Trail Level">{trailLevelInfo}</ContentGroup>,
+    hasVal(poi.categories) && <ContentGroup key="cats" title="Categories"><CategoryChipList categories={poi.categories} /></ContentGroup>,
   ].flat().filter(Boolean);
 
   const aboutCol2 = [
@@ -138,6 +171,8 @@ export default function TrailDetail({ poi }) {
     </ContentGroup>,
   ].filter(Boolean);
 
+  // Single column per #145 item 12 (address first, parking stacked below it —
+  // see Robeson Creek Greenway as Rhonda's reference example).
   const addrCol2 = [
     hasVal(poi.parking_types) && <ContentGroup key="parking" title="Parking"><ChipList items={poi.parking_types} /></ContentGroup>,
     hasVal(poi.arrival_methods) && <ContentGroup key="arrival" title="Arrival"><ChipList items={poi.arrival_methods} /></ContentGroup>,
@@ -190,7 +225,7 @@ export default function TrailDetail({ poi }) {
   const HIDDEN_ACCORDIONS = new Set(['mobility', 'drone', 'locally_history', 'pricing']);
   const sections = [
     (aboutCol1.length || aboutCol2.length) && { id: 'about_hours', title: 'About + Hours', defaultOpen: true, col1: aboutCol1, col2: aboutCol2 },
-    (addrCol1.length || addrCol2.length) && { id: 'address_parking', title: 'Address + Parking', col1: addrCol1, col2: addrCol2 },
+    (addrCol1.length || addrCol2.length) && { id: 'address_parking', title: 'Address + Parking', singleColumn: true, col1: [...addrCol1, ...addrCol2], col2: [] },
     hasTrailGuide && { id: 'trail_guide', title: 'Trail Guide', col1: trailGuideCol1, col2: trailGuideCol2 },
     (hasVal(trail.cost) || hasVal(trail.pass_info) || hasVal(poi.discounts) || hasVal(poi.pricing_details) || hasVal(poi.payment_methods)) && {
       id: 'pricing', title: 'Pricing + Passes',
@@ -216,9 +251,13 @@ export default function TrailDetail({ poi }) {
       col2: [hasVal(poi.mobility_access) && <ContentGroup key="ma" title="Mobility Access"><ChipList items={Array.isArray(poi.mobility_access) ? poi.mobility_access : Object.keys(poi.mobility_access).filter((k) => poi.mobility_access[k] === true)} /></ContentGroup>].filter(Boolean),
     },
     (hasVal(poi.pet_options) || hasVal(poi.pet_policy)) && {
-      id: 'pets', title: 'Pet Policy',
-      col1: [hasVal(poi.pet_options) && <ContentGroup key="po" title="Pets"><ChipList items={poi.pet_options} /></ContentGroup>, hasVal(poi.pet_policy) && <ContentGroup key="pp" title="Policy"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pet_policy) }} /></ContentGroup>].filter(Boolean),
-      col2: [<div className="acc_content_group" key="sa"><ServiceAnimalAlert /></div>],
+      id: 'pets', title: 'Pet Policy', singleColumn: true,
+      col1: [
+        hasVal(poi.pet_options) && <ContentGroup key="po" title="Pets"><ChipList items={poi.pet_options} /></ContentGroup>,
+        hasVal(poi.pet_policy) && <ContentGroup key="pp"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pet_policy) }} /></ContentGroup>,
+        <div className="acc_content_group" key="sa"><ServiceAnimalAlert /></div>,
+      ].filter(Boolean),
+      col2: [],
     },
     (hasVal(poi.drone_policy) || hasVal(poi.drone_usage)) && {
       id: 'drone', title: 'Drone Policy',
@@ -239,11 +278,39 @@ export default function TrailDetail({ poi }) {
     (hasVal(poi.website_url) || hasVal(poi.phone_number) || hasVal(poi.email) || hasSocialLinks(poi)) && {
       id: 'contact', title: 'Contact',
       col1: [
-        hasVal(poi.phone_number) && <ContentGroup key="ph" title="Phone"><div className="acc_list_group_1"><a href={`tel:${poi.phone_number}`}>{poi.phone_number}</a></div></ContentGroup>,
-        hasVal(poi.website_url) && <ContentGroup key="web" title="Website"><div className="acc_list_group_1"><a href={poi.website_url.startsWith('http') ? poi.website_url : `https://${poi.website_url}`} target="_blank" rel="noopener noreferrer">{poi.website_url}</a></div></ContentGroup>,
+        hasVal(poi.phone_number) && (
+          <ContentGroup key="ph" title="Phone">
+            <div className="acc_list_group_1 poi_contact_row">
+              <Phone size={16} />
+              <a href={`tel:${poi.phone_number}`}>{poi.phone_number}</a>
+              <button type="button" className="btn_reset poi_contact_copy_btn" onClick={handleCopyPhone}>
+                {copiedPhone ? <Check size={14} /> : <Copy size={14} />} {copiedPhone ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </ContentGroup>
+        ),
+        hasVal(poi.website_url) && (
+          <ContentGroup key="web" title="Website">
+            <div className="acc_list_group_1 poi_contact_row">
+              <Globe size={16} />
+              <a href={poi.website_url.startsWith('http') ? poi.website_url : `https://${poi.website_url}`} target="_blank" rel="noopener noreferrer">
+                Visit {poi.name} Website
+              </a>
+            </div>
+          </ContentGroup>
+        ),
       ].filter(Boolean),
       col2: [
-        hasVal(poi.email) && <ContentGroup key="em" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>,
+        hasVal(poi.email) && (
+          <ContentGroup key="em" title="Email">
+            <div className="acc_list_group_1 poi_contact_row">
+              <a href={`mailto:${poi.email}`}>{poi.email}</a>
+              <button type="button" className="btn_reset poi_contact_copy_btn" onClick={handleCopyEmail}>
+                {copiedEmail ? <Check size={14} /> : <Copy size={14} />} {copiedEmail ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </ContentGroup>
+        ),
         hasSocialLinks(poi) && <SocialLinksGroup key="soc" poi={poi} />,
       ].filter(Boolean),
     },
@@ -253,9 +320,10 @@ export default function TrailDetail({ poi }) {
     <>
     <POIDetailLayout
       poi={poi}
-      mainCategory={subtitleText}
+      mainCategory={categoryName}
       statusVariant={statusVariant || undefined}
       statusLabel={statusLabel}
+      hideStatus
     >
       {({ images: imgs, openLightbox }) => (
         <>
@@ -273,12 +341,14 @@ export default function TrailDetail({ poi }) {
             onOpenLightbox={openLightbox}
           />
 
-          <AmenitiesBox poi={poi} title="Amenities" />
+          <AmenitiesBox title="Amenities" amenitiesList={amenitiesFlat} />
 
           <div id="accordion_1_box" className="poi_accordion_box">
             <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
               {sections.map((s) => (
-                <AccSection key={s.id} title={s.title} defaultOpen={false} col1={s.col1} col2={s.col2} />
+                s.singleColumn
+                  ? <AccSection key={s.id} title={s.title} defaultOpen={false}>{s.col1}</AccSection>
+                  : <AccSection key={s.id} title={s.title} defaultOpen={false} col1={s.col1} col2={s.col2} />
               ))}
             </div>
           </div>

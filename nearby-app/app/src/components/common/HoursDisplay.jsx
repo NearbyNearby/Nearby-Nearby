@@ -125,7 +125,7 @@ function HoursDisplay({
                 </span>
                 <span className="hours-display__holiday-name">{holiday.name}</span>
                 <span className="hours-display__holiday-date">{holiday.dateStr}</span>
-                <span className="hours-display__holiday-status">
+                <span className={`hours-display__holiday-status hours-display__holiday-status--${holiday.hours?.status || 'default'}`}>
                   {formatHolidayStatus(holiday.hours)}
                 </span>
               </div>
