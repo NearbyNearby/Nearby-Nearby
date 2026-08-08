@@ -21,6 +21,47 @@ from shared.utils.event_status import validate_status_transition
 _UNSET = object()
 
 
+def _poi_location_lat_lng(location):
+    """Return (lat, lng) for a POI ``location`` column value, or (None, None).
+
+    Handles both a persisted geometry (WKBElement, read from the DB) and a
+    freshly assigned ``'POINT(lng lat)'`` WKT string (update_poi assigns the
+    column this way, pre-flush, when the request also updates location).
+    """
+    if location is None:
+        return None, None
+    if isinstance(location, str):
+        m = re.match(r'POINT\(([-\d.]+)\s+([-\d.]+)\)', location)
+        return (float(m.group(2)), float(m.group(1))) if m else (None, None)
+    try:
+        from geoalchemy2.shape import to_shape
+        point = to_shape(location)
+        return point.y, point.x
+    except Exception:
+        return None, None
+
+
+def _default_missing_restroom_coords(entries, fallback_lat, fallback_lng):
+    """Default a restroom entry's missing lat/lng to the POI's own location.
+
+    Issue #117: editors very often skip re-pinning the exact GPS position of
+    an indoor restroom. ``shared/poi_points.py`` requires a parseable
+    coordinate per entry (``geom`` is NOT NULL) or it drops the ENTIRE row
+    (name, description, features included, not just the pin), leaving only the
+    restroom's photos (stored independently in the images table) behind.
+    Defaulting to the POI's own coordinates keeps everything the editor typed.
+    """
+    if not isinstance(entries, list) or fallback_lat is None or fallback_lng is None:
+        return
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get('lat') in (None, ''):
+            entry['lat'] = fallback_lat
+        if entry.get('lng') in (None, ''):
+            entry['lng'] = fallback_lng
+
+
 def _set_optional_geometries(db_obj, *, geom_line=None, geom_area=None,
                              set_line=True, set_area=True):
     """Validate + assign the Task 2.4 geom_line / geom_area columns.
@@ -401,6 +442,12 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
         _f: poi_data.pop(_f, None)
         for _f, _i in _POINT_FIELDS.items() if _i["owner"] == "poi"
     }
+    # Issue #117: default missing restroom lat/lng to the POI's own coordinates
+    # so a row with no pin doesn't get silently dropped in its entirety.
+    _default_missing_restroom_coords(
+        _point_values.get('toilet_locations'),
+        poi.location.coordinates[1], poi.location.coordinates[0],
+    )
 
     # Sanitize HTML content in the POI data
     poi_data = sanitize_poi_fields(poi_data)
@@ -622,6 +669,13 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
         else:
             coords = location_data.coordinates
         db_obj.location = f'POINT({coords[0]} {coords[1]})'
+
+    # Issue #117: default missing restroom lat/lng to the POI's own coordinates
+    # (the just-updated location above, else the existing one) so a row with no
+    # pin doesn't get silently dropped in its entirety.
+    if 'toilet_locations' in _point_values:
+        _fallback_lat, _fallback_lng = _poi_location_lat_lng(db_obj.location)
+        _default_missing_restroom_coords(_point_values['toilet_locations'], _fallback_lat, _fallback_lng)
 
     # Task 2.4: line/area geometry update (partial-update safe). A key present in
     # update_data means the client sent it: a GeoJSON dict is validated -> WKT

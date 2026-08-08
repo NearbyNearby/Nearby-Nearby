@@ -19,7 +19,11 @@ import api from '../../utils/api';
  * Reusable component for searching and selecting POIs from the database.
  *
  * Props:
- *   onSelect      (fn)      - Called with { id, name, slug, poi_type, address_city } on selection
+ *   onSelect      (fn)      - Called with { id, name, slug, poi_type, address_city,
+ *                             email, phone_number, website_url, instagram_username,
+ *                             facebook_username } on selection (the extra contact
+ *                             fields let callers, e.g. Event Organizer linking
+ *                             for issue #122, prefill from the selected POI)
  *   placeholder   (string)  - Input placeholder text
  *   filterTypes   (string[])- Optional array of POI type strings to restrict results
  *   label         (string)  - Optional label rendered above the input
@@ -156,6 +160,12 @@ export default function POISearchSelect({
       slug: poi.slug,
       poi_type: poi.poi_type,
       address_city: poi.address_city,
+      // Contact fields so callers can prefill from the selected POI (#122).
+      email: poi.email,
+      phone_number: poi.phone_number,
+      website_url: poi.website_url,
+      instagram_username: poi.instagram_username,
+      facebook_username: poi.facebook_username,
     });
     setInputValue(poi.name);
     setShowDropdown(false);

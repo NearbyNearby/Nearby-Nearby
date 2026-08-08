@@ -552,11 +552,19 @@ function ImageCard({ image, onDelete, onUpdateMetadata, dragHandleProps, showDra
           </>
         ) : (
           <>
-            {image.original_filename && (
+            {/* Issue #121: show the saved alt text / caption (what editors
+                actually annotated) instead of the raw filename, so it's
+                obvious at a glance which photos still need metadata. Falls
+                back to the filename when neither has been set. */}
+            {image.caption ? (
+              <Text size="xs" truncate>{image.caption}</Text>
+            ) : image.alt_text ? (
+              <Text size="xs" truncate>{image.alt_text}</Text>
+            ) : image.original_filename ? (
               <Text size="xs" c="dimmed" truncate>
                 {image.original_filename}
               </Text>
-            )}
+            ) : null}
             <Button
               size="xs"
               variant="subtle"

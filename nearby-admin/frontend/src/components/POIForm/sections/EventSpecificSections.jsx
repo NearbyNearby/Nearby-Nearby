@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Stack, SimpleGrid, Switch, Divider, Text, Checkbox, Button,
-  TextInput, NumberInput, Card, Select, Alert, Badge, Group, Textarea
+  TextInput, NumberInput, Card, Select, Alert, Badge, Group, Textarea, FileInput
 } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
@@ -448,6 +448,16 @@ export const EventOrganizerSection = React.memo(function EventOrganizerSection({
   function handlePoiSelect(poi) {
     form.setFieldValue('event.organizer_poi_id', poi.id);
     form.setFieldValue('event.organizer_name', poi.name);
+    // Issue #122: copy the linked POI's contact info over so it doesn't have
+    // to be re-typed. POISearchSelect includes these on its onSelect payload.
+    form.setFieldValue('event.organizer_email', poi.email || '');
+    form.setFieldValue('event.organizer_phone', poi.phone_number || '');
+    form.setFieldValue('event.organizer_website', poi.website_url || '');
+    form.setFieldValue('event.organizer_social_media', {
+      ...(form.values.event?.organizer_social_media || {}),
+      instagram: poi.instagram_username || '',
+      facebook: poi.facebook_username || '',
+    });
   }
 
   function handleLinkToggle(e) {
@@ -763,18 +773,28 @@ export const EventSponsorsSection = React.memo(function EventSponsorsSection({ f
                       onImagesChange={(images) => handleLogoImagesChange(index, images)}
                     />
                   ) : (
+                    /* Issue #123: the POI (and therefore the real image-upload
+                       endpoint) doesn't exist yet the instant this section
+                       renders. Rather than blocking the user, hold the picked
+                       file in form state (`_pendingLogoFile`) and upload it
+                       transparently right after the draft POI is created;
+                       see uploadPendingSponsorLogos() in usePOIHandlers.jsx,
+                       called from handleAutoCreate / handleSubmit. */
                     <Stack gap={4}>
-                      {/* Backward-compat: legacy sponsors may already carry a
-                          logo_url string. Show it until the POI is saved and the
-                          uploader becomes available. */}
                       {sponsor.logo_url ? (
                         <Text size="xs" c="dimmed" truncate>
                           Current logo: {sponsor.logo_url}
                         </Text>
                       ) : null}
-                      <Text size="sm" c="dimmed">
-                        Save the POI first to upload a sponsor logo
-                      </Text>
+                      <FileInput
+                        label="Sponsor Logo"
+                        description="Pick the logo now. It uploads automatically once the event is saved"
+                        placeholder={sponsor._pendingLogoFile ? sponsor._pendingLogoFile.name : 'Choose image...'}
+                        accept="image/*"
+                        value={sponsor._pendingLogoFile || null}
+                        onChange={(file) => updateSponsorField(index, '_pendingLogoFile', file)}
+                        clearable
+                      />
                     </Stack>
                   )}
                 </>

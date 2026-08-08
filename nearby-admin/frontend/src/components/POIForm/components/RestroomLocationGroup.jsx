@@ -44,8 +44,14 @@ export const RestroomLocationGroup = React.memo(function RestroomLocationGroup({
       addButtonLabel="Add Another Bathroom Location"
       defaultRow={{
         restroom_name: '',
-        lat: null,
-        lng: null,
+        // Seed with the POI's own coordinates rather than null. A restroom row
+        // with no parseable lat/lng is silently dropped in its entirety (name,
+        // description, features included, not just the pin) by the poi_points
+        // sync layer — geom is NOT NULL there. Most editors never touch the
+        // coordinate fields for an indoor restroom, so defaulting to "here"
+        // keeps the row (and everything else they typed) from vanishing.
+        lat: typeof form.values?.latitude === 'number' ? form.values.latitude : null,
+        lng: typeof form.values?.longitude === 'number' ? form.values.longitude : null,
         w3w: '',
         description: '',
         photos: '',

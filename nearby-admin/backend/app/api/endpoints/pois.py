@@ -229,6 +229,13 @@ def autosave_poi(
     # from the merged snapshot is safe); sync them as rows before commit.
     from shared.poi_points import POINT_FIELDS as _POINT_FIELDS, sync_point_rows as _sync_point_rows
     _point_values = {k: filtered.pop(k) for k in list(filtered) if k in _POINT_FIELDS}
+    # Issue #117: default missing restroom lat/lng to the POI's own coordinates
+    # (location isn't autosave-editable, so `poi.location` is always current) so
+    # a row with no pin doesn't get silently dropped in its entirety.
+    if 'toilet_locations' in _point_values:
+        from app.crud.crud_poi import _poi_location_lat_lng, _default_missing_restroom_coords
+        _fallback_lat, _fallback_lng = _poi_location_lat_lng(poi.location)
+        _default_missing_restroom_coords(_point_values['toilet_locations'], _fallback_lat, _fallback_lng)
 
     # Task 2.5: stop writing the legacy photo columns (images table wins) and
     # contact_info (main_contact_* columns win). Drop them from the autosave

@@ -32,6 +32,11 @@ vi.mock('../../../common/POISearchSelect', () => ({
               slug: 'test-poi',
               poi_type: 'BUSINESS',
               address_city: 'Durham',
+              email: 'contact@testpoi.com',
+              phone_number: '919-555-0100',
+              website_url: 'https://testpoi.com',
+              instagram_username: 'testpoi',
+              facebook_username: 'testpoifb',
             })
           }
         >
@@ -132,6 +137,24 @@ describe('EventOrganizerSection', () => {
 
     // Organizer name input should now have "Test POI"
     expect(screen.getByDisplayValue('Test POI')).toBeInTheDocument();
+  });
+
+  it('selecting a POI copies its contact info (#122)', async () => {
+    render(<TestWrapper />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: /link to poi/i }));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /select test poi/i }));
+    });
+
+    expect(screen.getByDisplayValue('contact@testpoi.com')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('919-555-0100')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('https://testpoi.com')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('testpoi')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('testpoifb')).toBeInTheDocument();
   });
 
   it('renders pre-filled organizer name from initial values', () => {

@@ -42,6 +42,12 @@ import { ImageUploadField } from '../../ImageUpload/ImageUploadField';
  *                                  by image_context='access_point_${idx}' so
  *                                  the back-end Images table can attribute
  *                                  uploads to a specific access-point row.
+ *                                  Issue #146: `description` duplicated the
+ *                                  `notes` field, so its form input was
+ *                                  removed (notes stays). `description` is
+ *                                  left in the JSONB shape/schema untouched
+ *                                  (expand/contract); it's just no longer
+ *                                  editable from this form.
  */
 export default function TrailheadAccessPointsSection({ form, poiId }) {
   // ---- Trailhead (single) ----
@@ -174,17 +180,6 @@ export default function TrailheadAccessPointsSection({ form, poiId }) {
                 value={ap.name || ''}
                 onChange={(e) =>
                   form.setFieldValue(`access_points.${idx}.name`, e.currentTarget.value)
-                }
-              />
-
-              <Textarea
-                label="Description"
-                placeholder="Short description of this access point (optional)"
-                autosize
-                minRows={2}
-                value={ap.description || ''}
-                onChange={(e) =>
-                  form.setFieldValue(`access_points.${idx}.description`, e.currentTarget.value)
                 }
               />
 

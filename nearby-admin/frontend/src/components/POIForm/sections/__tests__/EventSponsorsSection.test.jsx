@@ -143,8 +143,8 @@ describe('EventSponsorsSection', () => {
     expect(screen.getByTestId('poi-search-select')).toBeInTheDocument();
   });
 
-  it('manual mode shows name, url, and logo upload (or save-first hint when unsaved)', async () => {
-    render(<TestWrapper />);
+  it('manual mode shows name, url, and a logo file picker when unsaved', async () => {
+    const { container } = render(<TestWrapper />);
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /add sponsor/i }));
@@ -153,11 +153,44 @@ describe('EventSponsorsSection', () => {
     // Switch is OFF by default → manual fields visible
     expect(screen.getByText(/sponsor name/i)).toBeInTheDocument();
     expect(screen.getByText(/sponsor url/i)).toBeInTheDocument();
-    // Bug #87: the raw "Logo URL" box was replaced with an image uploader. The
-    // test wrapper renders without a POI id (unsaved), so the save-first hint
-    // for the logo is shown instead of the uploader.
-    expect(screen.getByText(/save the poi first to upload a sponsor logo/i)).toBeInTheDocument();
+    // Issue #123: the raw "Logo URL" box / blocking "save first" message was
+    // replaced with a FileInput so a logo can be picked immediately; it
+    // uploads automatically once the POI has been saved.
     expect(screen.queryByText(/logo url/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/save the poi first/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/sponsor logo/i)).toBeInTheDocument();
+    // Mantine's FileInput doesn't expose its placeholder as a DOM attribute
+    // on the (visually hidden) native <input type="file">, so target it by type.
+    expect(container.querySelector('input[type="file"]')).toBeInTheDocument();
+  });
+
+  it('picking a logo file before the POI is saved holds it as _pendingLogoFile (#123)', async () => {
+    let liveForm;
+    const { container } = render(<TestWrapper onForm={(f) => { liveForm = f; }} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /add sponsor/i }));
+    });
+
+    const file = new File(['logo-bytes'], 'logo.png', { type: 'image/png' });
+    const fileInput = container.querySelector('input[type="file"]');
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+
+    expect(liveForm.values.event.sponsors[0]._pendingLogoFile).toBe(file);
+  });
+
+  it('shows the real image uploader (no pending-file picker) once the POI has an id', async () => {
+    const { container } = render(<TestWrapper id="poi-1" />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /add sponsor/i }));
+    });
+
+    expect(screen.getByTestId('image-upload')).toBeInTheDocument();
+    expect(container.querySelector('input[type="file"]')).not.toBeInTheDocument();
   });
 
   it('tier select is available in manual mode', async () => {

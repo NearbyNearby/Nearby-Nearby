@@ -7,6 +7,51 @@ import api from '../../../utils/api';
 import { emptyInitialValues } from '../constants/initialValues';
 import { preparePOIPayload } from '../utils/formCleanup';
 
+// Issue #123: a sponsor logo picked before the POI exists is held as a raw
+// File on the sponsor row (`_pendingLogoFile`, set by EventSponsorsSection).
+// Once a POI id exists (auto-create, or the very first save), upload each
+// pending file the same way ImageUploadField does and swap it for a real
+// logo_url/logo_image_id, transparently, without asking the user to re-pick
+// anything after save.
+async function uploadPendingSponsorLogos(poiId, sponsors) {
+  if (!poiId || !Array.isArray(sponsors) || !sponsors.some((s) => s?._pendingLogoFile)) {
+    return sponsors;
+  }
+  const updated = [];
+  for (const sponsor of sponsors) {
+    if (!sponsor?._pendingLogoFile) {
+      updated.push(sponsor);
+      continue;
+    }
+    try {
+      const fileFormData = new FormData();
+      fileFormData.append('file', sponsor._pendingLogoFile);
+      fileFormData.append('image_type', 'sponsor_logo');
+      fileFormData.append('context', `sponsor_${sponsor._id}`);
+      const response = await api.request(`/images/upload/${poiId}`, {
+        method: 'POST',
+        body: fileFormData,
+      });
+      if (response.ok) {
+        const uploaded = await response.json();
+        const { _pendingLogoFile, ...rest } = sponsor;
+        updated.push({
+          ...rest,
+          logo_url: uploaded.url || uploaded.medium_url || uploaded.thumbnail_url || '',
+          logo_image_id: uploaded.id,
+        });
+      } else {
+        // Leave the pending file in place so the user can retry the upload.
+        updated.push(sponsor);
+      }
+    } catch (error) {
+      console.error('Sponsor logo upload failed:', error);
+      updated.push(sponsor);
+    }
+  }
+  return updated;
+}
+
 export const usePOIHandlers = (id, isEditing, form, setPoiId) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -273,6 +318,22 @@ export const usePOIHandlers = (id, isEditing, form, setPoiId) => {
     }
   }, [id, isEditing]);
 
+  // Issue #123: flush any sponsor logo picked before the POI existed as soon
+  // as an id shows up (typically right after auto-create resolves). Handles
+  // the case where the user picked a file DURING that brief gap, which the
+  // explicit post-create flush in handleSubmit/handleAutoCreate can't catch
+  // because it only sees sponsors that existed at the moment the POI was
+  // actually created.
+  useEffect(() => {
+    if (!id) return;
+    const sponsors = form.values.event?.sponsors;
+    if (!Array.isArray(sponsors) || !sponsors.some((s) => s?._pendingLogoFile)) return;
+    uploadPendingSponsorLogos(id, sponsors).then((updated) => {
+      form.setFieldValue('event.sponsors', updated);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   // Helper to extract validation error details from 422 response
   const extractValidationError = async (response) => {
     try {
@@ -358,6 +419,25 @@ export const usePOIHandlers = (id, isEditing, form, setPoiId) => {
 
         const createdPoi = await response.json();
         poiId = createdPoi.id;
+
+        // Issue #123: flush any sponsor logo picked before the POI existed,
+        // now that we have a real id to upload it against. The create payload
+        // went out before the upload, so its sponsor rows lack logo_url and
+        // logo_image_id; persist the uploaded references with a follow-up PUT
+        // before navigating away, or the uploaded image is orphaned.
+        if (values.event?.sponsors?.some((s) => s?._pendingLogoFile)) {
+          try {
+            const updated = await uploadPendingSponsorLogos(poiId, values.event.sponsors);
+            if (payload.event && updated.some((s) => s?.logo_image_id)) {
+              payload.event.sponsors = updated.map(({ _pendingLogoFile, ...rest }) => rest);
+              await api.put(`/pois/${poiId}`, payload);
+            }
+          } catch (error) {
+            // The POI itself was created fine; a failed logo persist should
+            // not turn the whole save into an error.
+            console.error('Persisting sponsor logos after create failed:', error);
+          }
+        }
 
         notifications.update({
           id: loadingNotification,
