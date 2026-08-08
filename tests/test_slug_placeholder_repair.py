@@ -94,3 +94,43 @@ class TestFullSaveRepairsPlaceholder:
         )
         assert resp.status_code == 200
         assert _admin_get(admin_client, poi["id"])["slug"] == before
+
+
+class TestDraftSlugTracksName:
+    """Autosave hardening: a mid-typing pause must not lock in a partial slug."""
+
+    def test_partial_name_autosave_then_full_name_repairs_the_slug(self, admin_client):
+        poi = create_business(admin_client, name="New POI")
+        # User pauses mid-word: autosave fires with a partial name.
+        resp = admin_client.patch(f"/api/pois/{poi['id']}/autosave", json={"name": "Qu"})
+        assert resp.status_code == 200
+        # They finish typing: the draft's slug follows the real name.
+        resp = admin_client.patch(
+            f"/api/pois/{poi['id']}/autosave", json={"name": "Quiltmaker Cafe"}
+        )
+        assert resp.status_code == 200
+        after = _admin_get(admin_client, poi["id"])
+        assert after["slug"].startswith("quiltmaker-cafe")
+
+    def test_repeated_autosave_of_the_same_name_is_idempotent(self, admin_client):
+        poi = create_business(admin_client, name="New POI")
+        for _ in range(3):
+            resp = admin_client.patch(
+                f"/api/pois/{poi['id']}/autosave", json={"name": "Steady Name Store"}
+            )
+            assert resp.status_code == 200
+        after = _admin_get(admin_client, poi["id"])
+        assert after["slug"] == "steady-name-store"
+
+    def test_published_poi_with_real_slug_is_never_reslugged_by_autosave(self, admin_client):
+        poi = create_business(admin_client, name="Published Landmark")
+        before = poi["slug"]
+        resp = admin_client.put(
+            f"/api/pois/{poi['id']}", json={"publication_status": "published"}
+        )
+        assert resp.status_code == 200
+        resp = admin_client.patch(
+            f"/api/pois/{poi['id']}/autosave", json={"name": "Renamed Landmark"}
+        )
+        assert resp.status_code == 200
+        assert _admin_get(admin_client, poi["id"])["slug"] == before

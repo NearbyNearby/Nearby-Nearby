@@ -251,13 +251,20 @@ def autosave_poi(
     _parking_link_value = filtered.pop(_PARKING_LINK_FIELD, _UNSET_AUTOSAVE)
 
     # #143: autosave persists `name` directly, which is what leaves a draft
-    # stuck on its new-poi[-N] placeholder slug. Regenerate while the slug is
-    # still a placeholder. A POI with a real slug is never re-slugged here,
-    # so live URLs cannot change under the client.
+    # stuck on its new-poi[-N] placeholder slug. Repair a placeholder on any
+    # POI, and let an UNPUBLISHED draft keep tracking its name (draft URLs are
+    # never public, and a mid-typing autosave must not lock in a partial-name
+    # slug). A published POI with a real slug is never re-slugged here, so
+    # live URLs cannot change under the client.
     from app.crud.crud_poi import generate_slug, ensure_unique_slug, slug_is_placeholder
-    if 'name' in filtered and slug_is_placeholder(poi.slug):
+    if 'name' in filtered and (
+        slug_is_placeholder(poi.slug) or poi.publication_status != 'published'
+    ):
         _slug_base = generate_slug(filtered['name'] or poi.name, filtered.get('address_city', poi.address_city))
-        if _slug_base and not slug_is_placeholder(_slug_base):
+        _already_derived = bool(_slug_base) and (
+            poi.slug == _slug_base or (poi.slug or '').startswith(_slug_base + '-')
+        )
+        if _slug_base and not slug_is_placeholder(_slug_base) and not _already_derived:
             poi.slug = ensure_unique_slug(db, _slug_base, exclude_id=poi.id)
 
     # Task 2.5: stop writing the legacy photo columns (images table wins) and
