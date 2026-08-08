@@ -25,6 +25,8 @@ function LocalBusinessJsonLd({ poi }) {
   // Convert hours to Schema.org format
   const buildOpeningHours = () => {
     if (!poi.hours || !poi.hours.regular) return null;
+    // #118 - no weekly schedule means no openingHours claim for search engines.
+    if (poi.hours.no_regular_hours === true) return null;
 
     const dayMapping = {
       monday: 'Mo',

@@ -310,7 +310,7 @@ export default function PoiHeader({
                           hours={poi.hours}
                           appointmentBookingUrl={poi.appointment_booking_url}
                           appointmentRequired={poi.hours_but_appointment_required}
-                          hoursNotes={poi.hours_notes}
+                          hoursNotes={poi.hours?.notes}
                         />
                       </div>
                     )}

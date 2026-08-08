@@ -117,7 +117,7 @@ export default function BusinessDetail({ poi }) {
       <ContentGroup key="hours" title="Hours">
         <div className="acc_content_text">
           {/* Issue #70: holiday_hours top-level field removed; holidays live in hours.holidays */}
-          <HoursDisplay hours={poi.hours} appointmentBookingUrl={poi.appointment_booking_url} appointmentRequired={poi.hours_but_appointment_required} hoursNotes={poi.hours_notes} />
+          <HoursDisplay hours={poi.hours} appointmentBookingUrl={poi.appointment_booking_url} appointmentRequired={poi.hours_but_appointment_required} hoursNotes={poi.hours?.notes} />
         </div>
       </ContentGroup>
     ),

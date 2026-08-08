@@ -4,7 +4,8 @@ import {
   getWeekHours,
   formatLegacyHours,
   getUpcomingHolidays,
-  formatHolidayStatus
+  formatHolidayStatus,
+  HOLIDAY_UNCONFIRMED_TEXT
 } from '../../utils/hoursUtils';
 import { sanitizeHtml } from '../../utils/sanitize';
 
@@ -33,14 +34,19 @@ function HoursDisplay({
   const [showAllHolidays, setShowAllHolidays] = useState(false);
   const INITIAL_HOLIDAY_COUNT = 4;
 
+  // #118 - this location keeps no weekly schedule; show one honest line
+  // instead of a grid that would read "Closed" every day.
+  const noRegularHours = hours?.no_regular_hours === true;
+
   // Get week hours using the utility function
   const weekHours = hours ? getWeekHours(hours) : [];
 
   // Handle legacy hours format (simple day: time strings)
-  const legacyHours = !weekHours.length && hours ? formatLegacyHours(hours) : [];
+  const legacyHours = !weekHours.length && hours && !noRegularHours ? formatLegacyHours(hours) : [];
 
-  // Issue #70: only read holidays from the canonical nested key.
-  const upcomingHolidays = getUpcomingHolidays(hours?.holidays);
+  // Issue #70: holidays come from the canonical nested key only. Issue #116:
+  // the util needs the whole blob so it can derive follows-regular results.
+  const upcomingHolidays = getUpcomingHolidays(hours);
 
   // Determine which holidays to show
   const visibleHolidays = showAllHolidays
@@ -55,14 +61,21 @@ function HoursDisplay({
   const hasAppointments = (appointmentLinks && appointmentLinks.length > 0) || appointmentBookingUrl;
   const hasNotes = hoursNotes || appointmentRequired;
 
-  if (!hasHours && !hasHolidays && !hasAppointments && !hasNotes) {
+  if (!hasHours && !noRegularHours && !hasHolidays && !hasAppointments && !hasNotes) {
     return null;
   }
 
   return (
     <div className="hours-display">
       {/* Regular Hours Section */}
-      {hasHours && (
+      {noRegularHours && (
+        <div className="hours-display__section">
+          <h4 className="hours-display__header">HOURS</h4>
+          <p className="hours-display__no-regular">No regular hours</p>
+        </div>
+      )}
+
+      {!noRegularHours && hasHours && (
         <div className="hours-display__section">
           <h4 className="hours-display__header">HOURS</h4>
           <div className="hours-display__days">
@@ -77,6 +90,7 @@ function HoursDisplay({
                   <span className="hours-display__day-hours">
                     {day.formattedHours}
                     {day.label && <span className="hours-display__day-note"> ({day.label})</span>}
+                    {day.note && <span className="hours-display__day-note"> {day.note}</span>}
                   </span>
                 </div>
               ))
@@ -125,9 +139,15 @@ function HoursDisplay({
                 </span>
                 <span className="hours-display__holiday-name">{holiday.name}</span>
                 <span className="hours-display__holiday-date">{holiday.dateStr}</span>
-                <span className={`hours-display__holiday-status hours-display__holiday-status--${holiday.hours?.status || 'default'}`}>
-                  {formatHolidayStatus(holiday.hours)}
+                <span className={`hours-display__holiday-status hours-display__holiday-status--${holiday.mode || 'default'}`}>
+                  {holiday.unconfirmed ? 'Not confirmed' : formatHolidayStatus(holiday)}
                 </span>
+                {/* #116 - the pill stays short; the explanation rides alongside it. */}
+                {(holiday.unconfirmed || holiday.note) && (
+                  <span className="hours-display__holiday-note">
+                    {holiday.unconfirmed ? HOLIDAY_UNCONFIRMED_TEXT : holiday.note}
+                  </span>
+                )}
               </div>
             ))}
           </div>

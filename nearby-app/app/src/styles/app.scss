@@ -9564,6 +9564,32 @@ body.overlay_lock {
   border-color: $blue;
 }
 
+/* #116/#118: styles for the new hours elements. The row's existing
+   grid-template-columns already ends in 1fr, which the note cell fills. */
+.hours-display__no-regular {
+  color: $nn_slate;
+  font-style: italic;
+}
+
+.hours-display__holiday-note {
+  font-size: 0.8rem;
+  color: $nn_gray;
+
+  @media (max-width: 600px) {
+    grid-column: 2;
+  }
+}
+
+.hours-display__holiday-status--unconfirmed {
+  color: $nn_gray;
+  border-color: $grayB;
+}
+
+.hours-display__holiday-status--follows_regular {
+  color: $nn_slate;
+  border-color: $grayB;
+}
+
 /* SEE MORE button */
 .hours-display__see-more {
   display: inline-flex;
