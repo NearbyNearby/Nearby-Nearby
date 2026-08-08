@@ -148,6 +148,72 @@ class TestUploadImage:
         assert data["url"] is not None
 
 
+class TestUploadParkingLotImage:
+    """Lot photos exercise the nullable ``images.poi_id`` widened by #90/#161."""
+
+    def _create_lot(self, admin_client, **overrides):
+        payload = {"name": "Photo Lot", "publication_status": "published"}
+        payload.update(overrides)
+        resp = admin_client.post("/api/parking-lots/", json=payload)
+        assert resp.status_code == 201, resp.text
+        return resp.json()
+
+    def test_standalone_lot_photo_has_no_poi_owner(self, admin_client, ensure_minio_bucket):
+        """A standalone lot's photo stores poi_id NULL and its own S3 prefix.
+
+        Uses a 300x300 source so size VARIANTS are actually generated: those rows
+        also have poi_id NULL, so they prove the variants carry parking_lot_id
+        and therefore satisfy ck_images_owner_present.
+        """
+        lot = self._create_lot(admin_client)
+
+        png_bytes = _create_test_png(width=300, height=300)
+        resp = admin_client.post(
+            f"/api/images/upload/parking-lot/{lot['id']}",
+            files={"file": ("lot.png", io.BytesIO(png_bytes), "image/png")},
+            data={"caption": "Look for the blue awning"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["url"] is not None
+
+        fetched = admin_client.get(f"/api/parking-lots/{lot['id']}").json()
+        assert len(fetched["images"]) == 1
+        assert fetched["images"][0]["caption"] == "Look for the blue awning"
+        assert fetched["images"][0]["type"] == "parking"
+        assert fetched["images"][0]["thumbnail_url"] is not None
+
+        objects = ensure_minio_bucket.list_objects_v2(
+            Bucket=MINIO_BUCKET, Prefix=f"images/parking-lots/{lot['id']}/parking/"
+        )
+        assert objects.get("KeyCount", 0) >= 1
+
+    def test_owned_lot_photo_also_belongs_to_the_owner_poi(
+        self, admin_client, ensure_minio_bucket
+    ):
+        """An owned lot's photo carries BOTH ids, so the owner still sees it."""
+        biz = create_business(admin_client, name="Lot Owner Biz")
+        lot = self._create_lot(admin_client, name="Owned Lot", owner_poi_id=biz["id"])
+
+        png_bytes = _create_test_png()
+        resp = admin_client.post(
+            f"/api/images/upload/parking-lot/{lot['id']}",
+            files={"file": ("owned_lot.png", io.BytesIO(png_bytes), "image/png")},
+        )
+        assert resp.status_code == 200, resp.text
+
+        poi_images = admin_client.get(f"/api/images/poi/{biz['id']}").json()
+        parking = [i for i in poi_images if i["image_type"] == "parking"]
+        assert len(parking) == 1
+
+    def test_upload_to_unknown_lot_is_404(self, admin_client, ensure_minio_bucket):
+        png_bytes = _create_test_png()
+        resp = admin_client.post(
+            f"/api/images/upload/parking-lot/{uuid.uuid4()}",
+            files={"file": ("nope.png", io.BytesIO(png_bytes), "image/png")},
+        )
+        assert resp.status_code == 404
+
+
 class TestUploadHeic:
     def test_upload_heic_happy_path(self, admin_client, ensure_minio_bucket):
         """HEIC upload is accepted and stored as JPEG in MinIO."""

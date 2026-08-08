@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.sentry import init_sentry
-from app.api.endpoints import pois, categories, attributes, auth, relationships, images, primary_types, utils, form_responses
+from app.api.endpoints import pois, categories, attributes, auth, relationships, images, primary_types, utils, form_responses, parking_lots
 
 init_sentry()
 from app.database import engine, Base
@@ -52,6 +52,7 @@ app.include_router(images.router, prefix="/api/images", tags=["Images"])
 app.include_router(primary_types.router, prefix="/api/primary-types", tags=["Primary Types"])
 app.include_router(utils.router, prefix="/api", tags=["Utils"])
 app.include_router(form_responses.router, prefix="/api", tags=["Form Responses"])
+app.include_router(parking_lots.router, prefix="/api", tags=["Parking Lots"])
 
 @app.get("/")
 def read_root():

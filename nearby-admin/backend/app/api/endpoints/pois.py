@@ -38,14 +38,20 @@ def _enrich_link_fields(db: Session, poi):
 
 def _enrich_response_fields(db: Session, poi):
     """Enrich an admin POI response: Task 2.1 link fields (from edges), Task 2.3
-    point fields (from poi_points), and Task 2.5 media fields (featured_image /
-    photos / gallery_photos derived from the images table) — all via
-    set_committed_value so the instance is never dirtied."""
+    point fields (from poi_points), Task 2.5 media fields (featured_image /
+    photos / gallery_photos derived from the images table), and the #90/#161
+    parking fields (parking_lot_links from the edges, plus the unified
+    parking_lots array), none of which dirty the instance."""
     if poi is None:
         return poi
     from shared.poi_points import enrich_poi_point_fields
     from shared.poi_media import enrich_poi_media_fields
-    return enrich_poi_media_fields(db, enrich_poi_point_fields(db, _enrich_link_fields(db, poi)))
+    from shared.parking_lots import enrich_poi_parking
+    return enrich_poi_parking(
+        db,
+        enrich_poi_media_fields(db, enrich_poi_point_fields(db, _enrich_link_fields(db, poi))),
+        audience="admin",
+    )
 
 
 @router.post("/pois/", response_model=schemas.PointOfInterest, status_code=201)
@@ -237,6 +243,13 @@ def autosave_poi(
         _fallback_lat, _fallback_lng = _poi_location_lat_lng(poi.location)
         _default_missing_restroom_coords(_point_values['toilet_locations'], _fallback_lat, _fallback_lng)
 
+    # Parking lots (#90/#161): links to SHAREABLE lots persist as
+    # poi_parking_links edges, not a column. Pull them out of the autosave
+    # payload so the setattr loop never sees them; sync them before commit.
+    from shared.parking_lots import LINK_FIELD as _PARKING_LINK_FIELD, sync_parking_links as _sync_parking_links
+    from app.crud.crud_poi import _UNSET as _UNSET_AUTOSAVE
+    _parking_link_value = filtered.pop(_PARKING_LINK_FIELD, _UNSET_AUTOSAVE)
+
     # Task 2.5: stop writing the legacy photo columns (images table wins) and
     # contact_info (main_contact_* columns win). Drop them from the autosave
     # payload so they are never setattr'd onto their retained legacy columns.
@@ -300,6 +313,10 @@ def autosave_poi(
     # Task 2.3: sync any provided point-geometry fields into poi_points (same txn).
     for _f, _v in _point_values.items():
         _sync_point_rows(db, poi.id, _f, _v)
+
+    # Parking lots (#90/#161): sync links only when this autosave provided them.
+    if _parking_link_value is not _UNSET_AUTOSAVE:
+        _sync_parking_links(db, poi.id, _parking_link_value)
 
     # Append-only audit row, in the SAME transaction as the autosave (Task 1.1).
     record_poi_revision(db, poi, 'update', user_id=getattr(current_user, 'id', None))

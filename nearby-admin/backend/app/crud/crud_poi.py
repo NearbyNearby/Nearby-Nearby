@@ -442,6 +442,12 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
         _f: poi_data.pop(_f, None)
         for _f, _i in _POINT_FIELDS.items() if _i["owner"] == "poi"
     }
+
+    # Parking lots (#90/#161): links to SHAREABLE lots persist as
+    # poi_parking_links edges. There is no column, so pop it out of poi_data
+    # before the model is constructed; it is synced once the POI exists.
+    from shared.parking_lots import LINK_FIELD as _PARKING_LINK_FIELD, sync_parking_links as _sync_parking_links
+    _parking_link_value = poi_data.pop(_PARKING_LINK_FIELD, None)
     # Issue #117: default missing restroom lat/lng to the POI's own coordinates
     # so a row with no pin doesn't get silently dropped in its entirety.
     _default_missing_restroom_coords(
@@ -576,6 +582,8 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
         # Task 2.3: sync point-geometry fields into poi_points rows (same txn).
         for _f, _v in _point_values.items():
             _sync_point_rows(db, db_poi.id, _f, _v)
+        # Parking lots (#90/#161): sync links into poi_parking_links (same txn).
+        _sync_parking_links(db, db_poi.id, _parking_link_value)
         # Append-only audit row, in the SAME transaction as the create (Task 1.1).
         record_poi_revision(db, db_poi, 'create', user_id)
         db.commit()
@@ -623,6 +631,12 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
         for _f, _i in _POINT_FIELDS.items()
         if _i["owner"] == "poi" and _f in update_data
     }
+
+    # Parking lots (#90/#161): links to SHAREABLE lots persist as
+    # poi_parking_links edges. Pop it only when THIS request provided it, so a
+    # PUT that omits the field leaves the existing links untouched.
+    from shared.parking_lots import LINK_FIELD as _PARKING_LINK_FIELD, sync_parking_links as _sync_parking_links
+    _parking_link_value = update_data.pop(_PARKING_LINK_FIELD, _UNSET)
 
     # Remove deprecated photo columns that have been moved to the Images table
     deprecated_photo_fields = [
@@ -872,6 +886,9 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
         # Task 2.3: sync provided point-geometry fields into poi_points rows.
         for _f, _v in _point_values.items():
             _sync_point_rows(db, db_obj.id, _f, _v)
+        # Parking lots (#90/#161): sync links only when the request provided them.
+        if _parking_link_value is not _UNSET:
+            _sync_parking_links(db, db_obj.id, _parking_link_value)
         # Append-only audit row, in the SAME transaction as the update (Task 1.1).
         record_poi_revision(db, db_obj, 'update', user_id)
         db.commit()

@@ -74,6 +74,7 @@ _SOURCE_RE = re.compile(
     r"|^images:[a-z0-9_]+$"
     r"|^edges:[a-z0-9_]+$"  # Task 2.1: POI-to-POI links served from poi_relationships
     r"|^points:[a-z0-9_]+$"  # Task 2.3: point geometry served from poi_points
+    r"|^lots:[a-z0-9_]+$"  # #90/#161: unified parking read (own pins ++ linked lots)
 )
 
 

@@ -887,6 +887,29 @@ SYNTHETIC_FIELDS = [
         "computed": True,
         "card": False,
     },
+    {
+        # Issues #90/#161. The unified parking read: the POI's own pins
+        # (poi_points kind='parking') followed by the SHAREABLE lots it links,
+        # every entry the same shape with an "origin" discriminator. Not a
+        # column, so it has to be synthetic. The write-side input
+        # (parking_lot_links) is admin-only and deliberately NOT a registry
+        # field. Carries no PII by construction.
+        "key": "parking_lots",
+        "type": "list",
+        "group": "Parking",
+        "applies_to": ["BUSINESS", "SERVICES", "PARK", "TRAIL", "EVENT",
+                       "YOUTH_ACTIVITIES", "JOBS", "VOLUNTEER_OPPORTUNITIES",
+                       "DISASTER_HUBS"],
+        "tier": "any",
+        "audience": "public",
+        "render": "bespoke",
+        "icon": "parking",
+        "value_source": None,
+        "schema_org": None,
+        "source": "lots:parking",
+        "computed": True,
+        "card": False,
+    },
 ]
 
 

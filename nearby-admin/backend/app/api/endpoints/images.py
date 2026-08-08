@@ -138,6 +138,67 @@ async def upload_image(
         raise HTTPException(status_code=500, detail="Image upload failed.")
 
 
+@router.post("/upload/parking-lot/{lot_id}")
+async def upload_parking_lot_image(
+    lot_id: UUID,
+    file: UploadFile = File(...),
+    alt_text: Optional[str] = Form(None),
+    caption: Optional[str] = Form(None),
+    display_order: Optional[int] = Form(0),
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+) -> ImageUploadResponse:
+    """
+    Upload a photo for a reusable parking lot (issues #90 / #161).
+
+    - **lot_id**: UUID of the parking lot
+    - **file**: The image file to upload
+    - **caption**: "What should visitors look for?" (the note rides on caption,
+      so no new image column was needed)
+
+    An OWNED lot's photo carries BOTH ids, so it still appears in the owner POI's
+    parking_images collection; a STANDALONE lot's photo has poi_id NULL and is
+    therefore invisible to every existing `Image.poi_id == x` query path.
+    The type is always `parking` (no new ImageType value, no ALTER TYPE).
+    """
+    from app.models.parking_lot import ParkingLot
+
+    lot = db.query(ParkingLot).filter(ParkingLot.id == lot_id).first()
+    if not lot:
+        raise HTTPException(status_code=404, detail="Parking lot not found")
+
+    from shared.parking_lots import lot_image_context
+
+    try:
+        db_image = await image_service.upload_image(
+            db=db,
+            file=file,
+            poi_id=lot.owner_poi_id,
+            image_type=ImageType.parking,
+            user_id=None,
+            context=lot_image_context(lot_id),
+            alt_text=alt_text,
+            caption=caption,
+            display_order=display_order,
+            parking_lot_id=lot_id,
+        )
+
+        urls = image_service.get_image_urls(db_image)
+
+        return ImageUploadResponse(
+            id=db_image.id,
+            filename=db_image.filename,
+            url=urls["url"],
+            thumbnail_url=urls.get("thumbnail_url"),
+            message="Image uploaded successfully"
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Parking lot image upload failed for lot_id=%s", lot_id)
+        raise HTTPException(status_code=500, detail="Image upload failed.")
+
+
 @router.post("/upload-multiple/{poi_id}")
 async def upload_multiple_images(
     poi_id: UUID,

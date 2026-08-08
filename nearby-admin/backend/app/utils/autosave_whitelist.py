@@ -81,6 +81,10 @@ AUTOSAVE_ALLOWED_FIELDS: set[str] = {
     'parking_notes',
     # 'public_transit_info' removed — renamed to _deprecated_public_transit_info (Migration A #33)
     'expect_to_pay_parking',
+    # Links to SHAREABLE lots (#90/#161). Not a column: the autosave handler
+    # pulls it out and syncs it into poi_parking_links, like the Task 2.1 link
+    # fields and the Task 2.3 point fields.
+    'parking_lot_links',
 
     # Additional info
     'downloadable_maps',

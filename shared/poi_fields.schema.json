@@ -112,7 +112,7 @@
         "source": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^(poi|business|park|trail|event)\\.[a-z0-9_]+$|^computed\\.[a-z0-9_]+$|^images:[a-z0-9_]+$|^edges:[a-z0-9_]+$|^points:[a-z0-9_]+$"
+          "pattern": "^(poi|business|park|trail|event)\\.[a-z0-9_]+$|^computed\\.[a-z0-9_]+$|^images:[a-z0-9_]+$|^edges:[a-z0-9_]+$|^points:[a-z0-9_]+$|^lots:[a-z0-9_]+$"
         },
         "computed": {
           "type": "boolean"

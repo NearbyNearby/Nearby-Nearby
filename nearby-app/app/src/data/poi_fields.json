@@ -1902,6 +1902,35 @@
     "replaced_by": null
   },
   {
+    "key": "parking_lots",
+    "label": "Parking Lots",
+    "type": "list",
+    "group": "Parking",
+    "order": 9901,
+    "applies_to": [
+      "BUSINESS",
+      "SERVICES",
+      "PARK",
+      "TRAIL",
+      "EVENT",
+      "YOUTH_ACTIVITIES",
+      "JOBS",
+      "VOLUNTEER_OPPORTUNITIES",
+      "DISASTER_HUBS"
+    ],
+    "tier": "any",
+    "audience": "public",
+    "render": "bespoke",
+    "icon": "parking",
+    "value_source": null,
+    "schema_org": null,
+    "source": "lots:parking",
+    "computed": true,
+    "card": false,
+    "deprecated": false,
+    "replaced_by": null
+  },
+  {
     "key": "icon_wheelchair_accessible",
     "label": "Wheelchair Accessible",
     "type": "boolean",

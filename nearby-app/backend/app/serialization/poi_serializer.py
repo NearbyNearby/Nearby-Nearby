@@ -175,6 +175,16 @@ def _read_source(db, poi, entry: Dict[str, Any], images: List[Any]) -> Any:
         kind = source.split(":", 1)[1]
         return read_points_by_kind(db, poi.id, kind)
 
+    # lots:<kind> (issues #90/#161). The unified parking read: the POI's own pins
+    # (poi_points kind='parking') followed by the SHAREABLE lots it links, each
+    # entry tagged with an ``origin``. Needs ``db``; the field is card:false so
+    # the card path (db=None) never carries it.
+    if source.startswith("lots:"):
+        if db is None:
+            return []
+        from shared.parking_lots import read_parking_lots
+        return read_parking_lots(db, poi.id, audience="public")
+
     # computed.<fn> — read the stored column by entry key (icon_*,
     # accessible_restroom, inclusive_playground are real boolean columns).
     if source.startswith("computed."):

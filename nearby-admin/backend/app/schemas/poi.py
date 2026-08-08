@@ -13,7 +13,28 @@ from geoalchemy2.shape import to_shape
 
 from .category import Category
 from .primary_type import PrimaryType
+from .parking_lot import ParkingLotLink
 from ._coercers import EmptyStringToNoneMixin
+
+
+def normalize_parking_lot_links(links: Optional[List[Any]]) -> Optional[List[Dict[str, Any]]]:
+    """Accept a bare ``[uuid, ...]`` list as well as the full dict shape.
+
+    The link picker sends dicts (it owns sort_order and the per-link label), but
+    a plain UUID list is the natural payload for a simple "attach these lots"
+    call, so both are supported. ``sort_order`` defaults to the list index.
+    """
+    if links is None:
+        return None
+    result: List[Dict[str, Any]] = []
+    for idx, link in enumerate(links):
+        if isinstance(link, dict):
+            entry = dict(link)
+            entry.setdefault("sort_order", idx)
+            result.append(entry)
+        else:
+            result.append({"parking_lot_id": link, "sort_order": idx, "label": None})
+    return result
 
 # Type for titled links - supports both old string format and new dict format
 TitledLink = Union[str, Dict[str, str]]
@@ -515,6 +536,15 @@ class PointOfInterestBase(EmptyStringToNoneMixin, BaseModel):
     # parking_photos - DEPRECATED: moved to Images table (image_type='parking')
     # public_transit_info - DEPRECATED: renamed _deprecated_public_transit_info (Migration A #33)
     expect_to_pay_parking: Optional[Literal['yes', 'no', 'sometimes']] = None
+    # Shareable lots this POI surfaces. Write-only input: persisted as
+    # poi_parking_links edges (never a column), and what the reader gets back is
+    # the unified `parking_lots` array below. A bare [uuid, ...] is accepted.
+    parking_lot_links: Optional[List[ParkingLotLink]] = None
+
+    @field_validator('parking_lot_links', mode='before')
+    @classmethod
+    def coerce_parking_lot_links(cls, v):
+        return normalize_parking_lot_links(v)
 
     # Additional Info
     downloadable_maps: Optional[List[Dict[str, str]]] = None
@@ -735,6 +765,14 @@ class PointOfInterestUpdate(EmptyStringToNoneMixin, BaseModel):
     # parking_photos - DEPRECATED: moved to Images table (image_type='parking')
     # public_transit_info - DEPRECATED: renamed _deprecated_public_transit_info (Migration A #33)
     expect_to_pay_parking: Optional[Literal['yes', 'no', 'sometimes']] = None
+    # See PointOfInterestBase: write-only, persisted as poi_parking_links edges.
+    parking_lot_links: Optional[List[ParkingLotLink]] = None
+
+    @field_validator('parking_lot_links', mode='before')
+    @classmethod
+    def coerce_parking_lot_links(cls, v):
+        return normalize_parking_lot_links(v)
+
     downloadable_maps: Optional[List[Dict[str, str]]] = None
     payment_methods: Optional[List[str]] = None
     # key_facilities - DEPRECATED: renamed _deprecated_key_facilities (Migration A #34)
@@ -854,6 +892,10 @@ class PointOfInterest(PointOfInterestBase):
     main_category: Optional[Category] = None  # Will be populated via property
     secondary_categories: List[Category] = []  # Will be populated via property
     categories: List[Category] = []  # All categories (for backward compatibility)
+    # The unified parking read: the POI's own pins (origin "own") followed by its
+    # linked shareable lots (origin "linked"). Derived, never stored; populated by
+    # _enrich_response_fields via shared.parking_lots.enrich_poi_parking.
+    parking_lots: List[Dict[str, Any]] = []
     created_at: datetime
     last_updated: datetime
 

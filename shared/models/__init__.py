@@ -21,6 +21,7 @@ from shared.models.poi import (
     Trail,
     Event,
 )
+from shared.models.parking_lot import ParkingLot, POIParkingLink
 from shared.models.image import Image, IMAGE_TYPE_CONFIG
 from shared.models.poi_revision import POIRevision
 
@@ -40,6 +41,8 @@ __all__ = [
     "Park",
     "Trail",
     "Event",
+    "ParkingLot",
+    "POIParkingLink",
     "Image",
     "IMAGE_TYPE_CONFIG",
     "POIRevision",

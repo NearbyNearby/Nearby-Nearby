@@ -76,6 +76,52 @@ class TestPiiNotLeakedById:
         _assert_no_pii(resp.json(), resp.text)
 
 
+class TestPiiNotLeakedInParkingLots:
+    def test_parking_lot_entries_carry_no_contact_fields(self, db_session, app_client):
+        """The #90/#161 ``parking_lots`` array must stay PII-free.
+
+        A lot has no contact columns by construction, and the ``owner`` summary
+        is deliberately only {id, name, slug, poi_type}. This guards against a
+        future "just add the owner's phone number" convenience.
+        """
+        import uuid as _uuid
+        from shared.models.parking_lot import ParkingLot, POIParkingLink
+
+        owner = orm_create_business(
+            db_session,
+            name="Lot Owner With PII",
+            slug="lot-owner-with-pii",
+            published=True,
+            main_contact_name=PII_VALUES["main_contact_name"],
+            main_contact_email=PII_VALUES["main_contact_email"],
+            main_contact_phone=PII_VALUES["main_contact_phone"],
+        )
+        reader = orm_create_business(
+            db_session, name="Lot Reader", slug="lot-reader", published=True
+        )
+        lot = ParkingLot(
+            id=_uuid.uuid4(),
+            owner_poi_id=owner.id,
+            name="Shared Deck",
+            publication_status="published",
+        )
+        db_session.add(lot)
+        db_session.flush()
+        db_session.add(POIParkingLink(poi_id=reader.id, parking_lot_id=lot.id))
+        db_session.commit()
+
+        resp = app_client.get(f"/api/pois/{str(reader.id)}")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["parking_lots"]) == 1
+        entry = body["parking_lots"][0]
+        assert set(entry["owner"]) == {"id", "name", "slug", "poi_type"}
+        for key in PII_KEYS:
+            assert key not in entry
+            assert key not in entry["owner"]
+        _assert_no_pii(body, resp.text)
+
+
 class TestPiiNotLeakedBySlug:
     def test_pii_not_leaked_by_slug(self, db_session, app_client):
         """GET /api/pois/by-slug/{slug} must not expose admin-only PII either."""

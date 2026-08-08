@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any
 
-from sqlalchemy import Column, String, Integer, Text, TIMESTAMP, Enum, ForeignKey, Boolean
+from sqlalchemy import Column, String, Integer, Text, TIMESTAMP, Enum, ForeignKey, Boolean, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -149,9 +149,26 @@ IMAGE_TYPE_CONFIG: Dict[ImageType, Dict[str, Any]] = {
 class Image(Base):
     """Image model for storing POI images"""
     __tablename__ = "images"
+    __table_args__ = (
+        # An image belongs to a POI, to a standalone parking lot, or to both (an
+        # OWNED lot's photo carries both ids so it keeps appearing in the owner's
+        # parking_images collection). Belonging to neither is meaningless.
+        CheckConstraint(
+            "poi_id IS NOT NULL OR parking_lot_id IS NOT NULL",
+            name="ck_images_owner_present",
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    poi_id = Column(UUID(as_uuid=True), ForeignKey("points_of_interest.id", ondelete="CASCADE"), nullable=False)
+    # Nullable since the parking-lot release: a STANDALONE lot's photo has no POI
+    # owner, so it is invisible to every existing ``Image.poi_id == x`` query.
+    poi_id = Column(UUID(as_uuid=True), ForeignKey("points_of_interest.id", ondelete="CASCADE"), nullable=True)
+    parking_lot_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("parking_lots.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     image_type = Column(Enum(ImageType), nullable=False)
     image_context = Column(String(50), nullable=True)  # For contextual grouping (e.g., 'restroom_1', 'parking_2')
 
@@ -192,6 +209,7 @@ class Image(Base):
 
     # Relationships
     poi = relationship("PointOfInterest", back_populates="images")
+    parking_lot = relationship("ParkingLot", back_populates="images")
     uploader = relationship("User")
 
     # Self-referential relationship for size variants
@@ -243,6 +261,7 @@ class Image(Base):
         """Create a size variant of an existing image (S3 storage only)"""
         variant = cls(
             poi_id=parent_image.poi_id,
+            parking_lot_id=parent_image.parking_lot_id,
             image_type=parent_image.image_type,
             image_context=parent_image.image_context,
             filename=f"{size_variant}_{parent_image.filename}",
