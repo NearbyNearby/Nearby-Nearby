@@ -143,3 +143,24 @@ describe('Map attribution (#102)', () => {
     expect(prefix).not.toMatch(/\u{1F1FA}\u{1F1E6}/u);
   });
 });
+
+describe('Map hides opted-out locations (#130)', () => {
+  it('drops the pin for a nearby POI marked "do not display location"', () => {
+    const pois = [
+      POIS[0],
+      { ...POIS[1], dont_display_location: true },
+      POIS[2],
+    ];
+    render(<Map currentPOI={null} nearbyPOIs={pois} />);
+    const names = screen.getAllByTestId('marker').map((m) => m.querySelector('strong').textContent);
+    expect(names).toEqual(['Alpha', 'Charlie']);
+  });
+
+  it('drops the current-POI pin when the POI being viewed opted out', () => {
+    const current = { id: 'cur', name: 'Service Only', location: at(-79.17, 35.72), dont_display_location: true };
+    render(<Map currentPOI={current} nearbyPOIs={[POIS[0]]} />);
+    const names = screen.getAllByTestId('marker').map((m) => m.querySelector('strong').textContent);
+    expect(names).not.toContain('Service Only');
+    expect(names).toContain('Alpha');
+  });
+});

@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { Navigation, Toilet, Wifi, PawPrint, Accessibility } from 'lucide-react';
 import { getDisplayableLocation } from '../../utils/getDisplayableLocation';
+import { getNextOccurrence } from '../../utils/eventSchedule';
 import { getOpenCloseStatusLabel, getEffectiveHoursForDate, formatDayHours } from '../../utils/hoursUtils';
 
 // Card distance formatting: feet under a tenth of a mile, miles above it.
@@ -104,7 +105,24 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
 
   // Event start comes from the flat card field (registry card:true); fall back to
   // the nested event object for callers that pass a full detail payload.
-  const eventStart = poi.start_datetime || poi.event?.start_datetime;
+  // #141: for a repeating series that stored date is the FIRST occurrence, so the
+  // card resolves the occurrence that is current today. `null` means the
+  // recurrence has finished; the card then falls back to the stored date and the
+  // "Past" badge below is correct.
+  const eventSchedule = poi.event?.start_datetime ? poi.event : poi;
+  const nextOccurrence = isEvent ? getNextOccurrence(eventSchedule) : null;
+  const eventStart = nextOccurrence?.start || poi.start_datetime || poi.event?.start_datetime;
+  // Past is measured from the start of today in UTC, the same cutoff the API's
+  // browse filter uses (_event_is_past), so the badge can never contradict a
+  // card the server just delivered as current.
+  const _badgeNow = new Date();
+  const _todayStartUtc = new Date(Date.UTC(
+    _badgeNow.getUTCFullYear(), _badgeNow.getUTCMonth(), _badgeNow.getUTCDate()
+  ));
+  const occurrenceEnd = nextOccurrence
+    ? (nextOccurrence.end ?? nextOccurrence.start)
+    : (eventStart ? new Date(eventStart) : null);
+  const eventIsPast = Boolean(occurrenceEnd) && occurrenceEnd < _todayStartUtc;
 
   // Coordinates for dawn/dusk-aware status (GeoJSON order: [lng, lat])
   const _poiCoords = poi?.location?.coordinates;
@@ -192,7 +210,7 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
       )}
 
       {/* Past event badge for Scheduled events whose date has passed */}
-      {isEvent && eventStart && new Date(eventStart) < new Date() && poi.event?.event_status === 'Scheduled' && (
+      {isEvent && eventIsPast && poi.event?.event_status === 'Scheduled' && (
         <span className="nearby-card__status-badge nearby-card__status-badge--past">Past</span>
       )}
 

@@ -136,3 +136,43 @@ describe('Explore distance formatting (#134)', () => {
     expect(distances[2]).toBe('0.9 mi');
   });
 });
+
+describe('Explore hides locations for opted-out POIs (#130)', () => {
+  const HIDDEN_POIS = [
+    { id: 'shown', name: 'Shown Place', poi_type: 'BUSINESS', location: northOf(0.05) },
+    {
+      id: 'hidden', name: 'Hidden Place', poi_type: 'BUSINESS',
+      location: northOf(0.1), dont_display_location: true,
+    },
+  ];
+
+  beforeEach(() => {
+    let first = true;
+    global.fetch = vi.fn(() => {
+      const body = first ? HIDDEN_POIS : [];
+      first = false;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
+    });
+  });
+
+  it('drops the map marker for a POI marked "do not display location"', async () => {
+    renderExplore();
+    await screen.findAllByText('Hidden Place');
+
+    const names = screen.getAllByTestId('marker').map((m) => m.querySelector('strong').textContent);
+    expect(names).toContain('Shown Place');
+    expect(names).not.toContain('Hidden Place');
+  });
+
+  it('drops the Directions button on that POI card but keeps the card itself', async () => {
+    renderExplore();
+    await screen.findAllByText('Hidden Place');
+
+    const cards = Array.from(document.querySelectorAll('.one_search_map_result_single'));
+    const hidden = cards.find((c) => c.querySelector('.one_search_map_result_title').textContent === 'Hidden Place');
+    const shown = cards.find((c) => c.querySelector('.one_search_map_result_title').textContent === 'Shown Place');
+    expect(hidden).toBeTruthy();
+    expect(within(hidden).queryByText('Directions')).toBeNull();
+    expect(within(shown).getByText('Directions')).toBeInTheDocument();
+  });
+});

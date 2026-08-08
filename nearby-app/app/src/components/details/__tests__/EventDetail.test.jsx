@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import EventDetail from '../EventDetail';
 
 // Mock child components that pull in heavy deps (Leaflet, etc.)
@@ -139,6 +139,44 @@ describe('EventDetail', () => {
     expect(dateLine).toBeInTheDocument();
     expect(dateLine).toHaveTextContent('10am-6pm');
     expect(dateLine).toHaveTextContent('Jun');
+  });
+
+  // --- #141: a repeating event shows the CURRENT occurrence, not the first ---
+
+  describe('repeating events', () => {
+    // Saturday 2026-08-08, so the next Sunday occurrence is 2026-08-09.
+    const NOW = new Date(2026, 7, 8, 12, 0, 0);
+    const weeklySince2023 = {
+      event_status: 'Scheduled',
+      is_repeating: true,
+      repeat_pattern: { frequency: 'weekly', interval: 1 },
+      recurrence_end_date: null,
+      start_datetime: '2023-07-02T15:00:00', // a Sunday, years in the past
+      end_datetime: '2023-07-02T18:00:00',
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('header shows the upcoming occurrence, not the series start', () => {
+      renderDetail({ event: weeklySince2023 });
+      const dateLine = document.querySelector('.poi_page_main_category');
+      expect(dateLine).toBeInTheDocument();
+      expect(dateLine).toHaveTextContent('Aug 9th');
+      expect(dateLine).toHaveTextContent('3pm-6pm');
+      expect(dateLine).not.toHaveTextContent('Jul 2nd');
+    });
+
+    it('is not labelled "Ended" just because the series started long ago', () => {
+      renderDetail({ event: weeklySince2023 });
+      expect(screen.queryByText('Ended', { hidden: true })).not.toBeInTheDocument();
+    });
   });
 
   // --- B2: Cost renders as an InfoRow inside About + Details ---

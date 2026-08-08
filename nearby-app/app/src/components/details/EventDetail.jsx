@@ -17,7 +17,7 @@ import { EventJsonLd } from '../seo/index';
 import DirectionsModal from '../common/DirectionsModal';
 
 import { getDisplayableLocation } from '../../utils/getDisplayableLocation';
-import { formatEventDateTime, formatRecurrence } from '../../utils/eventSchedule';
+import { formatEventDateTime, formatRecurrence, getNextOccurrence } from '../../utils/eventSchedule';
 
 
 /* ------------------------------------------------------------------ */
@@ -36,12 +36,15 @@ const hasContent = (v) => {
   return true;
 };
 
-/** Event-time derived open/closed label. */
-function deriveEventStatus(event) {
+/** Event-time derived open/closed label, judged on the CURRENT occurrence (#141). */
+function deriveEventStatus(event, occurrence) {
   if (!event?.start_datetime) return null;
   const now = Date.now();
-  const s = new Date(event.start_datetime).getTime();
-  const e = event.end_datetime ? new Date(event.end_datetime).getTime() : s;
+  const start = occurrence?.start ?? new Date(event.start_datetime);
+  const s = start.getTime();
+  const e = occurrence
+    ? (occurrence.end ?? start).getTime()
+    : (event.end_datetime ? new Date(event.end_datetime).getTime() : s);
   if (now < s) return { text: 'Upcoming', cls: 'poi_page_hours_opensoon' };
   if (now > e) return { text: 'Ended', cls: 'poi_page_hours_closed' };
   return { text: 'Fully Open', cls: 'poi_page_hours_opennow' };
@@ -77,7 +80,11 @@ function EventDetail({ poi }) {
   const displayLoc = getDisplayableLocation(poi);
   const dontDisplayLocation = poi.dont_display_location === true;
   const hideExact = displayLoc.hideExact || dontDisplayLocation;
-  const status = deriveEventStatus(event);
+  // #141: a repeating event is one POI whose start_datetime is the FIRST date of
+  // the series. Everything date-shaped on this page reads the occurrence that is
+  // current today instead, so a weekly market does not present as a stale listing.
+  const occurrence = getNextOccurrence(event);
+  const status = deriveEventStatus(event, occurrence);
   const isCanceled = event?.event_status === 'cancelled' || event?.event_status === 'Canceled';
 
   const getEventCoords = () => {
@@ -100,7 +107,9 @@ function EventDetail({ poi }) {
 
   /* ---- derived display data ---- */
   const venueName = event?.venue_name_snapshot || event?.venue?.name || event?.venue_name || null;
-  const dateTimeLine = formatEventDateTime(event?.start_datetime, event?.end_datetime);
+  const dateTimeLine = occurrence
+    ? formatEventDateTime(occurrence.start, occurrence.end)
+    : formatEventDateTime(event?.start_datetime, event?.end_datetime);
 
   const petOptionsStr = Array.isArray(poi.pet_options) && poi.pet_options.length > 0
     ? poi.pet_options.join(', ')

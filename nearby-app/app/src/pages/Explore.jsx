@@ -230,7 +230,7 @@ const ResultCard = forwardRef(function ResultCard({ poi, index, isHighlighted, o
       )}
 
       <div className="one_search_map_result_single_buttons" onClick={stop}>
-        {lat && lng && (
+        {lat && lng && !poi.dont_display_location && (
           <button
             type="button"
             className="btn_reset button btn_outline_teal btn_poi_button_1"

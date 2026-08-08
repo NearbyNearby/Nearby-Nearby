@@ -130,6 +130,9 @@ class POISearchResult(BaseModel):
     address_street: Optional[str] = None
     description_short: Optional[str] = None
     location: Optional[Any] = None
+    # #130: service-based POIs opt out of being pinned on a map. Every surface
+    # that draws a marker from a search result needs the flag.
+    dont_display_location: Optional[bool] = None
     main_category: Optional[Category] = None  # Primary display category
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 

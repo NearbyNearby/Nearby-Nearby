@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import NearbyCard from '../NearbyCard.jsx';
 
@@ -116,6 +116,52 @@ describe('NearbyCard — flat registry card fields (Task 1.4)', () => {
     render(<NearbyCard poi={poi} {...defaultProps} />);
 
     expect(screen.getByTitle('Wheelchair Accessible')).toBeInTheDocument();
+  });
+
+  // --- #141: repeating events resolve to the occurrence current today ---
+
+  describe('repeating events', () => {
+    // Saturday 2026-08-08; the next Thursday occurrence is 2026-08-13.
+    const NOW = new Date(2026, 7, 8, 12, 0, 0);
+
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const weeklyCard = {
+      id: 'e-rec', name: 'Weekly Market', poi_type: 'EVENT', distance_meters: 100,
+      start_datetime: '2020-07-02T15:00:00',
+      end_datetime: '2020-07-02T18:00:00',
+      is_repeating: true,
+      repeat_pattern: { frequency: 'weekly', interval: 1, days_of_week: ['Thu'] },
+      recurrence_end_date: null,
+    };
+
+    it('shows the upcoming occurrence date, not the first date of the series', () => {
+      render(<NearbyCard poi={weeklyCard} {...defaultProps} />);
+      expect(screen.getByText(/Aug 13/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Jul 2/i)).not.toBeInTheDocument();
+    });
+
+    it('does not stamp a "Past" badge on an open-ended repeating series', () => {
+      render(<NearbyCard poi={{ ...weeklyCard, event: { event_status: 'Scheduled' } }} {...defaultProps} />);
+      expect(screen.queryByText('Past')).not.toBeInTheDocument();
+    });
+
+    it('still marks a series whose recurrence has ended as Past', () => {
+      const retired = {
+        ...weeklyCard,
+        recurrence_end_date: '2021-07-02T15:00:00',
+        event: { event_status: 'Scheduled' },
+      };
+      render(<NearbyCard poi={retired} {...defaultProps} />);
+      expect(screen.getByText('Past')).toBeInTheDocument();
+    });
   });
 
   it('renders event date from a flat start_datetime (no nested event object)', () => {

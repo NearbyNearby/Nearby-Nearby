@@ -97,6 +97,28 @@ def _exclude_past_and_cancelled_events(pois, include_past=False, include_cancell
     return result
 
 
+# Recurrence definition shipped alongside a card's start_datetime (#141). The
+# stored start_datetime of a repeating event is the FIRST occurrence of the
+# series, so a card that renders it alone shows a stale date (and a bogus "Past"
+# badge). These are public registry fields with card == false, so they are
+# attached to the card payload here rather than widened in the registry.
+_CARD_RECURRENCE_FIELDS = (
+    'end_datetime', 'is_repeating', 'repeat_pattern',
+    'recurrence_end_date', 'excluded_dates',
+)
+
+
+def _attach_card_recurrence(poi, poi_dict: dict) -> dict:
+    """Add the recurrence block to an EVENT card so the client can resolve the
+    occurrence that is current today. Non-events are left untouched."""
+    event = getattr(poi, 'event', None)
+    if event is None:
+        return poi_dict
+    for field in _CARD_RECURRENCE_FIELDS:
+        poi_dict[field] = getattr(event, field, None)
+    return poi_dict
+
+
 def get_poi_images(db: Session, poi_id: uuid.UUID) -> List[dict]:
     """Get all images for a POI, returning only original images (not variants)"""
     # Get original images
@@ -557,6 +579,8 @@ def api_get_nearby_pois(
     for poi, distance in filtered_pairs:
         poi_dict = serialize_poi_card(poi)
         poi_dict['distance_meters'] = distance
+        poi_dict['dont_display_location'] = bool(poi.dont_display_location)
+        _attach_card_recurrence(poi, poi_dict)
         results.append(schemas.poi.POINearbyResult.model_validate(poi_dict))
 
     return results
@@ -633,6 +657,11 @@ def api_get_nearby_pois_by_id(
         poi_dict = serialize_poi_card(poi)
         poi_dict['distance_meters'] = poi.distance_meters
         poi_dict['categories'] = categories_data
+        # #130: the maps hide pins for POIs that opted out of showing an exact
+        # location. The flag is a detail-only registry field (card:false), so it
+        # is attached here (POINearbyResult allows extras).
+        poi_dict['dont_display_location'] = bool(poi.dont_display_location)
+        _attach_card_recurrence(poi, poi_dict)
         results.append(schemas.poi.POINearbyResult.model_validate(poi_dict))
 
     return results
@@ -709,6 +738,9 @@ def api_get_pois_by_category(
             'address_street': poi.address_street,
             'description_short': poi.description_short,
             'location': PointGeometry.from_wkb(poi.location) if poi.location else None,
+            # #130: the Explore map hides pins for POIs that opted out of showing
+            # an exact location, so the flag has to travel with the browse payload.
+            'dont_display_location': bool(poi.dont_display_location),
             'hours': poi.hours,
             # wheelchair_accessible removed (Issue #45 PR2 Migration B — column dropped)
         }
@@ -784,6 +816,8 @@ def api_get_pois_by_type(
             'address_street': poi.address_street,
             'description_short': poi.description_short,
             'location': PointGeometry.from_wkb(poi.location) if poi.location else None,
+            # #130: see by-category above; the Explore map needs this flag.
+            'dont_display_location': bool(poi.dont_display_location),
             'hours': poi.hours,
             'pet_options': poi.pet_options,
             'wifi_options': poi.wifi_options,
