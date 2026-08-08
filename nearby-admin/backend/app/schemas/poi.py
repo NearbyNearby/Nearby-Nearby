@@ -348,7 +348,43 @@ class EventUpdate(EmptyStringToNoneMixin, BaseModel):
         return v
 class Event(EventBase):
     poi_id: uuid.UUID
+    # Issue #124: "once saved, the event doesn't remember the venue". venue_poi_id
+    # persists fine, but the form had nothing to display. There is no ORM
+    # relationship to the venue POI, so resolve its name/type at read time.
+    # Read-only, response-only (EventCreate/EventUpdate do not carry them).
+    venue_name: Optional[str] = None
+    venue_type: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode='before')
+    @classmethod
+    def _resolve_venue_display(cls, data):
+        """Fill venue_name/venue_type from the linked venue POI when serializing an ORM row.
+
+        session.get() hits the identity map first, but on list endpoints an
+        event whose venue is not in the page pays one extra SELECT per row
+        (bounded by page size). If event-heavy list views grow, eager-load the
+        venue in crud.get_pois instead.
+        """
+        if isinstance(data, dict):
+            return data
+        venue_id = getattr(data, 'venue_poi_id', None)
+        if not venue_id or getattr(data, 'venue_name', None) is not None:
+            return data
+        from sqlalchemy.orm import object_session
+        session = object_session(data)
+        if session is None:
+            return data
+        from app.models.poi import PointOfInterest
+        with session.no_autoflush:
+            venue = session.get(PointOfInterest, venue_id)
+        if venue is not None:
+            data.venue_name = venue.name
+            data.venue_type = (
+                venue.poi_type.value if hasattr(venue.poi_type, 'value')
+                else str(venue.poi_type)
+            )
+        return data
 
 # Point of Interest Schemas
 POI_TYPES = Literal['BUSINESS', 'SERVICES', 'PARK', 'TRAIL', 'EVENT', 'YOUTH_ACTIVITIES', 'JOBS', 'VOLUNTEER_OPPORTUNITIES', 'DISASTER_HUBS']
@@ -940,6 +976,11 @@ class VenueDataForEvent(BaseModel):
     location: Optional[PointGeometry] = None
     front_door_latitude: Optional[float] = None
     front_door_longitude: Optional[float] = None
+    what3words_address: Optional[str] = None
+    arrival_methods: Optional[List[str]] = None
+    # Entry notes normalized across venue types (business/park/trail_entry_notes)
+    # so the event form can drop them straight into event_entry_notes (#124 P11).
+    entry_notes: Optional[str] = None
 
     # Contact info
     phone_number: Optional[str] = None
@@ -951,22 +992,53 @@ class VenueDataForEvent(BaseModel):
     parking_notes: Optional[str] = None
     parking_locations: Optional[List[Dict[str, Any]]] = None
     expect_to_pay_parking: Optional[str] = None
+    accessible_parking_details: Optional[List[str]] = None
     # public_transit_info - DEPRECATED: renamed _deprecated_public_transit_info (Migration A #33)
 
     # Accessibility
     # wheelchair_accessible - DROPPED (Issue #45 PR2 Migration B)
     wheelchair_details: Optional[str] = None
+    # {step_free_entry, main_area_accessible, ground_level_service} (#124)
+    mobility_access: Optional[Dict[str, Any]] = None
 
     # Restroom
     public_toilets: Optional[List[str]] = None
     toilet_description: Optional[str] = None
     toilet_locations: Optional[List[Dict[str, Any]]] = None
+    accessible_restroom: Optional[bool] = None
+    accessible_restroom_details: Optional[List[str]] = None
 
-    # Hours
-    hours: Optional[Dict[str, Any]] = None
+    # Playground (#124)
+    playground_available: Optional[bool] = None
+    playground_types: Optional[List[str]] = None
+    playground_surface_types: Optional[List[str]] = None
+    playground_notes: Optional[str] = None
+    playground_locations: Optional[List[Dict[str, Any]]] = None
+    playground_age_groups: Optional[List[str]] = None
+    playground_ada_checklist: Optional[List[str]] = None
+    inclusive_playground: Optional[bool] = None
+
+    # Pet policy (#124)
+    pet_options: Optional[List[str]] = None
+    pet_policy: Optional[str] = None
+
+    # Alcohol + smoking (#124)
+    alcohol_available: Optional[str] = None
+    alcohol_availability: Optional[List[str]] = None
+    alcohol_options: Optional[List[str]] = None
+    alcohol_policy_details: Optional[str] = None
+    alcohol_notes: Optional[str] = None
+    byob_allowed: Optional[bool] = None
+    smoking_options: Optional[List[str]] = None
+    smoking_details: Optional[str] = None
 
     # Amenities
     amenities: Optional[Dict[str, Any]] = None
+    payment_methods: Optional[List[str]] = None
+    cell_service: Optional[Any] = None
+    payphone_locations: Optional[List[Dict[str, Any]]] = None
+
+    # Hours are NOT copyable (#124): an event's schedule is its own.
 
     @field_validator('amenities', mode='before')
     @classmethod

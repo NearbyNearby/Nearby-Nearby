@@ -531,7 +531,7 @@ async def copy_images_from_venue(
     target_poi_id: UUID,
     image_types: List[ImageTypeEnum] = Query(
         ...,
-        description="Image types to copy (entry, parking, restroom)"
+        description="Image types to copy (entry, parking, restroom, playground)"
     ),
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user)
@@ -554,8 +554,10 @@ async def copy_images_from_venue(
 
     # Validate source is a venue type
     source_type = source_poi.poi_type.value if hasattr(source_poi.poi_type, 'value') else str(source_poi.poi_type)
-    if source_type not in ['BUSINESS', 'PARK']:
-        raise HTTPException(status_code=400, detail="Source POI must be a BUSINESS or PARK")
+    # TRAIL is a valid venue everywhere else (venues/list, venue-data), so its
+    # photos have to be copyable too (#124).
+    if source_type not in ['BUSINESS', 'PARK', 'TRAIL']:
+        raise HTTPException(status_code=400, detail="Source POI must be a BUSINESS, PARK or TRAIL")
 
     # Validate target is an event
     target_type = target_poi.poi_type.value if hasattr(target_poi.poi_type, 'value') else str(target_poi.poi_type)

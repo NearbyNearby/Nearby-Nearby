@@ -92,14 +92,14 @@ vi.mock('../_shared', () => ({
 
 import EventLayout from '../EventLayout';
 
-function Harness({ userRole = 'editor' } = {}) {
+function Harness({ userRole = 'editor', event = {} } = {}) {
   const form = useForm({
     initialValues: {
       hours: {},
       poi_type: 'EVENT',
       listing_type: 'free',
       mobility_access: {},
-      event: {},
+      event,
     },
   });
   return (
@@ -218,5 +218,69 @@ describe('EventLayout — #73 20-accordion reorg', () => {
     fireEvent.click(control);
     expect(screen.getByTestId('stub-parking-group')).toBeInTheDocument();
     expect(screen.getByTestId('stub-parking-lot-links')).toBeInTheDocument();
+  });
+
+  // #124: the inheritance choice moved out of one big list and into each
+  // venue-owned accordion, so it can be set per section.
+  describe('per-section venue inheritance controls (#124)', () => {
+    const VENUE_PANELS = [
+      'Event Identity',
+      'Address',
+      'Parking',
+      'Accessibility + Mobility Access',
+      'Public Restrooms',
+      'Playground',
+      'On Site Facilities + Amenities',
+      'Pet Policy',
+      'Alcohol + Smoking',
+    ];
+
+    function openAll(container) {
+      Array.from(container.querySelectorAll('.mantine-Accordion-control')).forEach((c) => {
+        fireEvent.click(c);
+      });
+    }
+
+    it('shows no venue mode control anywhere when no venue is linked', () => {
+      const { container } = render(<Harness userRole="editor" />);
+      openAll(container);
+      expect(screen.queryAllByText('Venue data')).toHaveLength(0);
+    });
+
+    it('puts one venue mode control in each of the 9 venue-owned panels', () => {
+      const { container } = render(
+        <Harness userRole="editor" event={{ venue_poi_id: 'venue-1' }} />,
+      );
+      openAll(container);
+      expect(screen.getAllByText('Venue data')).toHaveLength(VENUE_PANELS.length);
+    });
+
+    it('scopes each control to its own panel', () => {
+      const { container } = render(
+        <Harness userRole="editor" event={{ venue_poi_id: 'venue-1' }} />,
+      );
+      openAll(container);
+      VENUE_PANELS.forEach((title) => {
+        // "Event Identity" carries a Required badge, so match on the prefix.
+        const item = Array.from(container.querySelectorAll('.mantine-Accordion-item'))
+          .find((el) => el.querySelector('.mantine-Accordion-control')
+            ?.textContent.trim().startsWith(title));
+        expect(item, `no accordion item titled ${title}`).toBeTruthy();
+        expect(item.textContent).toContain('Venue data');
+      });
+    });
+
+    it('leaves non-venue panels alone', () => {
+      const { container } = render(
+        <Harness userRole="editor" event={{ venue_poi_id: 'venue-1' }} />,
+      );
+      openAll(container);
+      ['Rentals', 'Images', 'Contact + Compliance', 'Event Sponsors'].forEach((title) => {
+        const item = Array.from(container.querySelectorAll('.mantine-Accordion-item'))
+          .find((el) => el.querySelector('.mantine-Accordion-control')
+            ?.textContent.trim().startsWith(title));
+        expect(item.textContent).not.toContain('Venue data');
+      });
+    });
   });
 });

@@ -273,7 +273,19 @@ def _apply_venue_inheritance(db: Session, poi_dict: dict, event) -> dict:
     from shared.poi_points import enrich_poi_point_fields
     enrich_poi_point_fields(db, venue_poi)
 
+    # Issue #124: the public page needs the venue's NAME to render the venue
+    # link. These are plain instance attributes (not columns, so the session is
+    # never dirtied) read by the nested Event schema. Resolving them live beats
+    # a snapshot column, which would go stale when the venue is renamed.
+    event.venue_name = venue_poi.name
+    event.venue_type = (
+        venue_poi.poi_type.value if hasattr(venue_poi.poi_type, 'value')
+        else venue_poi.poi_type
+    )
+
+    from sqlalchemy.orm.attributes import set_committed_value
     from shared.utils.venue_inheritance import resolve_venue_inheritance
+    from shared.constants.venue_sections import INHERITABLE_FIELDS, venue_entry_notes
 
     venue_data = {
         column.name: getattr(venue_poi, column.name)
@@ -286,27 +298,39 @@ def _apply_venue_inheritance(db: Session, poi_dict: dict, event) -> dict:
         for column in venue_poi.__table__.columns
     }
 
-    # Build a simpler dict from poi_dict for the fields we care about
-    inheritable_fields = [
-        "parking_types", "parking_locations", "parking_notes", "expect_to_pay_parking",
-        # public_transit_info removed (Migration A #33 — renamed to _deprecated_public_transit_info)
-        "public_toilets", "toilet_locations", "toilet_description",
-        # wheelchair_accessible removed (Issue #45 PR2 Migration B — column dropped)
-        "wheelchair_details", "hours", "amenities",
-        "pet_options", "pet_policy", "drone_usage", "drone_policy",
-    ]
+    # Issue #124: the inheritable field list is derived from the ONE section
+    # registry instead of being duplicated here (it used to drift from the
+    # resolver's own map, and it still carried "hours").
+    inheritable_fields = INHERITABLE_FIELDS
     event_fields = {f: poi_dict.get(f) for f in inheritable_fields}
     venue_fields = {f: getattr(venue_poi, f, None) for f in inheritable_fields}
+    # The venue's PostGIS geometry has to be shaped like the event's before it
+    # can stand in for it (P12: inherit the venue's point, never null our own).
+    if venue_poi.location is not None:
+        venue_fields["location"] = PointGeometry.from_wkb(venue_poi.location)
 
     config = getattr(event, 'venue_inheritance', None)
     resolved = resolve_venue_inheritance(event_fields, venue_fields, config)
 
-    # Merge resolved fields back into poi_dict
+    # Merge resolved fields back into poi_dict. Only keys the response ALREADY
+    # carries are written: poi_dict is pruned to the public field set by both
+    # assembly paths, so this keeps inheritance from introducing a key the
+    # public contract does not have (POIDetail allows extras).
     for field in inheritable_fields:
-        if field in resolved:
+        if field in resolved and field in poi_dict:
             poi_dict[field] = resolved[field]
     if "_venue_source" in resolved:
         poi_dict["_venue_source"] = resolved["_venue_source"]
+
+    # Entry notes are the one cross-table inheritance: the venue keeps them in a
+    # type-specific column and the event has its own event_entry_notes. That IS
+    # a real column, so it goes in via set_committed_value: a plain assignment
+    # would mark the event dirty and could flush an inherited value into the
+    # row on what is supposed to be a read.
+    if (config or {}).get("address") == "as_is":
+        notes = venue_entry_notes(venue_poi)
+        if notes:
+            set_committed_value(event, 'event_entry_notes', notes)
 
     return poi_dict
 

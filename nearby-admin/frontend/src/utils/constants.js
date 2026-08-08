@@ -951,14 +951,23 @@ export const getStatusOptions = (poiType) => {
 };
 
 // Venue Inheritance Sections — which venue fields an event can inherit
+// Venue Inheritance Sections (issue #124), mirroring UI_SECTIONS in
+// shared/constants/venue_sections.py, the single source of truth for which POI
+// columns each section covers. `accordion` keys each section to the Event form
+// panel that hosts its mode control.
+// Hours is deliberately absent: an event's schedule is its own, not the venue's
+// opening hours. Stale {"hours": ...} config already stored is ignored.
 export const VENUE_INHERITANCE_SECTIONS = [
-  { value: 'address', label: 'Address & Location' },
-  { value: 'parking', label: 'Parking' },
-  { value: 'accessibility', label: 'Accessibility' },
-  { value: 'restrooms', label: 'Restrooms' },
-  { value: 'contact', label: 'Contact Info' },
-  { value: 'hours', label: 'Hours' },
-  { value: 'amenities', label: 'Amenities' },
+  { value: 'address', label: 'Address & Location', accordion: 's8-address' },
+  { value: 'parking', label: 'Parking', accordion: 's9-parking' },
+  { value: 'accessibility', label: 'Accessibility', accordion: 's10-accessibility' },
+  { value: 'restrooms', label: 'Restrooms', accordion: 's11-restrooms' },
+  { value: 'playground', label: 'Playground', accordion: 's12-playground' },
+  { value: 'amenities', label: 'Amenities', accordion: 's13-onsite-facilities' },
+  { value: 'pet_policy', label: 'Pet Policy', accordion: 's14-pets' },
+  { value: 'alcohol_smoking', label: 'Alcohol & Smoking', accordion: 's15-alcohol-smoking' },
+  // phone/email/website live in ContactSection, inside the identity panel.
+  { value: 'contact', label: 'Contact Info', accordion: 's1-identity' },
 ];
 
 // Venue Inheritance Modes — how each inherited section is used

@@ -68,6 +68,11 @@ class Event(BaseModel):
     # Venue inheritance (Task 45)
     venue_poi_id: Optional[str] = None
     venue_inheritance: Optional[dict] = None
+    # Issue #124: the venue's display name/type, resolved at read time from the
+    # linked venue POI (see _apply_venue_inheritance). Not columns; a snapshot
+    # column would go stale whenever the venue is renamed.
+    venue_name: Optional[str] = None
+    venue_type: Optional[str] = None
     # Recurring events expansion (Task 50)
     series_id: Optional[str] = None
     parent_event_id: Optional[str] = None

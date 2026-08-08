@@ -244,6 +244,26 @@ describe('EventDetail', () => {
     expect(venueLink).toHaveAttribute('href', '/poi/venue-abc-123');
   });
 
+  it('renders the venue from the real API shape: only venue_poi_id + venue_name (#124)', () => {
+    // API contract case. The public payload has no venue_name_snapshot and no
+    // nested venue object; the backend resolves the linked venue's name live
+    // into event.venue_name. Before #124 nothing populated any of the three
+    // sources, so the venue never rendered and the link was dead code.
+    renderDetail({
+      event: {
+        venue_poi_id: '3f0c2a1e-0000-4000-8000-000000000001',
+        venue_name: 'Carolina Brewery',
+        venue_type: 'BUSINESS',
+        venue_inheritance: { parking: 'as_is' },
+      },
+    });
+    const venueLink = screen.getByRole('link', { name: /carolina brewery/i, hidden: true });
+    expect(venueLink).toHaveAttribute(
+      'href',
+      '/poi/3f0c2a1e-0000-4000-8000-000000000001',
+    );
+  });
+
   it('venue name shows as plain text when no venue_poi_id', () => {
     renderDetail({
       event: {

@@ -9,7 +9,7 @@ import struct
 import uuid
 import zlib
 import pytest
-from conftest import create_business, MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+from conftest import create_business, create_park, create_trail, create_event, MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
 
 
 def _create_test_png(width=10, height=10):
@@ -459,3 +459,66 @@ class TestImageStorageVerification:
         before_count = objects_before.get("KeyCount", 0)
         after_count = objects_after.get("KeyCount", 0)
         assert after_count < before_count, f"Expected fewer objects after delete: before={before_count}, after={after_count}"
+
+
+class TestCopyImagesFromVenue:
+    """Issue #124: 'Photos - nothing copies over' when a venue is linked."""
+
+    def _upload(self, admin_client, poi_id, image_type):
+        resp = admin_client.post(
+            f"/api/images/upload/{poi_id}",
+            files={"file": (f"{image_type}_src.png", io.BytesIO(_create_test_png()), "image/png")},
+            data={"image_type": image_type},
+        )
+        assert resp.status_code == 200, resp.text
+        return resp.json()
+
+    def test_copy_from_business_venue(self, admin_client, ensure_minio_bucket):
+        """Baseline: entry/parking/restroom photos copy from a BUSINESS venue."""
+        venue = create_business(admin_client, name="Copy Source Biz")
+        event = create_event(admin_client, name="Copy Target Event")
+        for image_type in ("entry", "parking", "restroom"):
+            self._upload(admin_client, venue["id"], image_type)
+
+        resp = admin_client.post(
+            f"/api/images/copy/{venue['id']}/to/{event['id']}"
+            "?image_types=entry&image_types=parking&image_types=restroom"
+        )
+        assert resp.status_code == 200, resp.text
+        assert len(resp.json()["uploaded"]) == 3
+
+    def test_copy_playground_image_type(self, admin_client, ensure_minio_bucket):
+        """#124 added playground to what a venue hands an event."""
+        venue = create_park(admin_client, name="Playground Source Park")
+        event = create_event(admin_client, name="Playground Target Event")
+        self._upload(admin_client, venue["id"], "playground")
+
+        resp = admin_client.post(
+            f"/api/images/copy/{venue['id']}/to/{event['id']}?image_types=playground"
+        )
+        assert resp.status_code == 200, resp.text
+        assert len(resp.json()["uploaded"]) == 1
+
+        images = admin_client.get(f"/api/images/poi/{event['id']}").json()
+        assert any(img["image_type"] == "playground" for img in images)
+
+    def test_copy_from_trail_venue_allowed(self, admin_client, ensure_minio_bucket):
+        """TRAIL is a valid venue everywhere else, so its photos must copy too (#124)."""
+        venue = create_trail(admin_client, name="Copy Source Trail")
+        event = create_event(admin_client, name="Trail Copy Target Event")
+        self._upload(admin_client, venue["id"], "entry")
+
+        resp = admin_client.post(
+            f"/api/images/copy/{venue['id']}/to/{event['id']}?image_types=entry"
+        )
+        assert resp.status_code == 200, resp.text
+        assert len(resp.json()["uploaded"]) == 1
+
+    def test_copy_rejects_non_venue_source(self, admin_client, ensure_minio_bucket):
+        """An EVENT is still not a valid copy source."""
+        source = create_event(admin_client, name="Not A Venue Source")
+        target = create_event(admin_client, name="Not A Venue Target")
+        resp = admin_client.post(
+            f"/api/images/copy/{source['id']}/to/{target['id']}?image_types=entry"
+        )
+        assert resp.status_code == 400

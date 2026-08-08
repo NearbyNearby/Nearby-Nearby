@@ -1,34 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Stack, Select, Button, Card, Text, Group, Badge, Alert,
-  Loader, Divider, Checkbox, SimpleGrid
+  Loader, Divider, SegmentedControl,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconBuilding, IconTree, IconCopy, IconCheck } from '@tabler/icons-react';
+import { IconBuilding, IconTree, IconPhoto, IconCheck } from '@tabler/icons-react';
 import { api } from '../../../utils/api';
+import {
+  VENUE_INHERITANCE_SECTIONS,
+  VENUE_INHERITANCE_MODES,
+} from '../../../utils/constants';
+import { copyVenueSection } from './VenueSectionModeControl';
 
 /**
- * VenueSelector component for selecting a venue (BUSINESS or PARK)
- * and copying venue data to an event.
+ * VenueSelector: pick the venue an event happens at (issue #124).
+ *
+ * The picker only links the venue and summarizes it. What gets inherited is
+ * decided per section by VenueSectionModeControl, inside each Event form
+ * accordion, so the old all-or-nothing checkbox grid is gone.
+ *
+ * Two bugs this component used to cause:
+ *   - the Select was bound to local state only, so a saved venue came back
+ *     blank on reopen. It now hydrates from form.values.event.venue_poi_id.
+ *   - it wrote event.venue_name / venue_type / venue_hours, none of which are
+ *     columns. Pydantic dropped them, so the card said "Unknown venue".
  */
 export function VenueSelector({ form, poiId, types = ['BUSINESS', 'PARK', 'TRAIL'] }) {
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(false);
   const [venueLoading, setVenueLoading] = useState(false);
-  const [selectedVenueId, setSelectedVenueId] = useState(null);
   const [venueData, setVenueData] = useState(null);
-  const [copying, setCopying] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [copyOptions, setCopyOptions] = useState({
-    address: true,
-    contact: true,
-    parking: true,
-    accessibility: true,
-    restrooms: true,
-    hours: true,
-    amenities: true,
-    images: true
-  });
+  const [copyingImages, setCopyingImages] = useState(false);
+  const [imagesCopied, setImagesCopied] = useState(false);
+
+  const selectedVenueId = form.values.event?.venue_poi_id || null;
 
   // Fetch available venues on mount
   useEffect(() => {
@@ -52,154 +57,101 @@ export function VenueSelector({ form, poiId, types = ['BUSINESS', 'PARK', 'TRAIL
     fetchVenues();
   }, [JSON.stringify(types)]);
 
-  // Fetch venue data when a venue is selected
-  const handleVenueSelect = async (venueId) => {
-    setSelectedVenueId(venueId);
-    setVenueData(null);
-    setCopySuccess(false);
-
-    if (!venueId) return;
-
+  const loadVenueData = useCallback(async (venueId) => {
     setVenueLoading(true);
     try {
       const response = await api.get(`/pois/${venueId}/venue-data`);
       if (response.ok) {
-        const data = await response.json();
-        setVenueData(data);
+        setVenueData(await response.json());
       } else {
+        setVenueData(null);
         notifications.show({
           title: 'Error',
           message: 'Failed to fetch venue data',
-          color: 'red'
+          color: 'red',
         });
       }
     } catch (error) {
       console.error('Failed to fetch venue data:', error);
+      setVenueData(null);
       notifications.show({
         title: 'Error',
         message: 'Failed to fetch venue data',
-        color: 'red'
+        color: 'red',
       });
     } finally {
       setVenueLoading(false);
     }
+  }, []);
+
+  // Hydrate from the saved venue link. THIS is the fix for "once saved, the
+  // event doesn't remember the venue": the picker used to read local state
+  // only, which is empty on every reopen.
+  useEffect(() => {
+    if (!selectedVenueId) {
+      setVenueData(null);
+      return;
+    }
+    if (venueData?.venue_id === selectedVenueId) return;
+    loadVenueData(selectedVenueId);
+  }, [selectedVenueId, venueData?.venue_id, loadVenueData]);
+
+  const handleVenueSelect = (venueId) => {
+    setImagesCopied(false);
+    form.setFieldValue('event.venue_poi_id', venueId || null);
+    if (!venueId) {
+      setVenueData(null);
+      form.setFieldValue('event.venue_inheritance', null);
+    }
   };
 
-  // Copy venue data to event form
-  const handleCopyVenueData = async () => {
-    if (!venueData) return;
+  // Bulk helper: set every section to one mode at once. use_and_add still
+  // performs its one-time copy, section by section.
+  const handleSetAllSections = (mode) => {
+    const next = {};
+    VENUE_INHERITANCE_SECTIONS.forEach((section) => { next[section.value] = mode; });
+    form.setFieldValue('event.venue_inheritance', next);
 
-    setCopying(true);
-    try {
-      // Copy address fields
-      if (copyOptions.address) {
-        form.setFieldValue('address_full', venueData.address_full || '');
-        form.setFieldValue('address_street', venueData.address_street || '');
-        form.setFieldValue('address_city', venueData.address_city || '');
-        form.setFieldValue('address_state', venueData.address_state || '');
-        form.setFieldValue('address_zip', venueData.address_zip || '');
-        form.setFieldValue('address_county', venueData.address_county || '');
-
-        // Copy location coordinates
-        if (venueData.location?.coordinates) {
-          form.setFieldValue('longitude', venueData.location.coordinates[0]);
-          form.setFieldValue('latitude', venueData.location.coordinates[1]);
-        }
-        if (venueData.front_door_latitude) {
-          form.setFieldValue('front_door_latitude', venueData.front_door_latitude);
-        }
-        if (venueData.front_door_longitude) {
-          form.setFieldValue('front_door_longitude', venueData.front_door_longitude);
-        }
-      }
-
-      // Copy contact fields
-      if (copyOptions.contact) {
-        if (venueData.phone_number) form.setFieldValue('phone_number', venueData.phone_number);
-        if (venueData.email) form.setFieldValue('email', venueData.email);
-        if (venueData.website_url) form.setFieldValue('website_url', venueData.website_url);
-      }
-
-      // Copy parking fields
-      if (copyOptions.parking) {
-        if (venueData.parking_types) form.setFieldValue('parking_types', venueData.parking_types);
-        if (venueData.parking_notes) form.setFieldValue('parking_notes', venueData.parking_notes);
-        if (venueData.parking_locations) form.setFieldValue('parking_locations', venueData.parking_locations);
-        if (venueData.expect_to_pay_parking) form.setFieldValue('expect_to_pay_parking', venueData.expect_to_pay_parking);
-        // public_transit_info removed — renamed _deprecated_public_transit_info (Migration A #33)
-      }
-
-      // Copy accessibility fields
-      if (copyOptions.accessibility) {
-        // wheelchair_accessible removed — column dropped (Issue #45 PR2 Migration B)
-        if (venueData.wheelchair_details) form.setFieldValue('wheelchair_details', venueData.wheelchair_details);
-      }
-
-      // Copy restroom fields
-      if (copyOptions.restrooms) {
-        if (venueData.public_toilets) form.setFieldValue('public_toilets', venueData.public_toilets);
-        if (venueData.toilet_description) form.setFieldValue('toilet_description', venueData.toilet_description);
-        if (venueData.toilet_locations) form.setFieldValue('toilet_locations', venueData.toilet_locations);
-      }
-
-      // Copy hours (store in event.venue_hours)
-      if (copyOptions.hours && venueData.hours) {
-        form.setFieldValue('event.venue_hours', venueData.hours);
-      }
-
-      // Copy amenities
-      if (copyOptions.amenities && venueData.amenities) {
-        form.setFieldValue('amenities', venueData.amenities);
-      }
-
-      // Copy images if there are copyable images and the option is enabled
-      if (copyOptions.images && venueData.copyable_images?.length > 0 && poiId) {
-        const imageTypes = venueData.copyable_images.map(img => img.image_type);
-        const uniqueTypes = [...new Set(imageTypes)];
-
-        try {
-          const response = await api.request(`/images/copy/${venueData.venue_id}/to/${poiId}?${uniqueTypes.map(t => `image_types=${t}`).join('&')}`, {
-            method: 'POST'
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            notifications.show({
-              title: 'Images Copied',
-              message: `${result.successful_uploads?.length || 0} images copied from venue`,
-              color: 'green'
-            });
-          }
-        } catch (imgError) {
-          console.error('Failed to copy images:', imgError);
-          notifications.show({
-            title: 'Warning',
-            message: 'Venue data copied but images could not be copied',
-            color: 'yellow'
-          });
-        }
-      }
-
-      // Store venue reference
-      form.setFieldValue('event.venue_poi_id', venueData.venue_id);
-      form.setFieldValue('event.venue_name', venueData.venue_name);
-      form.setFieldValue('event.venue_type', venueData.venue_type);
-
-      setCopySuccess(true);
+    if (mode === 'use_and_add' && venueData) {
+      let copied = 0;
+      VENUE_INHERITANCE_SECTIONS.forEach((section) => {
+        copied += copyVenueSection(form, section.value, venueData);
+      });
       notifications.show({
         title: 'Venue Data Copied',
-        message: `Data from "${venueData.venue_name}" has been copied to the event`,
-        color: 'green'
+        message: `${copied} field(s) copied from "${venueData.venue_name}".`,
+        color: 'green',
+      });
+    }
+  };
+
+  const handleCopyImages = async () => {
+    if (!venueData?.copyable_images?.length || !poiId) return;
+
+    setCopyingImages(true);
+    try {
+      const uniqueTypes = [...new Set(venueData.copyable_images.map(img => img.image_type))];
+      const response = await api.request(
+        `/images/copy/${venueData.venue_id}/to/${poiId}?${uniqueTypes.map(t => `image_types=${t}`).join('&')}`,
+        { method: 'POST' },
+      );
+      if (!response.ok) throw new Error('copy failed');
+      const result = await response.json();
+      setImagesCopied(true);
+      notifications.show({
+        title: 'Photos Copied',
+        message: `${result.uploaded?.length || 0} photo(s) copied from the venue`,
+        color: 'green',
       });
     } catch (error) {
-      console.error('Failed to copy venue data:', error);
+      console.error('Failed to copy images:', error);
       notifications.show({
         title: 'Error',
-        message: 'Failed to copy venue data',
-        color: 'red'
+        message: 'Photos could not be copied from the venue',
+        color: 'red',
       });
     } finally {
-      setCopying(false);
+      setCopyingImages(false);
     }
   };
 
@@ -213,13 +165,18 @@ export function VenueSelector({ form, poiId, types = ['BUSINESS', 'PARK', 'TRAIL
     }, {})
   ).map(([group, items]) => ({ group, items }));
 
+  const venueName = venueData?.venue_name || form.values.event?.venue_name;
+  const venueType = venueData?.venue_type || form.values.event?.venue_type;
+
   return (
     <Stack>
       <Alert color="blue" variant="light" mb="md">
         <Text size="sm">
-          Select a venue (Business or Park) to copy its location, parking, accessibility,
-          and restroom information to this event. This is a one-time copy - changes to the
-          venue will not automatically update the event.
+          Link the Business, Park or Trail this event happens at. Nothing is copied
+          automatically: open each section below (Address, Parking, Accessibility,
+          Restrooms, Playground, Amenities, Pet Policy, Alcohol + Smoking, Contact)
+          and choose whether it follows the venue, starts as a one-time copy you can
+          edit, or is entered fresh. Hours are always the event&apos;s own.
         </Text>
       </Alert>
 
@@ -257,109 +214,70 @@ export function VenueSelector({ form, poiId, types = ['BUSINESS', 'PARK', 'TRAIL
         </Card>
       )}
 
-      {venueData && !venueLoading && (
+      {selectedVenueId && !venueLoading && (
         <Card withBorder p="md">
           <Stack>
-            <Group justify="space-between">
-              <Group gap="sm">
-                {venueData.venue_type === 'BUSINESS' ? (
-                  <IconBuilding size={20} style={{ color: '#6366f1' }} />
-                ) : (
-                  <IconTree size={20} style={{ color: '#22c55e' }} />
-                )}
-                <Text fw={600}>{venueData.venue_name}</Text>
-                <Badge color={venueData.venue_type === 'BUSINESS' ? 'indigo' : 'green'} size="sm">
-                  {venueData.venue_type}
+            <Group gap="sm">
+              {venueType === 'BUSINESS' ? (
+                <IconBuilding size={20} style={{ color: '#6366f1' }} />
+              ) : (
+                <IconTree size={20} style={{ color: '#22c55e' }} />
+              )}
+              <Text fw={600}>{venueName || 'Loading venue...'}</Text>
+              {venueType && (
+                <Badge color={venueType === 'BUSINESS' ? 'indigo' : 'green'} size="sm">
+                  {venueType}
                 </Badge>
-              </Group>
+              )}
             </Group>
 
-            {venueData.address_full && (
+            {venueData?.address_full && (
               <Text size="sm" c="dimmed">{venueData.address_full}</Text>
             )}
 
-            <Divider my="sm" label="Data to Copy" />
+            <Divider my="sm" label="Set all sections to" />
 
-            <SimpleGrid cols={{ base: 2, sm: 4 }}>
-              <Checkbox
-                label="Address & Location"
-                checked={copyOptions.address}
-                onChange={(e) => setCopyOptions(prev => ({ ...prev, address: e.target.checked }))}
-              />
-              <Checkbox
-                label="Contact Info"
-                checked={copyOptions.contact}
-                onChange={(e) => setCopyOptions(prev => ({ ...prev, contact: e.target.checked }))}
-              />
-              <Checkbox
-                label="Parking"
-                checked={copyOptions.parking}
-                onChange={(e) => setCopyOptions(prev => ({ ...prev, parking: e.target.checked }))}
-              />
-              <Checkbox
-                label="Accessibility"
-                checked={copyOptions.accessibility}
-                onChange={(e) => setCopyOptions(prev => ({ ...prev, accessibility: e.target.checked }))}
-              />
-              <Checkbox
-                label="Restrooms"
-                checked={copyOptions.restrooms}
-                onChange={(e) => setCopyOptions(prev => ({ ...prev, restrooms: e.target.checked }))}
-              />
-              <Checkbox
-                label="Hours"
-                checked={copyOptions.hours}
-                onChange={(e) => setCopyOptions(prev => ({ ...prev, hours: e.target.checked }))}
-              />
-              <Checkbox
-                label="Amenities"
-                checked={copyOptions.amenities}
-                onChange={(e) => setCopyOptions(prev => ({ ...prev, amenities: e.target.checked }))}
-              />
-              <Checkbox
-                label="Photos (Entry, Parking, Restroom)"
-                checked={copyOptions.images}
-                onChange={(e) => setCopyOptions(prev => ({ ...prev, images: e.target.checked }))}
-                disabled={!venueData.copyable_images?.length}
-              />
-            </SimpleGrid>
+            <SegmentedControl
+              size="xs"
+              data={VENUE_INHERITANCE_MODES}
+              value=""
+              onChange={handleSetAllSections}
+            />
+            <Text size="xs" c="dimmed">
+              A shortcut. Each section can still be changed on its own below.
+            </Text>
 
-            {venueData.copyable_images?.length > 0 && (
+            <Divider my="sm" label="Venue photos" />
+
+            {!venueData?.copyable_images?.length ? (
               <Text size="xs" c="dimmed">
-                {venueData.copyable_images.length} photo(s) available to copy
+                This venue has no entry, parking, restroom or playground photos to copy.
               </Text>
-            )}
-
-            <Button
-              onClick={handleCopyVenueData}
-              loading={copying}
-              leftSection={copySuccess ? <IconCheck size={16} /> : <IconCopy size={16} />}
-              color={copySuccess ? 'green' : 'blue'}
-              mt="md"
-            >
-              {copying ? 'Copying...' : copySuccess ? 'Data Copied!' : 'Copy Data to Event'}
-            </Button>
-
-            {copySuccess && (
-              <Alert color="green" variant="light">
+            ) : !poiId ? (
+              // The copy endpoint needs a saved target POI. This used to be a
+              // silent no-op on an unsaved event (#124: "Photos - nothing copies").
+              <Alert color="yellow" variant="light">
                 <Text size="sm">
-                  Venue data has been copied. You can now review and modify the copied
-                  information in the relevant form sections.
+                  {venueData.copyable_images.length} venue photo(s) available. Save this
+                  event first, then come back here to copy them.
                 </Text>
               </Alert>
+            ) : (
+              <Group>
+                <Button
+                  size="xs"
+                  variant="light"
+                  leftSection={imagesCopied ? <IconCheck size={14} /> : <IconPhoto size={14} />}
+                  color={imagesCopied ? 'green' : 'blue'}
+                  loading={copyingImages}
+                  onClick={handleCopyImages}
+                >
+                  {imagesCopied ? 'Photos copied' : `Copy ${venueData.copyable_images.length} venue photo(s)`}
+                </Button>
+                <Text size="xs" c="dimmed">Entry, parking, restroom and playground photos.</Text>
+              </Group>
             )}
           </Stack>
-        </Card>
-      )}
-
-      {/* Show current venue link if set */}
-      {form.values.event?.venue_poi_id && !selectedVenueId && (
-        <Card withBorder p="md" bg="gray.0">
-          <Group gap="sm">
-            <Text size="sm" c="dimmed">Current venue:</Text>
-            <Text size="sm" fw={500}>{form.values.event.venue_name || 'Unknown venue'}</Text>
-            <Badge size="xs">{form.values.event.venue_type}</Badge>
-          </Group>
         </Card>
       )}
     </Stack>

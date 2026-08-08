@@ -390,12 +390,14 @@ def get_venue_data_for_event(
 ):
     """
     Get venue data that can be copied to an event.
-    Only works for BUSINESS and PARK POI types.
-    Returns address, contact, parking, accessibility, restroom info, hours, amenities, and photos.
+    Only works for BUSINESS, PARK and TRAIL POI types.
+    Returns address, contact, parking, accessibility, restrooms, playground,
+    pet, alcohol/smoking, amenities and photos. Hours are excluded (#124).
     """
     from app.models.image import Image, ImageType
     from app.services.image_service import image_service
     from geoalchemy2.shape import to_shape
+    from shared.constants.venue_sections import venue_entry_notes
 
     db_poi = crud.get_poi(db, poi_id=poi_id)
     if db_poi is None:
@@ -409,8 +411,10 @@ def get_venue_data_for_event(
             detail=f"POI type '{poi_type}' cannot be used as a venue. Only BUSINESS, PARK, and TRAIL are valid."
         )
 
-    # Get copyable images (entry, parking, restroom)
-    copyable_image_types = [ImageType.entry, ImageType.parking, ImageType.restroom]
+    # Get copyable images (entry, parking, restroom, playground)
+    copyable_image_types = [
+        ImageType.entry, ImageType.parking, ImageType.restroom, ImageType.playground,
+    ]
     images = db.query(Image).filter(
         Image.poi_id == poi_id,
         Image.image_type.in_(copyable_image_types),
@@ -448,6 +452,9 @@ def get_venue_data_for_event(
         location=location,
         front_door_latitude=float(db_poi.front_door_latitude) if db_poi.front_door_latitude else None,
         front_door_longitude=float(db_poi.front_door_longitude) if db_poi.front_door_longitude else None,
+        what3words_address=db_poi.what3words_address,
+        arrival_methods=db_poi.arrival_methods,
+        entry_notes=venue_entry_notes(db_poi),
         phone_number=db_poi.phone_number,
         email=db_poi.email,
         website_url=db_poi.website_url,
@@ -455,14 +462,39 @@ def get_venue_data_for_event(
         parking_notes=db_poi.parking_notes,
         parking_locations=db_poi.parking_locations,
         expect_to_pay_parking=db_poi.expect_to_pay_parking,
+        accessible_parking_details=db_poi.accessible_parking_details,
         # public_transit_info removed (Migration A #33 — renamed to _deprecated_public_transit_info)
         # wheelchair_accessible removed (Issue #45 PR2 Migration B — column dropped)
         wheelchair_details=db_poi.wheelchair_details,
+        mobility_access=db_poi.mobility_access,
         public_toilets=db_poi.public_toilets,
         toilet_description=db_poi.toilet_description,
         toilet_locations=db_poi.toilet_locations,
-        hours=db_poi.hours,
+        accessible_restroom=db_poi.accessible_restroom,
+        accessible_restroom_details=db_poi.accessible_restroom_details,
+        playground_available=db_poi.playground_available,
+        playground_types=db_poi.playground_types,
+        playground_surface_types=db_poi.playground_surface_types,
+        playground_notes=db_poi.playground_notes,
+        playground_locations=db_poi.playground_locations,
+        playground_age_groups=db_poi.playground_age_groups,
+        playground_ada_checklist=db_poi.playground_ada_checklist,
+        inclusive_playground=db_poi.inclusive_playground,
+        pet_options=db_poi.pet_options,
+        pet_policy=db_poi.pet_policy,
+        alcohol_available=db_poi.alcohol_available,
+        alcohol_availability=db_poi.alcohol_availability,
+        alcohol_options=db_poi.alcohol_options,
+        alcohol_policy_details=db_poi.alcohol_policy_details,
+        alcohol_notes=db_poi.alcohol_notes,
+        byob_allowed=db_poi.byob_allowed,
+        smoking_options=db_poi.smoking_options,
+        smoking_details=db_poi.smoking_details,
         amenities=db_poi.amenities,
+        payment_methods=db_poi.payment_methods,
+        cell_service=db_poi.cell_service,
+        payphone_locations=db_poi.payphone_locations,
+        # hours deliberately not returned (#124)
         copyable_images=copyable_images
     )
 
