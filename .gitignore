@@ -90,6 +90,14 @@ npm-debug.log*
 .npm
 .eslintcache
 
+# Vite/Vitest cache (bind-mounted so it persists across `docker compose run`)
+nearby-app/app/.vite/
+nearby-admin/frontend/.vite/
+
+# sass-embedded verification builds (see nearby-app/app CLAUDE workflow)
+nearby-app/app/dist-baseline/
+nearby-app/app/dist-new/
+
 # Ruff
 .ruff_cache/
 
