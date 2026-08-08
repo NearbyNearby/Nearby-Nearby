@@ -45,12 +45,34 @@ SEARCH_QUERY_MAX_LEN = 500
 _EXCLUDED_EVENT_STATUSES = ("Canceled", "Rescheduled")
 
 
+def _event_is_past(event, cutoff):
+    """True when an event is over as of `cutoff`.
+
+    A repeating event is judged by its recurrence, not by the first occurrence:
+    a weekly market that started last year is still running unless its
+    recurrence_end_date has passed.
+    """
+    if getattr(event, 'is_repeating', False):
+        recurrence_end = getattr(event, 'recurrence_end_date', None)
+        return bool(recurrence_end and recurrence_end < cutoff)
+
+    end = getattr(event, 'end_datetime', None)
+    start = getattr(event, 'start_datetime', None)
+    ref_dt = end if end else start
+    return bool(ref_dt and ref_dt < cutoff)
+
+
 def _exclude_past_and_cancelled_events(pois, include_past=False, include_cancelled=False):
     """Filter a list of POI objects to exclude past and cancelled/rescheduled events.
 
     Non-event POIs always pass through.
+
+    "Past" is measured from the START OF TODAY (UTC), not the current instant,
+    so an event that began this morning is still "happening today" (#127).
     """
-    now = datetime.now(timezone.utc)
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     result = []
     for poi in pois:
         poi_type = poi.poi_type.value if hasattr(poi.poi_type, 'value') else poi.poi_type
@@ -68,12 +90,8 @@ def _exclude_past_and_cancelled_events(pois, include_past=False, include_cancell
             continue
 
         # Check past
-        if not include_past:
-            end = getattr(event, 'end_datetime', None)
-            start = getattr(event, 'start_datetime', None)
-            ref_dt = end if end else start
-            if ref_dt and ref_dt < now:
-                continue
+        if not include_past and _event_is_past(event, today_start):
+            continue
 
         result.append(poi)
     return result
@@ -174,6 +192,7 @@ def api_search_pois(
     """Keyword + multi-signal search for POIs."""
     embedding_client = getattr(request.app.state, 'embedding_client', None)
     results = multi_signal_search(db, query=q, limit=10, poi_type=poi_type, client=embedding_client)
+    results = _exclude_past_and_cancelled_events(results)
     return _apply_event_search_filters(results, date_from, date_to, event_status)
 
 @router.get("/pois/semantic-search", response_model=List[schemas.poi.POISearchResult])
@@ -191,6 +210,7 @@ def api_semantic_search_pois(
     """Semantic search — now routed through the multi-signal engine."""
     embedding_client = getattr(request.app.state, 'embedding_client', None)
     results = multi_signal_search(db, query=q, limit=limit, poi_type=poi_type, client=embedding_client)
+    results = _exclude_past_and_cancelled_events(results)
     return _apply_event_search_filters(results, date_from, date_to, event_status)
 
 @router.get("/pois/hybrid-search", response_model=List[schemas.poi.POISearchResult])
@@ -211,6 +231,9 @@ def api_hybrid_search_pois(
     """
     embedding_client = getattr(request.app.state, 'embedding_client', None)
     results = multi_signal_search(db, query=q, limit=limit, poi_type=poi_type, client=embedding_client)
+    # Search feeds the homepage suggestion dropdown, Explore and the Nearby
+    # search box; none of them should surface events that already happened (#127).
+    results = _exclude_past_and_cancelled_events(results)
     return _apply_event_search_filters(results, date_from, date_to, event_status)
 
 def _apply_venue_inheritance(db: Session, poi_dict: dict, event) -> dict:

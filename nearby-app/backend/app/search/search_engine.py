@@ -13,9 +13,11 @@ from sqlalchemy import text
 
 from .query_processor import parse_query, ParsedQuery
 from .constants import (
+    AMENITY_FLAG_PHRASES,
     SIGNAL_WEIGHTS,
     MIN_ABSOLUTE_SCORE,
     RELATIVE_SCORE_THRESHOLD,
+    SEMANTIC_SIMILARITY_THRESHOLD,
     TRIGRAM_SIMILARITY_THRESHOLD,
 )
 
@@ -31,6 +33,28 @@ def _safe_ident(name: str) -> Optional[str]:
     if not isinstance(name, str):
         return None
     return name if _IDENT_RE.fullmatch(name) else None
+
+
+# Closed set of the boolean columns an amenity phrase may filter on.
+_AMENITY_FLAG_COLUMNS = frozenset(AMENITY_FLAG_PHRASES.values())
+
+# Everything that isn't a letter or digit collapses to a single space, so
+# "Pet-Friendly", "PET FRIENDLY!" and "pet_friendly" all normalize to the same
+# lookup key.
+_NON_WORD_RE = re.compile(r"[^a-z0-9]+")
+
+
+def amenity_flag_column(query: str) -> Optional[str]:
+    """Return the icon_* column for a query that IS a known amenity phrase.
+
+    Only a query essentially EQUAL to the phrase counts (Issue #137). A richer
+    query like "pet friendly cafe in Pittsboro" keeps going through the normal
+    ranked path, where the phrase still contributes a structured-filter signal.
+    """
+    if not query:
+        return None
+    normalized = _NON_WORD_RE.sub(" ", query.strip().lower()).strip()
+    return AMENITY_FLAG_PHRASES.get(normalized)
 
 
 def multi_signal_search(
@@ -63,6 +87,13 @@ def multi_signal_search(
 
     # If explicit poi_type param, override any type hint from the query
     effective_type = poi_type.upper() if poi_type else parsed.poi_type_hint
+
+    # Issue #137: "pet friendly" (and friends) is a filter, not a phrase to
+    # fuzzy-match. Answer it from the computed amenity boolean and stop —
+    # ranking POIs that merely mention the words is exactly the reported bug.
+    flag_column = amenity_flag_column(query)
+    if flag_column:
+        return _amenity_flag_results(db, flag_column, effective_type, limit)
 
     # Collect candidate POI IDs with per-signal scores
     # Each signal returns {poi_id: score} where score is 0..1
@@ -122,18 +153,22 @@ def multi_signal_search(
     if not scored:
         return []
 
-    # Fetch full ORM objects, preserving score order
+    return _load_pois_in_order(db, [pid for pid, _ in scored])
+
+
+def _load_pois_in_order(db: Session, poi_ids: list) -> list:
+    """Fetch full ORM objects for poi_ids, preserving the given order."""
     from ..crud.crud_poi import _enrich_poi_with_category_info
     from .. import models
 
-    poi_ids = [pid for pid, _ in scored]
-    id_to_score = {pid: s for pid, s in scored}
+    if not poi_ids:
+        return []
 
     pois = db.query(models.poi.PointOfInterest).filter(
         models.poi.PointOfInterest.id.in_(poi_ids)
     ).all()
 
-    # Sort by score (the IN clause doesn't preserve order)
+    # Sort by the caller's order (the IN clause doesn't preserve it)
     poi_map = {str(p.id): p for p in pois}
     ordered = []
     for pid in poi_ids:
@@ -143,6 +178,38 @@ def multi_signal_search(
             ordered.append(poi)
 
     return ordered
+
+
+def _amenity_flag_results(
+    db: Session, flag_column: str, poi_type: Optional[str], limit: int
+) -> list:
+    """Return published POIs whose amenity boolean is true (Issue #137)."""
+    if flag_column not in _AMENITY_FLAG_COLUMNS:
+        return []
+    column = _safe_ident(flag_column)
+    if column is None:
+        return []
+
+    type_filter = "AND poi_type = :poi_type" if poi_type else ""
+    sql = text(f"""
+        SELECT id::text FROM points_of_interest
+        WHERE publication_status = 'published'
+        AND {column} IS TRUE
+        {type_filter}
+        ORDER BY name
+        LIMIT :limit
+    """)
+    params = {"limit": limit}
+    if poi_type:
+        params["poi_type"] = poi_type
+    try:
+        rows = db.execute(sql, params).fetchall()
+    except Exception as e:
+        print(f"[SEARCH] Amenity flag search error: {e}")
+        db.rollback()
+        return []
+
+    return _load_pois_in_order(db, [row[0] for row in rows])
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +239,12 @@ def _signal_exact_name(db: Session, query: str, poi_type: Optional[str]) -> dict
 
 
 def _signal_keyword_name(db: Session, query: str, poi_type: Optional[str]) -> dict:
-    """Trigram similarity on name. Returns normalized similarity score."""
+    """Trigram similarity on name. Returns the raw similarity as the score.
+
+    The score is deliberately NOT divided by the batch maximum: pg_trgm
+    similarity is already an absolute 0..1 quality measure, and normalizing by
+    the best row promoted the best of a bad batch to a perfect score (#140).
+    """
     type_filter = "AND poi_type = :poi_type" if poi_type else ""
     sql = text(f"""
         SELECT id::text,
@@ -189,10 +261,7 @@ def _signal_keyword_name(db: Session, query: str, poi_type: Optional[str]) -> di
         params["poi_type"] = poi_type
     try:
         rows = db.execute(sql, params).fetchall()
-        if not rows:
-            return {}
-        max_sim = max(row[1] for row in rows) or 1.0
-        return {row[0]: row[1] / max_sim for row in rows}
+        return {row[0]: float(row[1]) for row in rows}
     except Exception as e:
         print(f"[SEARCH] Keyword name signal error: {e}")
         db.rollback()
@@ -271,20 +340,31 @@ def _signal_semantic(
         FROM points_of_interest
         WHERE publication_status = 'published'
         AND embedding IS NOT NULL
+        AND (1 - (embedding <=> cast(:query_embedding as vector))) >= :threshold
         {type_filter}
         ORDER BY embedding <=> cast(:query_embedding as vector)
         LIMIT 30
     """)
-    params = {"query_embedding": str(list(query_embedding))}
+    params = {
+        "query_embedding": str(list(query_embedding)),
+        "threshold": SEMANTIC_SIMILARITY_THRESHOLD,
+    }
     if poi_type:
         params["poi_type"] = poi_type
     try:
         rows = db.execute(sql, params).fetchall()
         if not rows:
             return {}
-        max_sim = max(row[1] for row in rows) or 1.0
-        # Normalize so best match = 1.0
-        return {row[0]: max(row[1] / max_sim, 0.0) for row in rows}
+        # Rescale [threshold, 1] -> [0, 1] instead of dividing by the batch
+        # maximum. Normalizing by the best row made the worst neighbour of a
+        # bad batch look like a strong match, which is why a type-filtered
+        # search returned every row of that type (#140). Rescaling keeps a
+        # borderline match borderline, so the merge thresholds can drop it.
+        span = 1.0 - SEMANTIC_SIMILARITY_THRESHOLD
+        return {
+            row[0]: max((float(row[1]) - SEMANTIC_SIMILARITY_THRESHOLD) / span, 0.0)
+            for row in rows
+        }
     except Exception as e:
         print(f"[SEARCH] Semantic signal error: {e}")
         db.rollback()

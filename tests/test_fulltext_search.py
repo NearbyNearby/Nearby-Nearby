@@ -62,7 +62,13 @@ class TestFullTextSearch:
             db_session.rollback()
 
     def test_multiword_query(self, db_session, app_client):
-        """'pet friendly' matches descriptions containing those words."""
+        """A multi-word query matches descriptions containing those words.
+
+        The query used to be the bare phrase "pet friendly"; that is now an
+        amenity-flag query (#137) answered from icon_pet_friendly instead of
+        from text, so this test uses a longer phrase to keep exercising
+        full-text matching.
+        """
         orm_create_business(
             db_session,
             name="Quiet Bookshop",
@@ -71,7 +77,9 @@ class TestFullTextSearch:
         )
         db_session.commit()
 
-        resp = app_client.get("/api/pois/hybrid-search", params={"q": "pet friendly"})
+        resp = app_client.get(
+            "/api/pois/hybrid-search", params={"q": "pet friendly bookshop"}
+        )
         assert resp.status_code == 200
         names = [r["name"] for r in resp.json()]
         assert "Quiet Bookshop" in names

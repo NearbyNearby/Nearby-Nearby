@@ -464,9 +464,15 @@ class TestPastEventBehavior:
         names = [p["name"] for p in resp.json()]
         assert "Expired Festival" in names
 
-    def test_past_event_searchable(self, db_session, app_client):
-        """Past events still appear in search results."""
-        orm_create_event(
+    def test_past_event_not_searchable(self, db_session, app_client):
+        """Past events are hidden from search (#127).
+
+        This used to assert the opposite. Search feeds the homepage suggestion
+        dropdown, Explore and the Nearby search box, and surfacing finished
+        events there was the reported bug; the row is untouched and still
+        reachable directly (test_past_event_still_visible_on_detail above).
+        """
+        past = orm_create_event(
             db_session,
             name="Historical Gala 2024",
             published=True,
@@ -480,7 +486,10 @@ class TestPastEventBehavior:
         resp = app_client.get("/api/pois/search", params={"q": "Historical Gala"})
         assert resp.status_code == 200
         names = [r["name"] for r in resp.json()]
-        assert "Historical Gala 2024" in names
+        assert "Historical Gala 2024" not in names
+
+        # ...but the POI itself is untouched and still directly reachable.
+        assert app_client.get(f"/api/pois/{str(past.id)}").status_code == 200
 
 
 # ---------------------------------------------------------------------------

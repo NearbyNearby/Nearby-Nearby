@@ -87,12 +87,16 @@ class TestReadPathSemanticMatch:
     ):
         """A query sharing tokens with the embedded document ranks the POI.
 
-        Because the mock embedding is a token-hash bag-of-words, the query
-        "pet friendly" produces a vector with HIGH cosine similarity to the
-        document vector of a POI whose text contains those tokens. We give the
-        target a name that does NOT trigram/full-text match the query, and a
-        distractor that shares no query tokens, so the semantic signal is what
-        surfaces the target.
+        Because the mock embedding is a token-hash bag-of-words, a query whose
+        tokens are in the document produces a vector with HIGH cosine
+        similarity to that document vector. We give the target a name that does
+        NOT trigram match the query, and a distractor that shares no query
+        tokens, so the semantic signal is what surfaces the target.
+
+        The query is deliberately longer than the bare phrase "pet friendly":
+        that phrase is now an amenity-flag query answered from
+        icon_pet_friendly (#137), and the extra token overlap keeps the cosine
+        clear of SEMANTIC_SIMILARITY_THRESHOLD (#140).
         """
         # Belt-and-suspenders: ensure the read path uses the mock even though
         # app startup already ran get_embedding_client() (which is patched).
@@ -123,7 +127,8 @@ class TestReadPathSemanticMatch:
         # Read path: semantic-search routes through multi_signal_search and the
         # semantic signal (pgvector cosine) should surface the target.
         resp = app_client.get(
-            "/api/pois/semantic-search", params={"q": "pet friendly", "limit": 10}
+            "/api/pois/semantic-search",
+            params={"q": "pet friendly spot for dogs", "limit": 10},
         )
         assert resp.status_code == 200, resp.text
         results = resp.json()
@@ -136,7 +141,12 @@ class TestReadPathSemanticMatch:
         self, db_session, mock_embedding_client, app_client
     ):
         """The semantic signal function itself returns a non-empty score map for
-        the embedded POI — proving the contribution is semantic, not keyword."""
+        the embedded POI — proving the contribution is semantic, not keyword.
+
+        The query mirrors the document's tokens so the mock's cosine clears
+        SEMANTIC_SIMILARITY_THRESHOLD (#140); the bag-of-words mock cannot
+        express a paraphrase the way the real model does.
+        """
         from app.search.search_engine import _signal_semantic
 
         target = orm_create_business(
@@ -150,7 +160,10 @@ class TestReadPathSemanticMatch:
         db_session.commit()
 
         scores = _signal_semantic(
-            db_session, "pet friendly", None, mock_embedding_client
+            db_session,
+            "pet friendly destination with dog water bowls",
+            None,
+            mock_embedding_client,
         )
         assert scores, "semantic signal must return a non-empty score map"
         assert str(target.id) in scores
