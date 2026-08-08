@@ -134,7 +134,12 @@ def get_nearby_pois(db: Session, poi_id: str, radius_miles: float = 5.0,
         distance_expr <= radius_meters
     )
     query = _apply_nearby_facets(query, facets, payment)
-    nearby_pois_with_distance = query.order_by('distance_meters').all()
+    # Deterministic order: POIs at the exact same point (a venue and its event)
+    # otherwise come back in an arbitrary order, so their card/marker numbers
+    # swap between requests (#160).
+    nearby_pois_with_distance = query.order_by(
+        'distance_meters', models.poi.PointOfInterest.id
+    ).all()
 
     # The query returns tuples of (PointOfInterest, distance), so we need to format them.
     results = []

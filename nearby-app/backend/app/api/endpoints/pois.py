@@ -531,7 +531,11 @@ def api_get_nearby_pois(
         joinedload(models.poi.PointOfInterest.event)
     ).filter(
         models.poi.PointOfInterest.publication_status == 'published'
-    ).order_by('distance_meters').limit(20).all()
+    ).order_by(
+        # Tie-break on id so equidistant POIs keep a stable order and the
+        # limit-20 cut is deterministic (#160).
+        'distance_meters', models.poi.PointOfInterest.id
+    ).limit(20).all()
 
     # Filter past/cancelled events, then limit to 8
     filtered_pairs = []
