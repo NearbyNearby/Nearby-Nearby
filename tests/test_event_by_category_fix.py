@@ -7,11 +7,15 @@ fields are start_datetime, end_datetime, is_repeating, event_status.
 """
 
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from conftest import (
     orm_create_event, orm_create_category, orm_assign_main_category,
     orm_create_business, db_session, app_client,
 )
+
+# Relative future dates: by-category excludes past events by default, so
+# hardcoded dates become time bombs once the calendar passes them.
+_FUTURE = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=30)
 
 
 class TestByCategoryEventFields:
@@ -28,8 +32,8 @@ class TestByCategoryEventFields:
             name="Summer Concert",
             published=True,
             event_fields={
-                "start_datetime": datetime(2026, 7, 15, 18, 0, 0, tzinfo=timezone.utc),
-                "end_datetime": datetime(2026, 7, 15, 22, 0, 0, tzinfo=timezone.utc),
+                "start_datetime": _FUTURE.replace(hour=18, minute=0, second=0),
+                "end_datetime": _FUTURE.replace(hour=22, minute=0, second=0),
                 "is_repeating": True,
                 "event_status": "Scheduled",
                 "organizer_name": "Music Org",
@@ -83,7 +87,7 @@ class TestByCategoryEventFields:
             name="Town Festival",
             published=True,
             event_fields={
-                "start_datetime": datetime(2026, 8, 1, 10, 0, 0, tzinfo=timezone.utc),
+                "start_datetime": _FUTURE.replace(hour=10, minute=0, second=0),
                 "organizer_name": "Town Council",
                 "cost_type": "free",
             },
@@ -123,7 +127,7 @@ class TestByCategoryEventFields:
             name="Open-Ended Event",
             published=True,
             event_fields={
-                "start_datetime": datetime(2026, 9, 1, 10, 0, 0, tzinfo=timezone.utc),
+                "start_datetime": _FUTURE.replace(hour=10, minute=0, second=0),
                 "end_datetime": None,
                 "event_status": "Scheduled",
             },

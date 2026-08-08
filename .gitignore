@@ -104,3 +104,4 @@ npm-debug.log*
 *.tfvars
 !terraform/environments/prod/terraform.tfvars
 may-launch/
+.issue-media/
