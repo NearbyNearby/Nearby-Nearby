@@ -56,6 +56,8 @@ export const emptyInitialValues = {
   // Parking
   parking_types: [],
   parking_locations: [],
+  // Links to reusable/shared lots (#90/#161): [{parking_lot_id, sort_order, label}]
+  parking_lot_links: [],
   parking_notes: '',
   primary_parking_lat: null,
   primary_parking_lng: null,

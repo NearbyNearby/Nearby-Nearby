@@ -5,6 +5,7 @@
 import React from 'react';
 import { Stack, Divider, Text } from '@mantine/core';
 import { ImageUploadField } from '../ImageUpload/ImageUploadField';
+import ParkingLotImageUpload from '../ImageUpload/ParkingLotImageUpload';
 
 // Featured/Main Image Upload
 export const FeaturedImageUpload = ({ poiId, isBusiness, isFreeListing, form }) => {
@@ -69,6 +70,18 @@ export const ParkingPhotosUpload = ({ poiId, parkingIndex, parkingName, form }) 
       context={hasContext ? `parking_${parkingIndex + 1}` : undefined}
       label={hasContext ? `${parkingName || `Lot ${parkingIndex + 1}`} Photos` : "Parking Lot Photos"}
       description={hasContext ? `Photos of ${parkingName || `parking lot ${parkingIndex + 1}`}` : "Photos of parking areas (up to 5)"}
+    />
+  );
+};
+
+// Photos for a REUSABLE parking lot (#90 / #161). A lot is not a POI, so this
+// posts to /images/upload/parking-lot/{lot_id} rather than the POI upload route;
+// the per-photo caption carries the "what should visitors look for?" note.
+export const ParkingLotPhotosUpload = ({ lotId, lotName }) => {
+  return (
+    <ParkingLotImageUpload
+      lotId={lotId}
+      label={lotName ? `${lotName} Photos` : 'Lot Photos'}
     />
   );
 };

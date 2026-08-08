@@ -8,6 +8,8 @@ import POIMap from './components/POIMap';
 import CategoryList from './components/CategoryList';
 import CategoryForm from './components/CategoryForm';
 import AttributeManager from './components/AttributeManager';
+import ParkingLotList from './components/ParkingLotList';
+import ParkingLotForm from './components/ParkingLotForm';
 import PrimaryTypeList from './components/PrimaryTypeList';
 import FormResponses from './components/FormResponses';
 import PoiDetailPage from './pages/PoiDetailPage';
@@ -87,6 +89,7 @@ function App() {
           <NavLink label="Points of Interest" component={Link} to="/" onClick={closeMobile} />
           <NavLink label="POI Map" component={Link} to="/map" onClick={closeMobile} />
           <NavLink label="Manage Categories" component={Link} to="/categories" onClick={closeMobile} />
+          <NavLink label="Manage Parking Lots" component={Link} to="/parking-lots" onClick={closeMobile} />
           <NavLink label="Manage Primary Types" component={Link} to="/primary-types" onClick={closeMobile} />
           <NavLink label="Manage Attributes" component={Link} to="/attributes" onClick={closeMobile} />
           <NavLink
@@ -107,6 +110,9 @@ function App() {
             <Route path="/poi/new" element={<POIForm />} />
             <Route path="/poi/:id/edit" element={<POIForm />} />
             <Route path="/categories" element={<CategoryList />} />
+            <Route path="/parking-lots" element={<ParkingLotList />} />
+            <Route path="/parking-lot/new" element={<ParkingLotForm />} />
+            <Route path="/parking-lot/:id/edit" element={<ParkingLotForm />} />
             <Route path="/primary-types" element={<PrimaryTypeList />} />
             <Route path="/category/new" element={<CategoryForm />} />
             <Route path="/category/:id/edit" element={<CategoryForm />} />

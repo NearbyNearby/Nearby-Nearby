@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MantineProvider, Accordion } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
@@ -31,6 +31,9 @@ vi.mock('../../sections/LocationSection', () => ({
 }));
 vi.mock('../../sections/ContactSection', () => ({
   ContactSection: () => <div data-testid="stub-contact" />,
+}));
+vi.mock('../../components/ParkingLotLinkGroup', () => ({
+  default: () => <div data-testid="stub-parking-lot-links" />,
 }));
 vi.mock('../../components/RestroomLocationGroup', () => ({
   RestroomLocationGroup: () => <div data-testid="stub-restroom-group" />,
@@ -151,5 +154,16 @@ describe('BusinessFreeLayout — #74 reorg', () => {
     const texts = Array.from(controls).map((c) => c.textContent.trim());
     expect(texts.length).toBe(13);
     expect(texts[12]).toContain('Admin Only');
+  });
+  // #90/#161: the shared-lot link group lives in the SAME parking panel, below
+  // the listing's own parking.
+  it('renders the shared parking link group inside the Parking panel', () => {
+    const { container } = render(<Harness userRole="editor" />);
+    const control = Array.from(container.querySelectorAll('.mantine-Accordion-control'))
+      .find((c) => c.textContent.trim() === 'Parking');
+    fireEvent.click(control);
+    // Business Free gets no own-lot repeat, only the shared-lot link group.
+    expect(screen.queryByTestId('stub-parking-group')).not.toBeInTheDocument();
+    expect(screen.getByTestId('stub-parking-lot-links')).toBeInTheDocument();
   });
 });

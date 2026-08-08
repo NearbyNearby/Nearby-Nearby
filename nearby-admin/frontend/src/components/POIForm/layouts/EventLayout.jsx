@@ -26,6 +26,7 @@ import {
 import { CheckboxGroupSection } from '../components/CheckboxGroupSection';
 import { RestroomLocationGroup } from '../components/RestroomLocationGroup';
 import { ParkingLocationGroup } from '../components/ParkingLocationGroup';
+import ParkingLotLinkGroup from '../components/ParkingLotLinkGroup';
 import { FeaturedImageUpload, shouldUseImageUpload } from '../ImageIntegration';
 
 import ServiceAnimalAlert from '../components/ServiceAnimalAlert';
@@ -264,6 +265,7 @@ export default function EventLayout({ form, userRole, poiId }) {
         <Accordion.Control><Text fw={600}>Parking</Text></Accordion.Control>
         <Accordion.Panel>
           <ParkingLocationGroup form={form} id={poiId} isEvent label="Parking Locations" />
+          <ParkingLotLinkGroup form={form} />
         </Accordion.Panel>
       </Accordion.Item>
 

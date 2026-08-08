@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MantineProvider, Accordion } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
@@ -65,6 +65,9 @@ vi.mock('../../components/RestroomLocationGroup', () => ({
 }));
 vi.mock('../../components/ParkingLocationGroup', () => ({
   ParkingLocationGroup: () => <div data-testid="stub-parking-group" />,
+}));
+vi.mock('../../components/ParkingLotLinkGroup', () => ({
+  default: () => <div data-testid="stub-parking-lot-links" />,
 }));
 vi.mock('../../components/ServiceAnimalAlert', () => ({
   default: () => <div data-testid="stub-service-animal" />,
@@ -205,5 +208,15 @@ describe('EventLayout — #73 20-accordion reorg', () => {
     expect(
       screen.getByText(/Event-specific overrides \(capacity, indoor\/outdoor flag, venue address\)/)
     ).toBeInTheDocument();
+  });
+  // #90/#161: the shared-lot link group lives in the SAME parking panel, below
+  // the listing's own parking.
+  it('renders the shared parking link group inside the Parking panel', () => {
+    const { container } = render(<Harness userRole="editor" />);
+    const control = Array.from(container.querySelectorAll('.mantine-Accordion-control'))
+      .find((c) => c.textContent.trim() === 'Parking');
+    fireEvent.click(control);
+    expect(screen.getByTestId('stub-parking-group')).toBeInTheDocument();
+    expect(screen.getByTestId('stub-parking-lot-links')).toBeInTheDocument();
   });
 });

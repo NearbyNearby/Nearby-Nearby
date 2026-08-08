@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MantineProvider, Accordion } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
@@ -58,6 +58,9 @@ vi.mock('../../ImageIntegration', () => ({
 }));
 vi.mock('../../components/ParkingLocationGroup', () => ({
   ParkingLocationGroup: () => <div data-testid="stub-parking-group" />,
+}));
+vi.mock('../../components/ParkingLotLinkGroup', () => ({
+  default: () => <div data-testid="stub-parking-lot-links" />,
 }));
 vi.mock('../../components/RestroomLocationGroup', () => ({
   RestroomLocationGroup: () => <div data-testid="stub-restroom-group" />,
@@ -211,5 +214,15 @@ describe('BusinessPaidLayout — #75 18-accordion reorg', () => {
     const locallyIdx = texts.findIndex((t) => t === 'Locally Found + History');
     const imagesIdx = texts.findIndex((t) => t === 'Images');
     expect(locallyIdx).toBeLessThan(imagesIdx);
+  });
+  // #90/#161: the shared-lot link group lives in the SAME parking panel, below
+  // the listing's own parking.
+  it('renders the shared parking link group inside the Parking panel', () => {
+    const { container } = render(<Harness userRole="editor" />);
+    const control = Array.from(container.querySelectorAll('.mantine-Accordion-control'))
+      .find((c) => c.textContent.trim() === 'Parking');
+    fireEvent.click(control);
+    expect(screen.getByTestId('stub-parking-group')).toBeInTheDocument();
+    expect(screen.getByTestId('stub-parking-lot-links')).toBeInTheDocument();
   });
 });
