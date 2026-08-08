@@ -59,6 +59,7 @@ vi.mock('../../../HoursSelector', () => ({
 }));
 vi.mock('../../ImageIntegration', () => ({
   FeaturedImageUpload: () => <div data-testid="stub-featured" />,
+  DownloadableMapsUpload: () => <div data-testid="stub-downloadable-map" />,
   shouldUseImageUpload: () => true,
 }));
 vi.mock('../../components/ParkingLocationGroup', () => ({
@@ -209,5 +210,16 @@ describe('TrailLayout — #77 22-accordion reorg', () => {
     fireEvent.click(control);
     expect(screen.getByTestId('stub-parking-group')).toBeInTheDocument();
     expect(screen.getByTestId('stub-parking-lot-links')).toBeInTheDocument();
+  });
+
+  // #147: the trail guide map must be an upload (PDF or image), not a raw URL
+  // text field, so visitors can actually download whatever file is there.
+  it('Trail Guide uses the downloadable-map file upload, not a URL text field', () => {
+    const { container } = render(<Harness userRole="editor" />);
+    const control = Array.from(container.querySelectorAll('.mantine-Accordion-control'))
+      .find((c) => c.textContent.trim() === 'Trail Guide');
+    fireEvent.click(control);
+    expect(screen.getByTestId('stub-downloadable-map')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/URL to trail map/i)).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Navigation, Copy, Check, ExternalLink, Globe, Phone } from 'lucide-react';
+import { MapPin, Navigation, Copy, Check, ExternalLink, Globe, Phone, Download } from 'lucide-react';
 
 import {
   AccSection, ContentGroup, ChipList, CategoryChipList, QuickInfoRow,
@@ -119,7 +119,13 @@ export default function TrailDetail({ poi }) {
   const linkedParkName = trail.park_name || trail.park?.name || linkedParkFromRel?.name || null;
 
   const accessPoints = Array.isArray(trail.access_points) ? trail.access_points.filter(Boolean) : [];
-  const hasTrailGuide = !!(trail.mile_markers || trail.trailhead_signage || trail.audio_guide_available || trail.qr_trail_guide || trail.trail_guide_notes || trail.trail_lighting || accessPoints.length > 0);
+  // #147: the trail guide map is an upload (image or PDF), not a URL link;
+  // pull the uploaded files straight from the POI's images so visitors can
+  // download whatever was uploaded in admin.
+  const downloadableMaps = Array.isArray(poi?.images)
+    ? poi.images.filter((img) => img.type === 'downloadable_map' && img.url)
+    : [];
+  const hasTrailGuide = !!(trail.mile_markers || trail.trailhead_signage || trail.audio_guide_available || trail.qr_trail_guide || trail.trail_guide_notes || trail.trail_lighting || accessPoints.length > 0 || downloadableMaps.length > 0);
 
   /* ── Accordion section definitions ── */
   const aboutCol1 = [
@@ -196,6 +202,24 @@ export default function TrailDetail({ poi }) {
           {trail.qr_trail_guide && <div><strong>QR Trail Guide:</strong> Yes</div>}
           {trail.trail_lighting && <div><strong>Trail Lighting:</strong> {TRAIL_LIGHTING_LABELS[trail.trail_lighting] || trail.trail_lighting}</div>}
           {trail.trail_guide_notes && <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(trail.trail_guide_notes) }} />}
+        </div>
+      </ContentGroup>
+    ),
+    downloadableMaps.length > 0 && (
+      <ContentGroup key="downloadmap" title="Downloadable Trail Map">
+        <div className="acc_content_text pd-trail-map-downloads">
+          {downloadableMaps.map((img, idx) => (
+            <a
+              key={img.id || img.url}
+              href={img.url}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pd-link"
+            >
+              <Download size={14} /> Download Trail Map{downloadableMaps.length > 1 ? ` ${idx + 1}` : ''}
+            </a>
+          ))}
         </div>
       </ContentGroup>
     ),
