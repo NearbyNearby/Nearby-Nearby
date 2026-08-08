@@ -279,6 +279,18 @@ def ensure_unique_slug(db: Session, base_slug: str, exclude_id: uuid.UUID = None
         counter += 1
 
 
+# A POI created through the admin draft auto-create starts life named
+# "New POI", so its slug is the placeholder new-poi[-N] (#143). Autosave then
+# writes the real name straight onto the model, which makes update_poi's
+# name-change detection see no change and leaves the placeholder forever.
+# Treat a placeholder slug as always regenerable.
+_PLACEHOLDER_SLUG_RE = re.compile(r'^new-poi(-\d+)?$')
+
+
+def slug_is_placeholder(slug) -> bool:
+    return bool(slug) and bool(_PLACEHOLDER_SLUG_RE.match(slug))
+
+
 def get_poi(db: Session, poi_id: uuid.UUID):
     return db.query(models.PointOfInterest).options(
         joinedload(models.PointOfInterest.business),
@@ -668,11 +680,17 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
     name_changed = 'name' in update_data and update_data['name'] != db_obj.name
     city_changed = 'address_city' in update_data and update_data['address_city'] != db_obj.address_city
 
-    if name_changed or city_changed:
+    # #143: also regenerate when the stored slug is still the auto-create
+    # placeholder, even if this request did not change the name (autosave
+    # already wrote the real name, defeating the change detection above).
+    if name_changed or city_changed or slug_is_placeholder(db_obj.slug):
         new_name = update_data.get('name', db_obj.name)
         new_city = update_data.get('address_city', db_obj.address_city)
         base_slug = generate_slug(new_name, new_city)
-        update_data['slug'] = ensure_unique_slug(db, base_slug, exclude_id=db_obj.id)
+        # Never re-slug a placeholder into another placeholder (the POI is
+        # still literally named "New POI").
+        if (name_changed or city_changed) or not slug_is_placeholder(base_slug):
+            update_data['slug'] = ensure_unique_slug(db, base_slug, exclude_id=db_obj.id)
 
     # Handle location update
     if 'location' in update_data:
