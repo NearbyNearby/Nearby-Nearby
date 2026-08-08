@@ -15,6 +15,7 @@ import {
   // WheelchairIcon removed — wheelchair_accessible column dropped (Issue #45 PR2 Migration B)
   WifiIcon,
   PetIcon,
+  formatDistanceMiles,
 } from '../components/nearby-feature/NearbyCard';
 import DirectionsModal from '../components/common/DirectionsModal';
 import { getApiUrl } from '../config';
@@ -194,7 +195,7 @@ const ResultCard = forwardRef(function ResultCard({ poi, index, isHighlighted, o
       {hasDistance && (
         <div className="one_search_map_result_distance">
           <span className="one_search_map_result_calculated">
-            {poi.distance.toFixed(1)} {poi.distance === 1 ? 'mile' : 'miles'}
+            {formatDistanceMiles(poi.distance)}
           </span>{' '}
           <span className="one_search_map_result_frompoint">from downtown Pittsboro</span>
         </div>
@@ -463,11 +464,12 @@ export default function Explore() {
     ? customDate
     : DATE_PRESETS.find((p) => p.value === dateFilter)?.label || 'Any Date';
 
-  /* map split ------------------------------------------------------ */
-  const mapCurrent = filteredResults.find((p) => p?.location?.coordinates) || null;
-  const mapOthers  = mapCurrent
-    ? filteredResults.filter((p) => p !== mapCurrent && p?.location?.coordinates)
-    : [];
+  /* map ------------------------------------------------------------ */
+  // #133: the map gets the SAME list, in the SAME order, that the cards render,
+  // so marker N is always card N. (It used to promote the first mapped result to
+  // a "current POI" gold pin and pass the rest, which shifted every number.)
+  // Explore has no current POI, so no gold pin; Map handles currentPOI={null}.
+  const hasMappedResult = filteredResults.some((p) => p?.location?.coordinates);
 
   /* render --------------------------------------------------------- */
   return (
@@ -670,10 +672,10 @@ export default function Explore() {
             ))}
           </div>
           <div className="map_results_layout_1_right_col">
-            {mapCurrent ? (
+            {hasMappedResult ? (
               <Map
-                currentPOI={mapCurrent}
-                nearbyPOIs={mapOthers}
+                currentPOI={null}
+                nearbyPOIs={filteredResults}
                 onMarkerClick={handleMarkerClick}
                 highlightedId={highlightedCardId}
               />

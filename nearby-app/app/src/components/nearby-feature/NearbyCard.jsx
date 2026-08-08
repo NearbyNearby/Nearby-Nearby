@@ -3,14 +3,21 @@ import { Navigation, Toilet, Wifi, PawPrint, Accessibility } from 'lucide-react'
 import { getDisplayableLocation } from '../../utils/getDisplayableLocation';
 import { getOpenCloseStatusLabel, getEffectiveHoursForDate, formatDayHours } from '../../utils/hoursUtils';
 
-// Helper to convert meters to miles
-function formatDistance(meters) {
-  if (!meters || meters === 0) return '0 mi';
-  const miles = meters / 1609.34;
+// Card distance formatting: feet under a tenth of a mile, miles above it.
+// Exported so Explore's result cards read identically (#134) instead of always
+// printing miles.
+export function formatDistanceMiles(miles) {
+  if (!miles || miles <= 0) return '0 mi';
   if (miles < 0.1) {
     return `${Math.round(miles * 5280)} ft`;
   }
   return `${miles.toFixed(1)} mi`;
+}
+
+// Helper to convert meters to miles
+function formatDistance(meters) {
+  if (!meters || meters === 0) return '0 mi';
+  return formatDistanceMiles(meters / 1609.34);
 }
 
 // Amenity icon components — Lucide icons (swapped from custom SVGs 2026-05-29)

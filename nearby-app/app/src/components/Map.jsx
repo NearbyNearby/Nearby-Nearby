@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, AttributionControl, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -45,7 +45,14 @@ const createNumberedIcon = (number, isHighlighted = false) => {
     iconUrl: svgUrl,
     iconSize: [size, size],
     iconAnchor: [size/2, size/2],
-    popupAnchor: [0, -size/2]
+    popupAnchor: [0, -size/2],
+    // #160: the icon is a SQUARE image with an inscribed circle, so its
+    // transparent corners still capture clicks. Downtown POIs sit 20-35m apart
+    // (~10-18px at z16) which puts a neighbour's corner right on top of the pin
+    // you can actually see: clicking marker N then activated marker N+1.
+    // `.map-marker-numbered { clip-path: circle(50%) }` clips paint AND hit area
+    // to the visible circle, so what you see is what you click.
+    className: 'map-marker-numbered'
   });
 };
 
@@ -144,26 +151,23 @@ function ScrollWheelToggle() {
   );
 }
 
-function Map({ currentPOI, nearbyPOIs = [], radiusMiles, onMarkerClick, highlightedId }) {
-  if (!currentPOI || !currentPOI.location) {
-    return (
-      <div className="map-placeholder">
-        <p>No location data available</p>
-      </div>
-    );
-  }
-
-  const currentCoords = [
-    currentPOI.location.coordinates[1], // latitude
-    currentPOI.location.coordinates[0]  // longitude
-  ];
+function Map({ currentPOI = null, nearbyPOIs = [], radiusMiles, onMarkerClick, highlightedId }) {
+  // `currentPOI` is optional: Explore (#133) has no "current" POI and passes its
+  // FULL result list as nearbyPOIs so marker numbers equal the card numbers.
+  // NearbySection still passes a real currentPOI and gets the gold pin.
+  const currentCoords = currentPOI?.location?.coordinates
+    ? [
+        currentPOI.location.coordinates[1], // latitude
+        currentPOI.location.coordinates[0]  // longitude
+      ]
+    : null;
 
   // If the current POI has opted out of exact location display, we don't show its pin.
   const hideCurrentExact = Boolean(currentPOI?.dont_display_location);
 
   // Calculate bounds to fit all markers
   const allCoords = [];
-  if (!hideCurrentExact) {
+  if (currentCoords && !hideCurrentExact) {
     allCoords.push(currentCoords);
   }
   nearbyPOIs.forEach(poi => {
@@ -174,16 +178,27 @@ function Map({ currentPOI, nearbyPOIs = [], radiusMiles, onMarkerClick, highligh
       ]);
     }
   });
+
+  // Center on the current POI when there is one, otherwise on the first mapped
+  // result. With neither there is nothing to draw.
+  const center = currentCoords || allCoords[0] || null;
+  if (!center) {
+    return (
+      <div className="map-placeholder">
+        <p>No location data available</p>
+      </div>
+    );
+  }
   // Ensure the map always has at least one bound reference so it doesn't crash.
   if (allCoords.length === 0) {
-    allCoords.push(currentCoords);
+    allCoords.push(center);
   }
 
   return (
     <div className="map-container">
       <MapContainer
-        key={`${currentPOI?.id}-${nearbyPOIs.length}-${nearbyPOIs[nearbyPOIs.length - 1]?.id || ''}`}
-        center={currentCoords}
+        key={`${currentPOI?.id || 'explore'}-${nearbyPOIs.length}-${nearbyPOIs[nearbyPOIs.length - 1]?.id || ''}`}
+        center={center}
         zoom={14}
         className="leaflet-map"
         scrollWheelZoom={false}
@@ -193,7 +208,12 @@ function Map({ currentPOI, nearbyPOIs = [], radiusMiles, onMarkerClick, highligh
         wheelDebounceTime={40}
         maxZoom={20} // Allow much closer zoom
         minZoom={10}
+        attributionControl={false}
       >
+        {/* #102: Leaflet's default prefix is "🇺🇦 Leaflet"; drop the flag but keep
+            the library credit and the OSM/CARTO attributions below. */}
+        <AttributionControl position="bottomright" prefix="Leaflet" />
+
         {/* Carto Voyager - MapQuest-like warm colors */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -205,7 +225,7 @@ function Map({ currentPOI, nearbyPOIs = [], radiusMiles, onMarkerClick, highligh
         <ScrollWheelToggle />
 
         {/* Current POI marker - hidden when POI opts out of showing exact location */}
-        {!hideCurrentExact && (
+        {currentCoords && !hideCurrentExact && (
         <Marker position={currentCoords} icon={createCurrentIcon()}>
           <Popup className="custom-popup">
             <div className="popup-content">
@@ -216,7 +236,9 @@ function Map({ currentPOI, nearbyPOIs = [], radiusMiles, onMarkerClick, highligh
         </Marker>
         )}
 
-        {/* Nearby POI markers - PURPLE NUMBERED CIRCLES */}
+        {/* Nearby POI markers - PURPLE NUMBERED CIRCLES. The number is the POI's position in the list the
+            caller renders as cards, so an unmapped POI leaves a gap rather than
+            shifting every later marker (#133). */}
         {nearbyPOIs.map((poi, index) => {
           if (!poi.location) return null;
           // Hide pin for POIs that opted out of exact-location display
