@@ -26,11 +26,20 @@ from app.database import SessionLocal
 from app.models.poi import PointOfInterest, Business, Park, Trail, Event
 from app.models.category import Category, poi_category_association
 from app.models.image import Image, ImageType
+from app.models.parking_lot import ParkingLot
 from app.models.user import User
 from app.core.security import get_password_hash
 from app.crud.crud_user import get_user_by_email
+from app.crud.crud_poi import (
+    compute_accessible_restroom,
+    compute_icon_booleans,
+    _default_missing_restroom_coords,
+)
 
 from shared.models.enums import POIType
+from shared.constants.field_options import RESTROOM_ADA_CHECKLIST
+from shared.poi_points import sync_point_rows
+from shared.parking_lots import sync_parking_links
 
 # ---------------------------------------------------------------------------
 # Unsplash photo IDs — all freely licensed
@@ -123,12 +132,17 @@ def attach_image(
     image_key: str,
     display_order: int = 0,
     alt_text: str = "",
+    image_context: str | None = None,
 ) -> Image | None:
     """Download an Unsplash image and create an Image record.
 
     Because we're seeding a *local dev* database (no S3/MinIO required for
     display), we store a direct Unsplash URL as the storage_url. The frontend
     will load images from these URLs directly.
+
+    ``image_context`` scopes a contextual sub-entity photo (e.g. an event
+    sponsor's logo, uploaded under ``sponsor_<id>``) the same way the real
+    admin form does; leave it None for a POI's own main/gallery images.
     """
     url = unsplash_url(image_key, w=800)
     thumb_url = unsplash_url(image_key, w=150)
@@ -136,6 +150,7 @@ def attach_image(
     img = Image(
         poi_id=poi_id,
         image_type=image_type,
+        image_context=image_context,
         filename=f"{image_key}.jpg",
         original_filename=f"{image_key}.jpg",
         mime_type="image/jpeg",
@@ -155,6 +170,7 @@ def attach_image(
     thumb = Image(
         poi_id=poi_id,
         image_type=image_type,
+        image_context=image_context,
         filename=f"thumbnail_{image_key}.jpg",
         original_filename=f"{image_key}.jpg",
         mime_type="image/jpeg",
@@ -170,6 +186,50 @@ def attach_image(
     )
     db.add(thumb)
     return img
+
+
+def compute_amenity_icons(
+    *,
+    wifi_options=None,
+    pet_options=None,
+    public_toilets=None,
+    accessible_restroom_details=None,
+    accessible_parking_details=None,
+    mobility_access=None,
+    inclusive_playground=False,
+):
+    """Run the given underlying fields through the SAME icon-boolean helpers
+    ``app.crud.crud_poi`` runs on every real admin create/update, so a seeded
+    POI earns icon_free_wifi / icon_pet_friendly / icon_public_restroom /
+    icon_wheelchair_accessible exactly the way a real save would (rather than
+    us guessing/hardcoding the booleans directly).
+    """
+    data = {
+        "wifi_options": wifi_options,
+        "pet_options": pet_options,
+        "public_toilets": public_toilets,
+        "accessible_restroom_details": accessible_restroom_details,
+        "accessible_parking_details": accessible_parking_details,
+        "mobility_access": mobility_access,
+        "inclusive_playground": inclusive_playground,
+        "amenities": {},
+    }
+    compute_accessible_restroom(data)
+    compute_icon_booleans(data)
+    return {
+        "accessible_restroom": data["accessible_restroom"],
+        "icon_free_wifi": data["icon_free_wifi"],
+        "icon_pet_friendly": data["icon_pet_friendly"],
+        "icon_public_restroom": data["icon_public_restroom"],
+        "icon_wheelchair_accessible": data["icon_wheelchair_accessible"],
+    }
+
+
+# Pull the exact ADA checklist labels from the shared constant (rather than
+# retyping them) so compute_accessible_restroom's substring matching is
+# guaranteed to line up with what a real admin checkbox would send.
+def _restroom_ada_label(prefix: str) -> str:
+    return next(item["label"] for item in RESTROOM_ADA_CHECKLIST if item["label"].startswith(prefix))
 
 
 # ---------------------------------------------------------------------------
@@ -871,6 +931,859 @@ def create_events(db: Session):
         print(f"  Created: {e['name']} (slug: {poi.slug})")
 
 
+def create_extra_businesses(db: Session):
+    """Extra businesses covering hours/holiday/amenity/location-privacy
+    scenarios not exercised by create_businesses() above."""
+    print("\n--- Extra Businesses (hours, holidays, amenities, location privacy) ---")
+
+    cat_cafe = get_category(db, "Cafe")
+    cat_venue = get_category(db, "Live Music Venue")
+
+    pet_options = ["Dogs Allowed", "Clean Up Stations"]
+    public_toilets = ["Single Stall", "Wheelchair + ADA Accessible"]
+    accessible_restroom_details = [
+        _restroom_ada_label("Wide door"),
+        _restroom_ada_label("Side grab bar"),
+        _restroom_ada_label("Level entry"),
+    ]
+    accessible_parking_details = [
+        "Dedicated accessible parking spaces on site",
+        "Van accessible space available (8 foot access aisle)",
+    ]
+    outfitter_icons = compute_amenity_icons(
+        pet_options=pet_options,
+        public_toilets=public_toilets,
+        accessible_restroom_details=accessible_restroom_details,
+        accessible_parking_details=accessible_parking_details,
+    )
+
+    outfitter_hours = {
+        "regular": {
+            "monday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "09:00"}, "close": {"type": "fixed", "time": "17:00"}}]},
+            "tuesday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "09:00"}, "close": {"type": "fixed", "time": "17:00"}}]},
+            "wednesday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "09:00"}, "close": {"type": "fixed", "time": "17:00"}}]},
+            "thursday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "09:00"}, "close": {"type": "fixed", "time": "17:00"}}]},
+            "friday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "09:00"}, "close": {"type": "fixed", "time": "17:00"}}]},
+            "saturday": {"status": "closed"},
+            "sunday": {"status": "closed"},
+        },
+        "holidays": {
+            # mode: follows_regular - falls through to the normal Mon-Fri schedule.
+            "independence_day": {"name": "Independence Day", "date": "07-04", "mode": "follows_regular", "status": "open"},
+            # mode: open, with its own periods + a visitor-facing note.
+            "black_friday": {
+                "name": "Black Friday", "date": "11-24",
+                "mode": "open", "status": "open",
+                "periods": [{"open": {"type": "fixed", "time": "08:00"}, "close": {"type": "fixed", "time": "20:00"}}],
+                "note": "Extended hours for holiday shopping!",
+            },
+            # mode: closed.
+            "christmas": {
+                "name": "Christmas Day", "date": "12-25",
+                "mode": "closed", "status": "closed",
+                "note": "Closed for the holiday, reopens December 26",
+            },
+            # Legacy shape (pre-#116): status only, no mode key at all. Exercises
+            # get_holiday_mode()'s compat mapping (status=closed -> mode closed).
+            "thanksgiving": {"name": "Thanksgiving", "date": "fourth_thursday_november", "status": "closed"},
+        },
+    }
+
+    no_regular_hours = {
+        "no_regular_hours": True,
+        "regular": {
+            "monday": {"status": "closed"}, "tuesday": {"status": "closed"},
+            "wednesday": {"status": "closed"}, "thursday": {"status": "closed"},
+            "friday": {"status": "closed"}, "saturday": {"status": "closed"},
+            "sunday": {"status": "closed"},
+        },
+        "notes": "Hours vary week to week. Message us on Instagram for this week's pop-up times.",
+    }
+
+    seasonal_only_hours = {
+        "regular": {
+            "monday": {"status": "closed"}, "tuesday": {"status": "closed"},
+            "wednesday": {"status": "closed"}, "thursday": {"status": "closed"},
+            "friday": {"status": "closed"}, "saturday": {"status": "closed"},
+            "sunday": {"status": "closed"},
+        },
+        "seasonal_only": True,
+        "seasonal": {
+            "summer": {
+                "useDateRange": True,
+                "startDate": "05-15",
+                "endDate": "09-15",
+                "monday": {"status": "closed"},
+                "tuesday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "12:00"}, "close": {"type": "fixed", "time": "20:00"}}]},
+                "wednesday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "12:00"}, "close": {"type": "fixed", "time": "20:00"}}]},
+                "thursday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "12:00"}, "close": {"type": "fixed", "time": "20:00"}}]},
+                "friday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "12:00"}, "close": {"type": "fixed", "time": "21:00"}}]},
+                "saturday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "12:00"}, "close": {"type": "fixed", "time": "21:00"}}]},
+                "sunday": {"status": "open", "periods": [{"open": {"type": "fixed", "time": "12:00"}, "close": {"type": "fixed", "time": "19:00"}}]},
+            },
+        },
+    }
+
+    businesses = [
+        {
+            "name": "Chatham Trailhead Outfitters",
+            "slug": "chatham-trailhead-outfitters-pittsboro",
+            "location": "POINT(-79.1810 35.7190)",
+            "description_short": "Gear rental, trail snacks, and friendly advice for hikers headed into Chatham County's trail network.",
+            "description_long": (
+                "Chatham Trailhead Outfitters rents daypacks, trekking poles, and "
+                "bear-proof coolers for a day or a week on the trail. Our staff "
+                "knows every loop in the county and is happy to point you toward "
+                "the right trail for your group. Well-behaved leashed dogs are "
+                "always welcome, and our accessible restroom and parking make the "
+                "shop easy to visit for everyone. By appointment outside posted hours."
+            ),
+            "teaser_paragraph": "Gear rental & trail advice, steps from the trailhead.",
+            "address_street": "22 Trailhead Way",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "22 Trailhead Way, Pittsboro, NC 27312",
+            "phone_number": "(919) 555-0110",
+            "price_range": "$$",
+            "hours": outfitter_hours,
+            "hours_but_appointment_required": True,
+            "images": {"main": "store_main"},
+            "pet_options": pet_options,
+            "public_toilets": public_toilets,
+            "accessible_restroom_details": accessible_restroom_details,
+            "accessible_parking_details": accessible_parking_details,
+            **outfitter_icons,
+        },
+        {
+            "name": "Whispering Hollow Home Bakery",
+            "slug": "whispering-hollow-home-bakery-pittsboro",
+            "location": "POINT(-79.1955 35.7267)",
+            "description_short": "Small-batch sourdough and seasonal pies baked to order from a home kitchen outside Pittsboro.",
+            "description_long": (
+                "Whispering Hollow Home Bakery is a one-woman operation running "
+                "out of a licensed home kitchen. Because it's a residence, we "
+                "don't list an exact address publicly. Message us to arrange "
+                "pickup. Baking days and hours shift with the season and with "
+                "what's fresh at the farmers market, so check our Instagram "
+                "before you plan a visit."
+            ),
+            "teaser_paragraph": "Small-batch sourdough & pies, pickup by message.",
+            "address_street": "Private residence",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "Pittsboro, NC 27312",
+            "price_range": "$",
+            "hours": no_regular_hours,
+            "dont_display_location": True,
+            "category": cat_cafe,
+            "images": {"main": "cafe_gallery1"},
+        },
+        {
+            "name": "The Barn at Chatham Mills",
+            "slug": "the-barn-at-chatham-mills-pittsboro",
+            "location": "POINT(-79.1720 35.7245)",
+            "description_short": "A converted textile-mill barn hosting dances, weddings, and community gatherings.",
+            "description_long": (
+                "The Barn at Chatham Mills is a restored 1940s cotton-mill "
+                "warehouse turned event space, with exposed timber trusses and "
+                "room for 200 guests. We host everything from contra dances to "
+                "wedding receptions to nonprofit fundraisers. A gravel overflow "
+                "lot behind the building handles parking for larger events."
+            ),
+            "teaser_paragraph": "Restored mill barn hosting dances, weddings & fundraisers.",
+            "address_street": "480 Hillsboro Street",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "480 Hillsboro Street, Pittsboro, NC 27312",
+            "website_url": "https://thebarnatchathammills.example.com",
+            "price_range": "$$$",
+            "category": cat_venue,
+            "images": {"main": "event2_gallery1"},
+        },
+        {
+            "name": "Chatham Creamery Seasonal Stand",
+            "slug": "chatham-creamery-seasonal-stand-pittsboro",
+            "location": "POINT(-79.1695 35.7195)",
+            "description_short": "A walk-up soft-serve window open only for the warm months, right on the Rocky River Greenway.",
+            "description_long": (
+                "Chatham Creamery's seasonal stand serves soft-serve, "
+                "milkshakes, and frozen custard from a walk-up window "
+                "overlooking the Rocky River Greenway. We open when the "
+                "weather turns warm and close for the season once the leaves "
+                "start to fall. Check the seasonal hours below for exact dates."
+            ),
+            "teaser_paragraph": "Walk-up soft-serve window, open May through September.",
+            "address_street": "6 Greenway Court",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "6 Greenway Court, Pittsboro, NC 27312",
+            "price_range": "$",
+            "hours": seasonal_only_hours,
+            "category": cat_cafe,
+            "images": {"main": "cafe_gallery2"},
+        },
+    ]
+
+    for biz in businesses:
+        existing = db.query(PointOfInterest).filter(
+            PointOfInterest.slug == biz["slug"]
+        ).first()
+        if existing:
+            print(f"  Skipping (exists): {biz['name']}")
+            continue
+
+        poi = PointOfInterest(
+            poi_type=POIType.BUSINESS,
+            name=biz["name"],
+            slug=biz["slug"],
+            listing_type="paid",
+            publication_status="published",
+            is_verified=True,
+            status="Fully Open",
+            location=biz["location"],
+            description_short=biz["description_short"],
+            description_long=biz["description_long"],
+            teaser_paragraph=biz.get("teaser_paragraph"),
+            address_street=biz["address_street"],
+            address_city=biz["address_city"],
+            address_state=biz["address_state"],
+            address_zip=biz["address_zip"],
+            address_county=biz["address_county"],
+            address_full=biz["address_full"],
+            website_url=biz.get("website_url"),
+            phone_number=biz.get("phone_number"),
+            hours=biz.get("hours"),
+            hours_but_appointment_required=biz.get("hours_but_appointment_required", False),
+            dont_display_location=biz.get("dont_display_location", False),
+            pet_options=biz.get("pet_options"),
+            public_toilets=biz.get("public_toilets"),
+            accessible_restroom_details=biz.get("accessible_restroom_details"),
+            accessible_parking_details=biz.get("accessible_parking_details"),
+            accessible_restroom=biz.get("accessible_restroom", False),
+            icon_free_wifi=biz.get("icon_free_wifi", False),
+            icon_pet_friendly=biz.get("icon_pet_friendly", False),
+            icon_public_restroom=biz.get("icon_public_restroom", False),
+            icon_wheelchair_accessible=biz.get("icon_wheelchair_accessible", False),
+        )
+        poi.business = Business(price_range=biz["price_range"])
+        db.add(poi)
+        db.flush()
+
+        if biz.get("category"):
+            db.execute(poi_category_association.insert().values(
+                poi_id=poi.id, category_id=biz["category"].id, is_main=True
+            ))
+
+        imgs = biz["images"]
+        attach_image(db, poi.id, ImageType.main, imgs["main"], alt_text=f"{biz['name']} photo")
+
+        db.commit()
+        print(f"  Created: {biz['name']} (slug: {poi.slug})")
+
+
+def create_extra_parks_and_trails(db: Session):
+    """Bear Creek Nature Park + Loop Trail: restroom point-location coverage
+    (one entry missing lat/lng to exercise the Issue #117 fallback default,
+    one full-detail entry) sharing a trailhead parking lot."""
+    print("\n--- Extra Park & Trail (restroom locations, shared parking) ---")
+
+    cat_preserve = get_category(db, "Nature Preserve")
+    cat_trail = get_category(db, "Nature Trail")
+
+    park_lat, park_lng = 35.6950, -79.2200
+    park_slug = "bear-creek-nature-park-pittsboro"
+
+    existing_park = db.query(PointOfInterest).filter(PointOfInterest.slug == park_slug).first()
+    if existing_park:
+        print("  Skipping (exists): Bear Creek Nature Park")
+    else:
+        park_poi = PointOfInterest(
+            poi_type=POIType.PARK,
+            name="Bear Creek Nature Park",
+            slug=park_slug,
+            listing_type="community_comped",
+            publication_status="published",
+            is_verified=True,
+            status="Fully Open",
+            location=f"POINT({park_lng} {park_lat})",
+            description_short="A 40-acre creekside park with a visitor center, birding trails, and two restroom locations.",
+            description_long=(
+                "Bear Creek Nature Park protects 40 acres along Bear Creek with "
+                "a small visitor center, a butterfly garden, and a mile of "
+                "accessible boardwalk trail. A composting toilet sits near the "
+                "trailhead kiosk for quick stops, and the visitor center has "
+                "full flush restrooms during posted hours."
+            ),
+            teaser_paragraph="Creekside trails, a butterfly garden & a visitor center.",
+            address_street="710 Bear Creek Road",
+            address_city="Pittsboro",
+            address_state="NC",
+            address_zip="27312",
+            address_county="Chatham County",
+            address_full="710 Bear Creek Road, Pittsboro, NC 27312",
+            cost="0",
+            public_toilets=["Multi Stall", "Baby Changing Station"],
+        )
+        park_poi.park = Park(drone_usage_policy="No drones without permit")
+        db.add(park_poi)
+        db.flush()
+
+        if cat_preserve:
+            db.execute(poi_category_association.insert().values(
+                poi_id=park_poi.id, category_id=cat_preserve.id, is_main=True
+            ))
+
+        attach_image(db, park_poi.id, ImageType.main, "park3_gallery1", alt_text="Bear Creek Nature Park boardwalk")
+
+        # Issue #117: one restroom entry with NO lat/lng (exercises the
+        # POI-location fallback default), one with explicit coords + full detail.
+        toilet_entries = [
+            {
+                "restroom_name": "Trailhead Composting Toilet",
+                "lat": None,
+                "lng": None,
+                "description": "Composting toilet at the trailhead kiosk, no running water.",
+                "toilet_types": ["Single Stall"],
+            },
+            {
+                "restroom_name": "Visitor Center Restroom",
+                "lat": park_lat + 0.0012,
+                "lng": park_lng + 0.0009,
+                "description": "Flush restrooms inside the visitor center, open during posted hours.",
+                "toilet_types": ["Multi Stall", "Baby Changing Station", "Wheelchair + ADA Accessible"],
+            },
+        ]
+        _default_missing_restroom_coords(toilet_entries, park_lat, park_lng)
+        sync_point_rows(db, park_poi.id, "toilet_locations", toilet_entries)
+
+        db.commit()
+        print(f"  Created: Bear Creek Nature Park (slug: {park_poi.slug})")
+
+    trail_slug = "bear-creek-loop-trail-pittsboro"
+    existing_trail = db.query(PointOfInterest).filter(PointOfInterest.slug == trail_slug).first()
+    if existing_trail:
+        print("  Skipping (exists): Bear Creek Loop Trail")
+    else:
+        trail_poi = PointOfInterest(
+            poi_type=POIType.TRAIL,
+            name="Bear Creek Loop Trail",
+            slug=trail_slug,
+            listing_type="community_comped",
+            publication_status="published",
+            is_verified=True,
+            status="Fully Open",
+            location="POINT(-79.2215 35.6935)",
+            description_short="An easy 1-mile loop starting from the Bear Creek Nature Park trailhead lot.",
+            description_long=(
+                "Bear Creek Loop Trail is an easy, mostly flat mile of packed "
+                "dirt circling the park's namesake creek. It shares the "
+                "trailhead parking lot with Bear Creek Nature Park, so arrive "
+                "early on weekends."
+            ),
+            teaser_paragraph="Easy 1-mile creekside loop, shared trailhead lot.",
+            address_street="710 Bear Creek Road",
+            address_city="Pittsboro",
+            address_state="NC",
+            address_zip="27312",
+            address_county="Chatham County",
+            address_full="710 Bear Creek Road, Pittsboro, NC 27312",
+            cost="0",
+        )
+        trail_poi.trail = Trail(length_text="1.0 miles", difficulty="easy", route_type="loop")
+        db.add(trail_poi)
+        db.flush()
+
+        if cat_trail:
+            db.execute(poi_category_association.insert().values(
+                poi_id=trail_poi.id, category_id=cat_trail.id, is_main=True
+            ))
+
+        attach_image(db, trail_poi.id, ImageType.main, "trail2_gallery1", alt_text="Bear Creek Loop Trail")
+
+        db.commit()
+        print(f"  Created: Bear Creek Loop Trail (slug: {trail_poi.slug})")
+
+
+def create_extra_events(db: Session):
+    """Extra events covering the #127 event-visibility cutoff rules, repeating
+    recurrence_end_date semantics, a venue/nearby coordinate tie-break, and
+    event sponsors with an image-backed logo."""
+    print("\n--- Extra Events (visibility cutoffs, recurrence, sponsors, venue tie-break) ---")
+
+    cat_holiday_market = get_category(db, "Holiday Markets & Bazaars")
+    cat_festival = get_category(db, "Festivals, Parade & Fair")
+    cat_farmers_market = get_category(db, "Farmers Market")
+    cat_spring = get_category(db, "Spring & Easter")
+    cat_trivia = get_category(db, "Trivia Night")
+    cat_dancing = get_category(db, "Dancing")
+
+    now = datetime.now(timezone.utc)
+
+    # Tie-break with "The Barn at Chatham Mills" business (create_extra_businesses):
+    # Barn Dance Social is hosted there and shares its EXACT coordinates.
+    barn = db.query(PointOfInterest).filter(
+        PointOfInterest.slug == "the-barn-at-chatham-mills-pittsboro"
+    ).first()
+    barn_location = "POINT(-79.1720 35.7245)"
+    barn_id = barn.id if barn else None
+    if not barn:
+        print("  WARNING: 'The Barn at Chatham Mills' not found; Barn Dance Social will have no venue link.")
+
+    wifi_icons = compute_amenity_icons(wifi_options=["Free Wifi"])
+
+    events = [
+        {
+            "name": "Chatham Artisans Holiday Market",
+            "slug": "chatham-artisans-holiday-market-pittsboro",
+            "location": "POINT(-79.1775 35.7210)",
+            "description_short": "A one-day indoor market of Chatham County makers, just in time for holiday shopping.",
+            "description_long": (
+                "Chatham Artisans Holiday Market brings 40+ local makers "
+                "indoors for one Saturday of pottery, woodwork, jewelry, and "
+                "preserves. Hot cider and live acoustic music round out the "
+                "afternoon."
+            ),
+            "teaser_paragraph": "40+ local makers, one Saturday, hot cider included.",
+            "address_street": "365 Renaissance Court",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "365 Renaissance Court, Pittsboro, NC 27312",
+            "category": cat_holiday_market,
+            # Scenario: future single-day event.
+            "event": {
+                "start_datetime": (now + timedelta(days=14)).replace(hour=10, minute=0, second=0, microsecond=0),
+                "end_datetime": (now + timedelta(days=14)).replace(hour=16, minute=0, second=0, microsecond=0),
+                "is_repeating": False,
+                "organizer_name": "Chatham Arts Council",
+                "venue_settings": ["Indoor"],
+            },
+            "cost": "0",
+            "images": {"main": "event1_gallery1"},
+        },
+        {
+            "name": "Pittsboro Farmers Market Pop-Up",
+            "slug": "pittsboro-farmers-market-pop-up-pittsboro",
+            "location": "POINT(-79.1768 35.7212)",
+            "description_short": "A one-time midweek pop-up market on the courthouse lawn, today only.",
+            "description_long": (
+                "A one-time midweek pop-up of the regular Saturday farmers "
+                "market, held on the courthouse lawn for a few hours today "
+                "only, with the same vendors in a smaller footprint."
+            ),
+            "teaser_paragraph": "One-time midweek pop-up, today only.",
+            "address_street": "Courthouse Square",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "Courthouse Square, Pittsboro, NC 27312",
+            "category": cat_farmers_market,
+            # Scenario: started earlier TODAY. Must remain visible per the
+            # start-of-today cutoff even though start_datetime is in the past.
+            "event": {
+                "start_datetime": now - timedelta(hours=3),
+                "end_datetime": now + timedelta(hours=2),
+                "is_repeating": False,
+                "organizer_name": "Downtown Pittsboro Association",
+                "venue_settings": ["Outdoor"],
+            },
+            "cost": "0",
+            "images": {"main": "event2_gallery1"},
+        },
+        {
+            "name": "Spring Chatham Blossom Fest",
+            "slug": "spring-chatham-blossom-fest-pittsboro",
+            "location": "POINT(-79.1900 35.7300)",
+            "description_short": "A now-concluded weekend blossom festival along the Haw River, kept for direct-link testing.",
+            "description_long": (
+                "Spring Chatham Blossom Fest was a weekend celebration of the "
+                "dogwoods and redbuds blooming along the Haw River, with "
+                "guided walks, a plant swap, and a native-plant sale. This "
+                "listing stays published after the fact so past attendees can "
+                "still find it by direct link; it no longer appears in search "
+                "or browse results."
+            ),
+            "teaser_paragraph": "Weekend blossom festival along the Haw River (past).",
+            "address_street": "339 Haw River Road",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "339 Haw River Road, Pittsboro, NC 27312",
+            "category": cat_spring,
+            # Scenario: clearly past. Hidden from browse/search, reachable by link.
+            "event": {
+                "start_datetime": now - timedelta(days=60),
+                "end_datetime": now - timedelta(days=59),
+                "is_repeating": False,
+                "organizer_name": "Chatham Conservation Trust",
+                "venue_settings": ["Outdoor"],
+            },
+            "cost": "0",
+            "images": {"main": "event3_gallery1"},
+        },
+        {
+            "name": "Pittsboro Saturday Farmers Market",
+            "slug": "pittsboro-saturday-farmers-market-pittsboro",
+            "location": "POINT(-79.1772 35.7206)",
+            "description_short": "A weekly Saturday farmers market on the courthouse lawn, running rain or shine, indefinitely.",
+            "description_long": (
+                "Pittsboro Saturday Farmers Market has run every Saturday "
+                "morning for years, with no end date planned. Local produce, "
+                "eggs, flowers, and a rotating lineup of food trucks. Free "
+                "wifi is available at the market info tent, courtesy of the "
+                "Downtown Pittsboro Association."
+            ),
+            "teaser_paragraph": "Weekly Saturday market, produce & food trucks, no end date.",
+            "address_street": "Courthouse Square",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "Courthouse Square, Pittsboro, NC 27312",
+            "category": cat_farmers_market,
+            # Scenario: repeating, open-ended (recurrence_end_date NULL), stored
+            # start_datetime months ago. Must stay visible regardless.
+            "event": {
+                "start_datetime": (now - timedelta(days=200)).replace(hour=8, minute=0, second=0, microsecond=0),
+                "end_datetime": (now - timedelta(days=200)).replace(hour=12, minute=0, second=0, microsecond=0),
+                "is_repeating": True,
+                "repeat_pattern": {"frequency": "weekly", "days": ["saturday"]},
+                "recurrence_end_date": None,
+                "organizer_name": "Downtown Pittsboro Association",
+                "venue_settings": ["Outdoor"],
+            },
+            "cost": "0",
+            "images": {"main": "event1_main"},
+            "wifi_options": ["Free Wifi"],
+            **wifi_icons,
+        },
+        {
+            "name": "Chatham Winter Trivia Nights",
+            "slug": "chatham-winter-trivia-nights-pittsboro",
+            "location": "POINT(-79.1745 35.7230)",
+            "description_short": "A weekly winter trivia series that already wrapped for the season.",
+            "description_long": (
+                "Chatham Winter Trivia Nights ran every Wednesday through the "
+                "winter months. The series has concluded for the season (its "
+                "recurrence end date has passed), so it no longer appears in "
+                "browse or search, though the listing stays up for reference."
+            ),
+            "teaser_paragraph": "Weekly winter trivia series (concluded for the season).",
+            "address_street": "108 East Street",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "108 East Street, Pittsboro, NC 27312",
+            "category": cat_trivia,
+            # Scenario: repeating, recurrence_end_date HAS passed. Hidden.
+            "event": {
+                "start_datetime": (now - timedelta(days=150)).replace(hour=19, minute=0, second=0, microsecond=0),
+                "end_datetime": (now - timedelta(days=150)).replace(hour=21, minute=0, second=0, microsecond=0),
+                "is_repeating": True,
+                "repeat_pattern": {"frequency": "weekly", "days": ["wednesday"]},
+                "recurrence_end_date": now - timedelta(days=20),
+                "organizer_name": "Southern Roots BBQ",
+                "venue_settings": ["Indoor"],
+            },
+            "cost": "0",
+            "images": {"main": "event2_gallery1"},
+        },
+        {
+            "name": "Barn Dance Social",
+            "slug": "barn-dance-social-pittsboro",
+            "location": barn_location,
+            "description_short": "A monthly contra dance at The Barn at Chatham Mills, no partner or experience required.",
+            "description_long": (
+                "Barn Dance Social is a beginner-friendly contra dance held at "
+                "The Barn at Chatham Mills. A live string band and a caller "
+                "walk every dance before the music starts, so no partner or "
+                "experience is needed. Shares the venue's coordinates and "
+                "parking lot."
+            ),
+            "teaser_paragraph": "Beginner-friendly contra dance at The Barn.",
+            "address_street": "480 Hillsboro Street",
+            "address_city": "Pittsboro",
+            "address_state": "NC",
+            "address_zip": "27312",
+            "address_county": "Chatham County",
+            "address_full": "480 Hillsboro Street, Pittsboro, NC 27312",
+            "category": cat_dancing,
+            # Scenario: two published POIs at the EXACT same coordinates (this
+            # event + its venue business) for the nearby ordering tie-break.
+            "event": {
+                "start_datetime": (now + timedelta(days=21)).replace(hour=18, minute=0, second=0, microsecond=0),
+                "end_datetime": (now + timedelta(days=21)).replace(hour=23, minute=0, second=0, microsecond=0),
+                "is_repeating": False,
+                "organizer_name": "Chatham Contra Dance Collective",
+                "venue_settings": ["Indoor"],
+                "venue_poi_id": barn_id,
+            },
+            "cost": "$10",
+            "images": {"main": "event3_gallery1"},
+        },
+    ]
+
+    for e in events:
+        existing = db.query(PointOfInterest).filter(
+            PointOfInterest.slug == e["slug"]
+        ).first()
+        if existing:
+            print(f"  Skipping (exists): {e['name']}")
+            continue
+
+        evt_data = e["event"]
+        poi = PointOfInterest(
+            poi_type=POIType.EVENT,
+            name=e["name"],
+            slug=e["slug"],
+            listing_type="community_comped",
+            publication_status="published",
+            is_verified=True,
+            status="Fully Open",
+            location=e["location"],
+            description_short=e["description_short"],
+            description_long=e["description_long"],
+            teaser_paragraph=e.get("teaser_paragraph"),
+            address_street=e["address_street"],
+            address_city=e["address_city"],
+            address_state=e["address_state"],
+            address_zip=e["address_zip"],
+            address_county=e["address_county"],
+            address_full=e["address_full"],
+            cost=e.get("cost"),
+            wifi_options=e.get("wifi_options"),
+            accessible_restroom=e.get("accessible_restroom", False),
+            icon_free_wifi=e.get("icon_free_wifi", False),
+            icon_pet_friendly=e.get("icon_pet_friendly", False),
+            icon_public_restroom=e.get("icon_public_restroom", False),
+            icon_wheelchair_accessible=e.get("icon_wheelchair_accessible", False),
+        )
+        poi.event = Event(
+            start_datetime=evt_data["start_datetime"],
+            end_datetime=evt_data.get("end_datetime"),
+            is_repeating=evt_data.get("is_repeating", False),
+            repeat_pattern=evt_data.get("repeat_pattern"),
+            recurrence_end_date=evt_data.get("recurrence_end_date"),
+            organizer_name=evt_data.get("organizer_name"),
+            venue_settings=evt_data.get("venue_settings"),
+            venue_poi_id=evt_data.get("venue_poi_id"),
+        )
+        db.add(poi)
+        db.flush()
+
+        if e.get("category"):
+            db.execute(poi_category_association.insert().values(
+                poi_id=poi.id, category_id=e["category"].id, is_main=True
+            ))
+
+        imgs = e["images"]
+        attach_image(db, poi.id, ImageType.main, imgs["main"], alt_text=f"{e['name']} event photo")
+
+        db.commit()
+        print(f"  Created: {e['name']} (slug: {poi.slug})")
+
+    # Chatham Piedmont Storytelling Festival: separate from the loop above
+    # because it needs its POI id before it can attach sponsor logo images.
+    # Scenario: multi-day event currently ongoing, PLUS sponsors (one with an
+    # image-backed logo, one manual entry with no logo).
+    festival_slug = "chatham-piedmont-storytelling-festival-pittsboro"
+    existing_festival = db.query(PointOfInterest).filter(
+        PointOfInterest.slug == festival_slug
+    ).first()
+    if existing_festival:
+        print("  Skipping (exists): Chatham Piedmont Storytelling Festival")
+        return
+
+    festival = PointOfInterest(
+        poi_type=POIType.EVENT,
+        name="Chatham Piedmont Storytelling Festival",
+        slug=festival_slug,
+        listing_type="community_comped",
+        publication_status="published",
+        is_verified=True,
+        status="Fully Open",
+        location="POINT(-79.2050 35.7080)",
+        description_short="A three-day storytelling festival currently underway, with tellers from across the Piedmont.",
+        description_long=(
+            "Chatham Piedmont Storytelling Festival gathers tellers from "
+            "across the NC Piedmont for three days of ghost stories, tall "
+            "tales, and family-friendly matinees under a big top tent. Local "
+            "sponsors keep admission low for families."
+        ),
+        teaser_paragraph="Three days of tellers under a big top tent, happening now.",
+        address_street="1439 Henderson Tanyard Road",
+        address_city="Pittsboro",
+        address_state="NC",
+        address_zip="27312",
+        address_county="Chatham County",
+        address_full="1439 Henderson Tanyard Road, Pittsboro, NC 27312",
+        cost="$15",
+    )
+    db.add(festival)
+    db.flush()
+
+    if cat_festival:
+        db.execute(poi_category_association.insert().values(
+            poi_id=festival.id, category_id=cat_festival.id, is_main=True
+        ))
+
+    attach_image(db, festival.id, ImageType.main, "event3_main", alt_text="Chatham Piedmont Storytelling Festival")
+
+    sponsor_1_id = "sp-bank"
+    sponsor_logo_img = attach_image(
+        db, festival.id, ImageType.sponsor_logo, "store_gallery1",
+        alt_text="Chatham Bank & Trust logo", image_context=f"sponsor_{sponsor_1_id}",
+    )
+    sponsors = [
+        {
+            "_id": sponsor_1_id,
+            "name": "Chatham Bank & Trust",
+            "url": "https://chathambank.example.com",
+            "logo_url": sponsor_logo_img.storage_url if sponsor_logo_img else "",
+            "logo_image_id": str(sponsor_logo_img.id) if sponsor_logo_img else None,
+            "tier": "Gold",
+        },
+        {
+            "_id": "sp-hardware",
+            "name": "Pittsboro Hardware Co.",
+            "url": "https://pittsborohardware.example.com",
+            "logo_url": "",
+            "logo_image_id": None,
+            "tier": "Silver",
+        },
+    ]
+
+    festival.event = Event(
+        start_datetime=(now - timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0),
+        end_datetime=(now + timedelta(days=2)).replace(hour=21, minute=0, second=0, microsecond=0),
+        is_repeating=False,
+        organizer_name="Shakori Hills Community Arts Center",
+        venue_settings=["Outdoor"],
+        has_vendors=True,
+        vendor_types=["Food", "Crafts"],
+        sponsors=sponsors,
+    )
+    db.flush()
+    db.commit()
+    print(f"  Created: Chatham Piedmont Storytelling Festival (slug: {festival.slug})")
+
+
+def create_parking_lots(db: Session):
+    """Shareable parking lots (issues #90/#161): one owned by a business, one
+    standalone lot shared by two POIs with sort_order + a label, and one draft
+    standalone lot linked from a POI that must NOT appear in a public read.
+
+    Guarded: parking_lots / poi_parking_links may not exist yet on every local
+    dev DB (migration x_parking_lots_001), so a missing-table failure here is
+    caught and reported instead of aborting the rest of the seed.
+    """
+    print("\n--- Parking Lots (owned, standalone shared, draft standalone) ---")
+    try:
+        barn = db.query(PointOfInterest).filter(
+            PointOfInterest.slug == "the-barn-at-chatham-mills-pittsboro"
+        ).first()
+        park = db.query(PointOfInterest).filter(
+            PointOfInterest.slug == "bear-creek-nature-park-pittsboro"
+        ).first()
+        trail = db.query(PointOfInterest).filter(
+            PointOfInterest.slug == "bear-creek-loop-trail-pittsboro"
+        ).first()
+        outfitters = db.query(PointOfInterest).filter(
+            PointOfInterest.slug == "chatham-trailhead-outfitters-pittsboro"
+        ).first()
+
+        if not all([barn, park, trail, outfitters]):
+            print("  Skipping: one or more owning POIs not found (run the earlier seed steps first).")
+            return
+
+        # Lot A: owned by a business, linked back to that same business.
+        lot_a_name = "The Barn at Chatham Mills Overflow Lot"
+        lot_a = db.query(ParkingLot).filter(ParkingLot.name == lot_a_name).first()
+        if lot_a:
+            print(f"  Skipping (exists): {lot_a_name}")
+        else:
+            lot_a = ParkingLot(
+                owner_poi_id=barn.id,
+                name=lot_a_name,
+                parking_types=["Dedicated On-Site Parking Lot"],
+                notes="Gravel overflow field behind the barn, opened for larger events.",
+                geom="POINT(-79.1722 35.7243)",
+                expect_to_pay="no",
+                publication_status="published",
+            )
+            db.add(lot_a)
+            db.flush()
+            sync_parking_links(db, barn.id, [
+                {"parking_lot_id": str(lot_a.id), "sort_order": 0, "label": None},
+            ])
+            db.commit()
+            print(f"  Created: {lot_a_name} (owned by {barn.name})")
+
+        # Lot B: standalone, published, linked from TWO POIs with sort_order + label.
+        lot_b_name = "Bear Creek Trailhead Public Lot"
+        lot_b = db.query(ParkingLot).filter(ParkingLot.name == lot_b_name).first()
+        if lot_b:
+            print(f"  Skipping (exists): {lot_b_name}")
+        else:
+            lot_b = ParkingLot(
+                owner_poi_id=None,
+                name=lot_b_name,
+                parking_types=["Dedicated On-Site Parking Lot", "Bike Rack + Bicycle Parking"],
+                accessible_parking_details=["Dedicated accessible parking spaces on site"],
+                notes="Gravel lot shared by the park and the loop trail.",
+                geom="POINT(-79.2205 35.6945)",
+                expect_to_pay="no",
+                publication_status="published",
+            )
+            db.add(lot_b)
+            db.flush()
+            sync_parking_links(db, park.id, [
+                {"parking_lot_id": str(lot_b.id), "sort_order": 0, "label": "Main trailhead lot"},
+            ])
+            sync_parking_links(db, trail.id, [
+                {"parking_lot_id": str(lot_b.id), "sort_order": 0, "label": "Trail parking, arrive early on weekends"},
+            ])
+            db.commit()
+            print(f"  Created: {lot_b_name} (linked from park + trail)")
+
+        # Lot C: standalone, DRAFT - linked from one POI but must not show publicly.
+        lot_c_name = "Downtown Pittsboro Overflow Lot (Coming Soon)"
+        lot_c = db.query(ParkingLot).filter(ParkingLot.name == lot_c_name).first()
+        if lot_c:
+            print(f"  Skipping (exists): {lot_c_name}")
+        else:
+            lot_c = ParkingLot(
+                owner_poi_id=None,
+                name=lot_c_name,
+                parking_types=["Dedicated On-Site Parking Lot"],
+                notes="Planned overflow lot, not yet open to the public.",
+                publication_status="draft",
+            )
+            db.add(lot_c)
+            db.flush()
+            sync_parking_links(db, outfitters.id, [
+                {"parking_lot_id": str(lot_c.id), "sort_order": 0, "label": None},
+            ])
+            db.commit()
+            print(f"  Created: {lot_c_name} (draft - linked but not public)")
+
+    except Exception as exc:
+        db.rollback()
+        print(f"  WARNING: Skipping parking lots - tables may not exist yet ({exc})")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -882,23 +1795,35 @@ def main():
 
     db = SessionLocal()
     try:
-        print("\n[1/6] Ensuring test user...")
+        print("\n[1/10] Ensuring test user...")
         ensure_test_user(db)
 
-        print("\n[2/6] Ensuring categories...")
+        print("\n[2/10] Ensuring categories...")
         ensure_categories(db)
 
-        print("\n[3/6] Creating businesses...")
+        print("\n[3/10] Creating businesses...")
         create_businesses(db)
 
-        print("\n[4/6] Creating parks...")
+        print("\n[4/10] Creating parks...")
         create_parks(db)
 
-        print("\n[5/6] Creating trails...")
+        print("\n[5/10] Creating trails...")
         create_trails(db)
 
-        print("\n[6/6] Creating events...")
+        print("\n[6/10] Creating events...")
         create_events(db)
+
+        print("\n[7/10] Creating extra businesses (hours, holidays, amenities, location privacy)...")
+        create_extra_businesses(db)
+
+        print("\n[8/10] Creating extra park & trail (restroom locations, shared parking)...")
+        create_extra_parks_and_trails(db)
+
+        print("\n[9/10] Creating extra events (visibility cutoffs, recurrence, sponsors, venue tie-break)...")
+        create_extra_events(db)
+
+        print("\n[10/10] Creating parking lots...")
+        create_parking_lots(db)
 
         # Summary
         total = db.query(PointOfInterest).filter(
