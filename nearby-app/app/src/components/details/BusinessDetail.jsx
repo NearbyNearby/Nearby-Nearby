@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import {
-  AccSection, ContentGroup, ChipList, QuickInfoRow,
+  AccSection, ContentGroup, ChipList, CategoryChipList, QuickInfoRow,
   POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox, SocialLinksGroup, hasSocialLinks,
   hasVal, asArray, getImages,
 } from './shared';
@@ -11,6 +11,7 @@ import { SvgDirections, SvgLatLong } from './PoiHeader';
 import { LocalBusinessJsonLd } from '../seo/index';
 import DirectionsModal from '../common/DirectionsModal';
 
+import { Copy, Check, Globe, Phone } from 'lucide-react';
 import { getOpenCloseStatusLabel } from '../../utils/hoursUtils';
 import { getDisplayableLocation } from '../../utils/getDisplayableLocation';
 import { copyToClipboard, getCoordinates } from './shared/poiDetailUtils';
@@ -30,6 +31,10 @@ const IDEAL_FOR_GROUPS = [
 
 export default function BusinessDetail({ poi }) {
   const [directionsOpen, setDirectionsOpen] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copiedCoords, setCopiedCoords] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
 
   const displayLoc = getDisplayableLocation(poi);
   const hideExact = displayLoc.hideExact;
@@ -63,13 +68,13 @@ export default function BusinessDetail({ poi }) {
         if (Array.isArray(v)) v.forEach((x) => hasVal(x) && out.push(typeof x === 'object' ? (x.name || x.label || '') : String(x)));
       });
     }
-    // Server-computed icon booleans (same labels AmenityPillStrip paints on
-    // the other detail pages' amenity boxes).
+    // Server-computed icon booleans, shown as plain-text pills alongside the rest.
     if (poi?.icon_public_restroom) out.push('Public Restroom');
     if (poi?.icon_free_wifi) out.push('Wi-Fi Access');
     if (poi?.icon_wheelchair_accessible) out.push('Wheelchair Accessible');
     if (poi?.icon_pet_friendly) out.push('Pet Friendly');
-    if (poi?.playground_available) out.push('Playgrounds');
+    if (poi?.playground_available || (Array.isArray(poi?.playground_types) && poi.playground_types.length > 0)) out.push('Playgrounds');
+    if (Array.isArray(poi?.parking_types) && poi.parking_types.length > 0) out.push('Parking Facilities');
     return Array.from(new Set(out.filter(Boolean)));
   }, [poi]);
 
@@ -97,11 +102,13 @@ export default function BusinessDetail({ poi }) {
   const aboutCol1 = [
     hasVal(poi?.teaser_paragraph) && <ContentGroup key="teaser"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.teaser_paragraph) }} /></ContentGroup>,
     hasVal(poi?.description_long) && <ContentGroup key="desc"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_long) }} /></ContentGroup>,
-    Array.isArray(poi?.categories) && poi.categories.length > 0 && <ContentGroup key="cats" title="Categories"><ChipList items={poi.categories.map((c) => c.name || c.label || '')} /></ContentGroup>,
     goodForLabel && (
       <ContentGroup key="ideal" title="Ideal For">
         <ChipList items={(() => { const parts = []; IDEAL_FOR_GROUPS.forEach(({ key }) => { const arr = poi?.ideal_for?.[key]; if (Array.isArray(arr)) parts.push(...arr); }); return parts; })()} />
       </ContentGroup>
+    ),
+    Array.isArray(poi?.categories) && poi.categories.length > 0 && (
+      <ContentGroup key="cats" title="Categories"><CategoryChipList categories={poi.categories} /></ContentGroup>
     ),
   ].filter(Boolean);
 
@@ -116,6 +123,27 @@ export default function BusinessDetail({ poi }) {
     ),
   ].filter(Boolean);
 
+  const handleCopyAddress = async () => {
+    if (!addressLine) return;
+    if (await copyToClipboard(addressLine)) {
+      setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2000);
+    }
+  };
+  const handleCopyCoords = async () => {
+    if (!coords) return;
+    if (await copyToClipboard(`${coords.lat}, ${coords.lng}`)) {
+      setCopiedCoords(true); setTimeout(() => setCopiedCoords(false), 2000);
+    }
+  };
+  const handleCopyPhone = async () => {
+    if (!poi?.phone_number) return;
+    if (await copyToClipboard(poi.phone_number)) { setCopiedPhone(true); setTimeout(() => setCopiedPhone(false), 2000); }
+  };
+  const handleCopyEmail = async () => {
+    if (!poi?.email) return;
+    if (await copyToClipboard(poi.email)) { setCopiedEmail(true); setTimeout(() => setCopiedEmail(false), 2000); }
+  };
+
   const addrCol1 = !hideExact && (addressLine || coords) ? [(
     <ContentGroup key="addr" title="Address">
       <div className="acc_content_text">
@@ -124,9 +152,14 @@ export default function BusinessDetail({ poi }) {
           <button type="button" className="btn_reset button btn_outline_teal btn_poi_button_1" onClick={() => setDirectionsOpen(true)}>
             <SvgDirections /> <span className="poi_button_title">Directions</span>
           </button>
+          {addressLine && (
+            <button type="button" className="btn_reset button btn_outline_teal btn_poi_button_1" onClick={handleCopyAddress}>
+              {copiedAddress ? <Check size={14} /> : <Copy size={14} />} <span className="poi_button_title">{copiedAddress ? 'Copied!' : 'Copy Address'}</span>
+            </button>
+          )}
           {coords && (
-            <button type="button" className="btn_reset button btn_outline_teal btn_poi_button_1" onClick={async () => { await copyToClipboard(`${coords.lat}, ${coords.lng}`); }}>
-              <SvgLatLong /> <span className="poi_button_title">Lat + Long</span>
+            <button type="button" className="btn_reset button btn_outline_teal btn_poi_button_1" onClick={handleCopyCoords}>
+              {copiedCoords ? <Check size={14} /> : <SvgLatLong />} <span className="poi_button_title">{copiedCoords ? 'Copied!' : 'Lat + Long'}</span>
             </button>
           )}
         </div>
@@ -208,8 +241,12 @@ export default function BusinessDetail({ poi }) {
     hasVal(poi?.mobility_access) && <ContentGroup key="ma" title="Mobility Access"><ChipList items={Array.isArray(poi.mobility_access) ? poi.mobility_access : Object.keys(poi.mobility_access).filter((k) => poi.mobility_access[k] === true)} /></ContentGroup>,
   ].filter(Boolean);
 
-  const petCol1 = [hasVal(poi?.pet_options) && <ContentGroup key="pets" title="Pet Policy"><ChipList items={poi.pet_options} /></ContentGroup>].filter(Boolean);
-  const petCol2 = [hasVal(poi?.pet_options) && <ContentGroup key="sa"><ServiceAnimalAlert /></ContentGroup>].filter(Boolean);
+  const petCol1 = [
+    hasVal(poi?.pet_options) && <ContentGroup key="pets" title="Pet Policy"><ChipList items={poi.pet_options} /></ContentGroup>,
+    hasVal(poi?.pet_policy) && <ContentGroup key="pp"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pet_policy) }} /></ContentGroup>,
+    hasVal(poi?.pet_options) && <ContentGroup key="sa"><ServiceAnimalAlert /></ContentGroup>,
+  ].filter(Boolean);
+  const petCol2 = [];
 
   const playgroundCol1 = [
     hasVal(poi?.playground_types) && <ContentGroup key="pt" title="Playground Types"><ChipList items={poi.playground_types} /></ContentGroup>,
@@ -222,11 +259,37 @@ export default function BusinessDetail({ poi }) {
   ].filter(Boolean);
 
   const contactCol1 = [
-    phoneHref && <ContentGroup key="phone" title="Phone"><div className="acc_list_group_1"><a href={phoneHref}>{poi.phone_number}</a></div></ContentGroup>,
-    webHref && <ContentGroup key="web" title="Website"><div className="acc_list_group_1"><a href={webHref} target="_blank" rel="noreferrer">Visit Website</a></div></ContentGroup>,
+    phoneHref && (
+      <ContentGroup key="phone" title="Phone">
+        <div className="acc_list_group_1 poi_contact_row">
+          <Phone size={16} />
+          <a href={phoneHref}>{poi.phone_number}</a>
+          <button type="button" className="btn_reset poi_contact_copy_btn" onClick={handleCopyPhone}>
+            {copiedPhone ? <Check size={14} /> : <Copy size={14} />} {copiedPhone ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      </ContentGroup>
+    ),
+    webHref && (
+      <ContentGroup key="web" title="Website">
+        <div className="acc_list_group_1 poi_contact_row">
+          <Globe size={16} />
+          <a href={webHref} target="_blank" rel="noreferrer">Visit {poi.name} Website</a>
+        </div>
+      </ContentGroup>
+    ),
   ].filter(Boolean);
   const contactCol2 = [
-    hasVal(poi?.email) && <ContentGroup key="email" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>,
+    hasVal(poi?.email) && (
+      <ContentGroup key="email" title="Email">
+        <div className="acc_list_group_1 poi_contact_row">
+          <a href={`mailto:${poi.email}`}>{poi.email}</a>
+          <button type="button" className="btn_reset poi_contact_copy_btn" onClick={handleCopyEmail}>
+            {copiedEmail ? <Check size={14} /> : <Copy size={14} />} {copiedEmail ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      </ContentGroup>
+    ),
     hasSocialLinks(poi) && <SocialLinksGroup key="soc" poi={poi} />,
   ].filter(Boolean);
 
@@ -245,7 +308,7 @@ export default function BusinessDetail({ poi }) {
     { key: 'alc', title: 'Alcohol + Smoking', open: false, col1: alcSmokCol1, col2: alcSmokCol2 },
     { key: 'rest', title: 'Public Restrooms', open: false, col1: restroomCol1, col2: restroomCol2 },
     { key: 'wc', title: 'Wheelchair Accessible', open: false, col1: wheelchairCol1, col2: wheelchairCol2 },
-    { key: 'pet', title: 'Pet Policy', open: false, col1: petCol1, col2: petCol2 },
+    { key: 'pet', title: 'Pet Policy', open: false, col1: petCol1, col2: petCol2, singleColumn: true },
     { key: 'play', title: 'Playground', open: false, col1: playgroundCol1, col2: playgroundCol2 },
     { key: 'contact', title: 'Contact', open: false, col1: contactCol1, col2: contactCol2 },
   ];
@@ -259,6 +322,7 @@ export default function BusinessDetail({ poi }) {
       statusVariant={_statusVariant || undefined}
       statusLabel={_statusLabel}
       seoComponent={<LocalBusinessJsonLd poi={poi} />}
+      hideStatus
     >
       {({ images: imgs, openLightbox }) => (
         <>
@@ -277,15 +341,15 @@ export default function BusinessDetail({ poi }) {
             onOpenLightbox={openLightbox}
           />
 
-          {amenitiesFlat.length > 0 && (
-            <AmenitiesBox title="Amenities" amenitiesList={amenitiesFlat} />
-          )}
+          <AmenitiesBox title="Amenities" amenitiesList={amenitiesFlat} />
 
           {sections.length > 0 && (
             <div id="accordion_1_box" className="poi_accordion_box">
               <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
                 {sections.map((s) => (
-                  <AccSection key={s.key} title={s.title} defaultOpen={false} col1={s.col1.length > 0 ? s.col1 : null} col2={s.col2.length > 0 ? s.col2 : null} />
+                  s.singleColumn
+                    ? <AccSection key={s.key} title={s.title} defaultOpen={false}>{s.col1}</AccSection>
+                    : <AccSection key={s.key} title={s.title} defaultOpen={false} col1={s.col1.length > 0 ? s.col1 : null} col2={s.col2.length > 0 ? s.col2 : null} />
                 ))}
               </div>
             </div>

@@ -19,6 +19,7 @@ class PointGeometry(BaseModel):
 class Category(BaseModel):
     id: uuid.UUID
     name: str
+    slug: str
     model_config = ConfigDict(from_attributes=True)
 
 # --- Sub-Type Schemas ---

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 
 import NearbySection from '../../nearby-feature/NearbySection';
 import PhotoLightbox from '../PhotoLightbox';
-import HeroBanner from '../HeroBanner';
 import SuggestEditOverlay from '../SuggestEditOverlay';
 import PoiHeader from '../PoiHeader';
 import AccordionGroup from './AccordionGroup';
@@ -26,11 +25,12 @@ export default function POIDetailLayout({
   extraButtons,
   titleLeader,
   subtitleExtras,
-  showHero = true,
+  typeInfoBox,
   children,
   seoComponent,
   beforeHeader,
   afterMain,
+  hideStatus,
 }) {
   const [copiedCoords, setCopiedCoords] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -87,7 +87,6 @@ export default function POIDetailLayout({
   return (
     <div className="poi_detail_page">
       {seoComponent}
-      {showHero && <HeroBanner poi={poi} />}
 
       <div id="search_back_wrapper">
         <div id="show_back_or_breadcrumbs" className="wrapper_default">
@@ -124,6 +123,8 @@ export default function POIDetailLayout({
         extraButtons={extraButtons}
         titleLeader={titleLeader}
         subtitleExtras={subtitleExtras}
+        typeInfoBox={typeInfoBox}
+        hideStatus={hideStatus}
       />
 
       <main id="main_content" className="pb50px">

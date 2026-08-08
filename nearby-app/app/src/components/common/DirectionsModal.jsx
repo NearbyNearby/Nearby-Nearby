@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { getAmenities } from '../nearby-feature/NearbyCard';
+import { getEventScheduleLine } from '../../utils/eventSchedule';
 
 /**
  * DirectionsModal — shared controlled component for the directions picker.
@@ -21,12 +23,17 @@ export default function DirectionsModal({ isOpen, onClose, poiName, coords, poi 
 
   const dontDisplay = poi?.dont_display_location;
 
+  const isEvent = poi?.poi_type?.toLowerCase() === 'event';
+  const eventScheduleLine = isEvent ? getEventScheduleLine(poi?.event || poi) : null;
+
   const primaryCategory =
     poi?.main_category?.name ||
     poi?.categories?.find(c => c.is_main)?.category?.name ||
     poi?.categories?.[0]?.category?.name ||
     poi?.categories?.[0]?.name ||
     null;
+
+  const amenities = poi ? getAmenities(poi) : [];
 
   /* ── URL builders ── */
   const buildUrl = (service) => {
@@ -103,8 +110,27 @@ export default function DirectionsModal({ isOpen, onClose, poiName, coords, poi 
 
         <h3 className="directions-modal__title">{poiName}</h3>
 
+        {eventScheduleLine && (
+          <p className="directions-modal__date">{eventScheduleLine}</p>
+        )}
+
         {primaryCategory && (
           <p className="directions-modal__category">{primaryCategory}</p>
+        )}
+
+        {amenities.length > 0 && (
+          <div className="one_search_map_result_type_amenities_group" aria-label="Amenities">
+            {amenities.map((amenity) => (
+              <span
+                key={amenity.key}
+                className="one_search_amenity_icon"
+                title={amenity.title}
+                aria-label={amenity.title}
+              >
+                {amenity.icon}
+              </span>
+            ))}
+          </div>
         )}
 
         {/* Address display — show city/state only when exact is hidden */}

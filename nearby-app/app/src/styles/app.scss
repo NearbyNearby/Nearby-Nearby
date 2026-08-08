@@ -103,6 +103,19 @@ $nn_gold_hover:   #fdb93e;
 $nn_gold_soft:    #fef8e5;
 $nn_purple_soft:  #f3e8f3;
 
+// ── Trail difficulty badge colors (nearby-card__trail-difficulty) — placeholder values, Barry to tune for AAA contrast ──
+$trail_difficulty_easy_bg:        #ffffff;
+$trail_difficulty_easy_border:    #65af20;
+$trail_difficulty_easy_text:      $green;
+
+$trail_difficulty_moderate_bg:      #ffffff;
+$trail_difficulty_moderate_border:  $orange;
+$trail_difficulty_moderate_text:    #8A4700;
+
+$trail_difficulty_hard_bg:        #ffffff;
+$trail_difficulty_hard_border:    $red;
+$trail_difficulty_hard_text:      $red2;
+
 // ── Font stacks ──────────────────────────────────────────────────
 $font_sansserif:        Arial, Helvetica, sans-serif;
 $font_serif:            'Times New Roman', Georgia, Times, serif;
@@ -142,8 +155,8 @@ $dropdown-bg-mobile: #ffffff;
 
 $menu-bg-desktop: $nn_gold;
 $menu-text-desktop: black;
-$menu-hover-bg-desktop: tomato;
-$menu-active-bg-desktop: red;
+$menu-hover-bg-desktop: $nn_gold;
+$menu-active-bg-desktop: $nn_gold;
 $dropdown-bg-desktop: $nn_gold;
 
 
@@ -346,9 +359,6 @@ article, aside, details, figcaption, figure, footer, header, main, nav, section 
 /* Template base reset: inputs/buttons inherit font (size + family). */
 input, button, textarea, select {
   font: inherit;
-  /* merged from duplicate at original line 850 */
-    font: inherit;
-
 }
 
 
@@ -3487,13 +3497,8 @@ section,
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-
-  /* merged from duplicate at original line 3442 */
-  display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   padding: 8px;
-
 }
 
 
@@ -3939,30 +3944,12 @@ section,
   @media (min-width: 1200px) {
     text-align: left;
   }
-  /* merged from duplicate at original line 14938 */
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-gap: 5px;
-  justify-content: flex-start;
-  align-items: center;
-  padding: 20px;
-  text-align: center;
-
-  @media(min-width: 1200px) {
-    text-align: left;
-  }
 }
 
 .map_result_single_style_1 .one_search_map_result_amenities {
   justify-content: center;
 
   @media (min-width: 1200px) {
-    justify-content: left;
-  }
-  /* merged from duplicate at original line 14952 */
-  justify-content: center;
-
-  @media(min-width: 1200px) {
     justify-content: left;
   }
 }
@@ -3985,18 +3972,6 @@ section,
   @media (min-width: 1200px) {
     justify-content: flex-start;
   }
-  /* merged from duplicate at original line 14960 */
-  display: flex;
-  flex-wrap: wrap;
-  grid-gap: 3px;
-  justify-content: center;
-  align-items: center;
-  color: $nn_teal1;
-  font-size: 90%;
-
-  @media(min-width: 1200px) {
-    justify-content: flex-start;
-  }
 }
 
 .map_result_single_title {
@@ -4011,20 +3986,9 @@ section,
   @media (min-width: 2400px) {
     font-size: 21px;
   }
-  /* merged from duplicate at original line 14974 */
-  font-family: $font_poppins;
-  font-weight: 600;
-  font-size: 19px;
-  line-height: 1;
-
-  @media(min-width: 1600px) { font-size: 20px; }
-  @media(min-width: 2400px) { font-size: 21px; }
 }
 
 .map_result_single_category {
-  font-size: 90%;
-
-  /* merged from duplicate at original line 14984 */
   font-size: 90%;
 }
 
@@ -4481,10 +4445,6 @@ section,
 }
 .icon_pinterest {
   background-color: $color_pinterest;
-
-  /* merged from duplicate at original line 4408 */
-  background-color: $color_pinterest;
-
 }
 .icon_youtube {
   background-color: $color_youtube;
@@ -5587,47 +5547,21 @@ section,
         padding: 12px 20px;
         // REMOVED: padding-right: 50px; - Don't apply to all
         white-space: nowrap;
-        color: white !important;
+        color: $nn_dark !important;
         font-size: 17px;
     }
     @media(min-width:1400px) {
-        
+
     }
     @media(min-width:1600px) {
         font-size: 18px;
     }
     @media(min-width:1900px) {
-        
+
     }
     @media(min-width:2400px) {
         font-size: 19px;
     }
-  /* merged from duplicate at original line 5716 */
-
-  @media(min-width:600px) {
-    
-  }
-  @media(min-width:700px) {
-    
-  }
-  @media(min-width:980px) {
-    
-  }
-  @media(min-width:1200px) {
-        color: $nn_dark !important;
-  }
-  @media(min-width:1400px) {
-    
-  }
-  @media(min-width:1600px) {
-    
-  }
-  @media(min-width:1900px) {
-    
-  }
-  @media(min-width:2400px) {
-    
-  }
 }
 
 // ONLY submenu items with buttons need the extra padding
@@ -5963,8 +5897,8 @@ section,
     
   }
   @media(min-width:1200px) {
-        left: auto;
-        right: 0;
+    left: auto;
+    right: 0;
   }
   @media(min-width:1400px) {
     
@@ -7916,11 +7850,8 @@ body.overlay_lock {
   justify-content: center;
   align-items: center;
   padding-left: 5%;
-  /* merged from duplicate at original line 11959 */
-display: flex;
-align-items: center;
-color: $nn_slate;
-transition: transform .2s;
+  color: $nn_slate;
+  transition: transform .2s;
 }
 .acc_toggle_icon {
   display: block;
@@ -8315,15 +8246,15 @@ transition: transform .2s;
 }
 
 .popup-content {
-  padding: 12px 14px;
+  padding: 7px 20px 7px 10px;
 }
 
 .popup-content strong {
   display: block;
   color: $nn_dark;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
-  margin-bottom: 4px;
+  // margin-bottom: 4px;
   line-height: 1.3;
 }
 
@@ -8336,28 +8267,36 @@ transition: transform .2s;
   margin: 4px 0 0;
 }
 
-.popup-distance {
-  color: $nn_teal2;
-  font-size: 12px;
-  font-weight: 600;
-  margin: 4px 0;
-}
+// .popup-distance {
+//   color: $nn_teal2;
+//   font-size: 12px;
+//   font-weight: 600;
+//   margin: 4px 0;
+// }
 
-.popup-city {
-  color: $nn_gray;
-  font-size: 11px;
-  margin: 4px 0 0;
-}
+// .popup-city {
+//   color: $nn_gray;
+//   font-size: 11px;
+//   margin: 4px 0 0;
+// }
 
 .leaflet-popup-tip-container {
-  display: none;
+  display: block;
 }
 
 .leaflet-popup-close-button {
-  color: $nn_gray !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  top: 0 !important;
+  right: 0 !important;
+  color: $red2 !important;
   font-size: 18px !important;
-  padding: 6px 10px !important;
+  // padding: 6px 10px !important;
   font-weight: 600 !important;
+  // background-color: pink !important;
+  height: 48px !important;
+  width: 48px !important;
 }
 
 .leaflet-popup-close-button:hover {
@@ -9261,7 +9200,7 @@ transition: transform .2s;
   flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
-
+  
   @media(min-width:600px) {
     
   }
@@ -9286,11 +9225,7 @@ transition: transform .2s;
   @media(min-width:2400px) {
     
   }
-  /* merged from duplicate at original line 13255 */
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
+  
 }
 
 .poi_verified_badge  {
@@ -9321,13 +9256,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13262 */
-  background-color: transparent !important;
-  color: $nn_dark !important;
-  padding: 15px 20px 15px 0 !important;
-  // border: 1px solid $green2 !important;
 }
 
 .poi_verified_badge_title {
@@ -9358,13 +9288,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13269 */
-  font-weight: 600;
-  text-transform: none !important;
-  letter-spacing: 0;
-  font-size: 1.2em;
 }
 
 #poi_verified_tooltip {
@@ -9468,11 +9393,12 @@ transition: transform .2s;
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 0.9rem;
+  font-size: 0.9em;
+
   padding: 4px 0;
-  @media (max-width: 600px) {
-    font-size: 0.85rem;
-  }
+  // @media (max-width: 600px) {
+  //   font-size: 0.85rem;
+  // }
 }
 
 
@@ -9487,7 +9413,7 @@ transition: transform .2s;
 }
 
 .hours-display__day-row--modified {
-  color: #0d6efd;
+  color: $blue;
 }
 
 .hours-display__day-label {
@@ -9506,9 +9432,10 @@ transition: transform .2s;
 }
 
 .hours-display__day-note {
-  font-size: 0.8rem;
-  color: #0d6efd;
-  font-style: italic;
+  // font-size: 0.8rem;
+  display: block;
+  color: $blue;
+  // font-style: italic;
 }
 
 /* General hour notes */
@@ -9548,16 +9475,19 @@ transition: transform .2s;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  font-size: 0.9em;
 }
 
 .hours-display__holiday-row {
   display: grid;
-  grid-template-columns: 40px 1fr auto auto;
+  grid-template-columns: 100px 165px 125px auto 1fr;
   gap: 8px;
   align-items: center;
-  font-size: 0.875rem;
+  justify-content: flex-start;
+  // font-size: 0.875rem;
   padding: 6px 0;
   border-bottom: 1px solid $gray3;
+  
   @media (max-width: 600px) {
     grid-template-columns: 35px 1fr;
     grid-template-rows: auto auto;
@@ -9571,14 +9501,16 @@ transition: transform .2s;
 }
 
 .hours-display__holiday-prefix {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #0d6efd;
+  // font-size: 0.75rem;
+  font-weight: 700;
+  color: $nn_purple1;
+
   text-transform: uppercase;
+  
   @media (max-width: 600px) {
     grid-row: 1 / 3;
     align-self: start;
-    padding-top: 2px;
+    // padding-top: 2px;
   }
 }
 
@@ -9593,18 +9525,36 @@ transition: transform .2s;
 
 
 .hours-display__holiday-date {
-  font-size: 0.8rem;
-  color: $nn_gray;
+  // font-size: 0.8rem;
+  // color: $nn_purple1;
   white-space: nowrap;
 }
 
 .hours-display__holiday-status {
   font-size: 0.8rem;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 12px;
-  background-color: $gray3;
+  background-color: #ffffff;
   color: $nn_slate;
+  border: 1px solid $grayB;
   white-space: nowrap;
+}
+
+.hours-display__holiday-status--closed {
+  color: $red2;
+  border-color: $red;
+}
+
+.hours-display__holiday-status--24hours,
+.hours-display__holiday-status--open {
+  color: $green2;
+  border-color: $green2;
+}
+
+.hours-display__holiday-status--modified {
+  color: $blue;
+  border-color: $blue;
 }
 
 /* SEE MORE button */
@@ -10280,33 +10230,6 @@ transition: transform .2s;
 
 
 /* ===================================================================== *
- *  components/details/HeroBanner.scss
- * ===================================================================== */
-/* HeroBanner — full-width image-only hero for POI detail pages */
-
-.poi_hero_banner {
-  position: relative;
-  width: 100%;
-  height: clamp(320px, 40vw, 480px);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  overflow: hidden;
-  @media (max-width: 480px) {
-    height: 320px;
-  }
-}
-
-
-.poi_hero_banner_overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(26, 33, 40, 0.0) 0%, rgba(26, 33, 40, 0.55) 100%);
-  pointer-events: none;
-}
-
-
-/* ===================================================================== *
  *  components/details/InfoRow.scss
  * ===================================================================== */
 /* InfoRow — ported from nn-templates .poi_info_row (label + value) */
@@ -10693,8 +10616,8 @@ transition: transform .2s;
   margin-top: 16px;
   padding: 30px 35px;
   border-radius: 5px;
-  border: 1px solid #B9D8EA;
-  background: #EAF4FA;
+  border: 1px solid rgba($nn_teal1, 0.35);
+  background: rgba($nn_teal1, 0.08);
   color: $nn_dark;
 
   h4 {
@@ -10707,12 +10630,65 @@ transition: transform .2s;
   font-family: $font_poppins;
   font-size: clamp(1.2rem, 3vw, 1.7rem);
   // font-weight: 600;
-  color: $blue;
+  color: $nn_teal1;
 }
 .poi_service_animal_alert_body {
   margin: 0;
   // font-size: 0.875rem;
   // line-height: 1.5;
+}
+
+/* Contact accordion — social icons (#139/#144/#145 item 25) */
+.poi_social_icon_row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+.poi_social_icon_link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid $nn_teal1;
+  color: $nn_teal1;
+
+  svg path {
+    fill: $nn_teal1;
+  }
+
+  &:hover {
+    background: $nn_teal1;
+
+    svg path {
+      fill: white;
+    }
+  }
+}
+
+/* Contact accordion — website/phone icon + copy button (#139/#144/#145 items 22-24) */
+.poi_contact_row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  svg {
+    flex-shrink: 0;
+    color: $nn_teal1;
+  }
+}
+.poi_contact_copy_btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  border: none;
+  background: none;
+  color: $nn_teal1;
+  cursor: pointer;
+  font-size: 0.85em;
 }
 
 
@@ -11000,37 +10976,7 @@ transition: transform .2s;
   @media(min-width:2400px) {
     
   }
-  /* merged from duplicate at original line 11191 */
-  padding: 20px 0;
-  font-size: 90%;
-
-  @media(min-width:600px) {
-    
-  }
-  @media(min-width:700px) {
-    
-  }
-  @media(min-width:980px) {
   
-  }
-  @media(min-width:1200px) {
-    
-  }
-  @media(min-width:1400px) {
-    
-  }
-  @media(min-width:1600px) {
-    
-  }
-  @media(min-width:1900px) {
-    
-  }
-  @media(min-width:2400px) {
-    
-  }
-  /* merged from duplicate at original line 13298 */
-  padding: 20px 0;
-  font-size: 90%;
 }
 
 /* -----------------------------------  Single POI Page Styles   ----------------------------------- */
@@ -11063,13 +11009,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13126 */
-  width: 100%;
-  display: block;
-  position: relative;
-  padding: 35px 0;
 }
 
 .poi_status {
@@ -11077,6 +11018,7 @@ transition: transform .2s;
   width: 100%;
   color: $nn_purple1;
   color: $blue2;
+  display: none;
 
   @media(min-width:600px) {
     
@@ -11102,11 +11044,6 @@ transition: transform .2s;
   @media(min-width:2400px) {
     
   }
-  /* merged from duplicate at original line 13161 */
-  display: block;
-  width: 100%;
-  color: $nn_purple1;
-  color: $blue2;
 }
 
 .poi_page_title {
@@ -11137,49 +11074,49 @@ transition: transform .2s;
   @media(min-width:2400px) {
     font-size: 65px;
   }
-  /* merged from duplicate at original line 13175 */
-  font-size: 30px;
-  padding-bottom: 10px;
-
-  @media (min-width: 600px)  { font-size: 33px; }
-  @media (min-width: 700px)  { font-size: 36px; }
-  @media (min-width: 980px)  { font-size: 40px; }
-  @media (min-width: 1200px) { font-size: 45px; }
-  @media (min-width: 1400px) { font-size: 50px; }
-  @media (min-width: 1600px) { font-size: 55px; }
-  @media (min-width: 1900px) { font-size: 60px; }
-  @media (min-width: 2400px) { font-size: 65px; }
 }
 
 .poi_page_main_category {
   font-size: 1.2em;
 
+  .nearby-card__trail-difficulty {
+    display: inline-flex;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
   @media(min-width:600px) {
-    
+
   }
   @media(min-width:700px) {
-    
+
   }
   @media(min-width:980px) {
-  
+
   }
   @media(min-width:1200px) {
-    
+
   }
   @media(min-width:1400px) {
-    
+
   }
   @media(min-width:1600px) {
-    
+
   }
   @media(min-width:1900px) {
-    
+
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13189 */
-  font-size: 1.2em;
+}
+
+// Trail Level accordion row ("Out & Back, 1.5 miles [EASY]") — text + pill on one line.
+.poi_trail_level_row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .poi_intro_location {
@@ -11209,12 +11146,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13197 */
-  padding: 10px 0;
-  color: $nn_dark;
-  font-weight: bold;
 }
 
 .poi_page_hours {
@@ -11244,12 +11177,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13213 */
-  display: block;
-  width: 100%;
-  padding-bottom: 20px;
 }
 
 .poi_button_group_1 {
@@ -11281,15 +11210,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13536 */
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 10px;
-  /* merged from duplicate at original line 13756 */
   @media (max-width: 480px) {
     gap: 8px;
   }
@@ -11327,19 +11249,7 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
-  }
-  /* merged from duplicate at original line 13310 */
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-gap: 40px;
-  justify-content: flex-start;
-  align-items: flex-start;
-  margin-bottom: 40px;
 
-  @media (min-width: 1200px) {
-    grid-template-columns: 1.3fr 1fr;
-    grid-gap: 75px;
   }
 }
 
@@ -11373,15 +11283,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13332 */
-  display: grid;
-  grid-template-columns: 100px auto;
-  grid-gap: 20px;
-  justify-content: flex-start;
-  align-items: flex-start;
-  padding: 5px 0;
 }
 
 .poi_quick_info_single_title {
@@ -11409,10 +11312,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13341 */
-  font-weight: bold;
 }
 
 .poi_quick_info_single_info {
@@ -11450,15 +11351,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
-  }
-  /* merged from duplicate at original line 13345 */
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-gap: 15px;
 
-  @media (min-width: 500px) { grid-template-columns: repeat(3, 1fr); }
-  @media (min-width: 700px) { grid-template-columns: repeat(4, 1fr); }
+  }
 
   img {
     width: 100%;
@@ -11501,15 +11395,8 @@ transition: transform .2s;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 13370 */
-  padding: 15px 0 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 20px;
 
   a,
   span {
@@ -11517,6 +11404,45 @@ transition: transform .2s;
     font-weight: 500;
     text-decoration: none;
   }
+}
+
+/* Amenities box (#139/#144/#145 item 10) — plain text list, not links/icons.
+   No columns — just a flowing list with even spacing. */
+.poi_amenities_text_list {
+  padding: 15px 0 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 25px;
+
+  @media(min-width:600px) {
+
+  }
+  @media(min-width:700px) {
+
+  }
+  @media(min-width:980px) {
+
+  }
+  @media(min-width:1200px) {
+
+  }
+  @media(min-width:1400px) {
+
+  }
+  @media(min-width:1600px) {
+
+  }
+  @media(min-width:1900px) {
+
+  }
+  @media(min-width:2400px) {
+
+  }
+}
+.poi_amenities_text_item {
+  color: $nn_dark;
+  font-weight: 400;
 }
 
 .acc_head {
@@ -12383,6 +12309,7 @@ margin-top: 0;
   grid-template-columns: 1fr;
 
   grid-gap: 0;
+  align-content: start;
   position: relative;
   cursor: pointer;
   // Cards in a row are stretched to equal height by the parent grid. Without
@@ -12413,15 +12340,8 @@ margin-top: 0;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 14833 */
-  padding: 35px 25px 25px 25px;
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-gap: 0;
-  position: relative;
-  cursor: pointer;
 }
 
 .one_search_map_result_number {
@@ -12465,30 +12385,12 @@ margin-top: 0;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 14842 */
-  background-color: $nn_purple1;
-  color: white;
-  font-family: $font_poppins;
-  font-weight: bold;
-  font-size: 25px;
-  width: 55px;
-  height: 55px;
-  border-radius: 55px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  border: 2px solid white;
-  left: 50%;
-  top: -27px;
-  position: absolute;
-  transform: translateX(-50%);
 }
 
 .one_search_map_result_type {
-  font-size: 90%;
+  // font-size: 90%;
 
   @media(min-width:600px) {
     
@@ -12512,10 +12414,8 @@ margin-top: 0;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 14884 */
-  font-size: 90%;
 }
 
 
@@ -12609,10 +12509,8 @@ margin-top: 0;
     
   }
   @media(min-width:2400px) {
-    
+
   }
-  /* merged from duplicate at original line 14872 */
-  font-size: 90%;
 }
 
 
@@ -12860,14 +12758,25 @@ margin-top: 0;
   box-shadow: 0 10px 24px rgba(86, 37, 86, 0.12);
   border-color: #f0b84a;
 }
+@keyframes one_search_map_result_highlight_pulse {
+  0% {
+    border-color: $blue;
+    box-shadow: 0 10px 24px rgba($nn_teal1, 0.35);
+  }
+  // 50% {
+  //   border-color: $nn_purple1;
+  //   box-shadow: 0 10px 24px rgba($nn_gold, 0.35);
+  // }
+  100% {
+    border-color: $nn_gold;
+    box-shadow: none;
+  }
+}
 .one_search_map_result_single--highlighted {
-  border-color: $nn_gold !important;
-  box-shadow: 0 10px 24px rgba(254, 199, 100, 0.35) !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  animation: one_search_map_result_highlight_pulse 3.2s ease forwards;
 }
 .one_search_map_result_single_buttons .btn_poi_button_1 {
   text-decoration: none !important;
-  /* merged from duplicate at original line 12964 */
   background-color: #fff !important;
   color: #245b4e !important;
   border: 2px solid #245b4e !important;
@@ -13232,20 +13141,20 @@ margin-top: 0;
   }
 }
 
-.btn_share {
-  border: 2px solid $blue !important;
-  color: $blue !important;
-  /* merged from duplicate at original line 13419 */
-  .poi_button_icon { fill: $blue; }
+// .btn_share {
+//   border: 2px solid $blue !important;
+//   color: $blue !important;
+//   /* merged from duplicate at original line 13419 */
+//   .poi_button_icon { fill: $blue; }
 
-  &:hover {
-    border-color: $blue;
-    background: $blue;
-    color: white;
+//   &:hover {
+//     border-color: $blue;
+//     background: $blue;
+//     color: white;
 
-    .poi_button_icon { fill: white; }
-  }
-}
+//     .poi_button_icon { fill: white; }
+//   }
+// }
 
 .poi_button_title {}
 
@@ -13273,6 +13182,14 @@ margin-top: 0;
   font-size: 20px;
   font-weight: 600;
   line-height: 1.1;
+}
+
+.poi_type_info_box {
+  width: 100%;
+  font-family: $font_poppins;
+  font-size: 15px;
+  font-weight: 600;
+  color: $nn_slate;
 }
 
 
@@ -13354,11 +13271,11 @@ margin-top: 0;
   }
 
   .poi_verified_tooltip_inner {
-    padding: 25px;
-    font-size: 0.9em;
-    line-height: 1.2;
-    color: $nn_dark;
-    background-color: #ffd;
+    // padding: 25px;
+    // font-size: 0.9em;
+    line-height: 1.4;
+    // color: $nn_dark;
+    // background-color: #ffd;
   }
 }
 
@@ -13418,7 +13335,7 @@ margin-top: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 15px;
-  margin-top: 30px;
+  padding: 20px 0 30px 0;
 }
 
 
@@ -14035,8 +13952,9 @@ margin-top: 0;
   align-items: center;
   gap: 6px;
   color: $nn_teal2;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
+  padding-bottom: 5px;
 
   svg {
     flex-shrink: 0;
@@ -14067,35 +13985,66 @@ margin-top: 0;
 }
 
 .nearby-card__trail-length {
-  font-size: 13px;
-  font-weight: 600;
-  color: $nn_dark;
+  // font-size: 13px;
+  // font-weight: 600;
+  // color: $nn_dark;
 }
 
 .nearby-card__trail-difficulty {
+  display: flex;
+  gap: 5px;
+  justify-content: space-between;
+  align-items: center;
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 5px 9px;
+  border-radius: 99px;
   text-transform: uppercase;
+  border: 1px solid gold;
+}
+
+.nearby-card__trail-difficulty:before {
+  display: block;
+  content: "";
+  height: 9px;
+  width: 9px;
+  border-radius: 9px;
+  background-color: gold;
 }
 
 .nearby-card__trail-difficulty--easy {
-  background: #dcfce7;
-  color: #166534;
+  background: $trail_difficulty_easy_bg;
+  color: $trail_difficulty_easy_text;
+  border-color: $trail_difficulty_easy_border;
 }
 
 .nearby-card__trail-difficulty--moderate {
-  background: #fef3c7;
-  color: #92400e;
+  background: $trail_difficulty_moderate_bg;
+  color: $trail_difficulty_moderate_text;
+  border-color: $trail_difficulty_moderate_border;
 }
 
 .nearby-card__trail-difficulty--difficult,
-.nearby-card__trail-difficulty--hard {
-  background: #fee2e2;
-  color: #991b1b;
+.nearby-card__trail-difficulty--hard,
+.nearby-card__trail-difficulty--challenging {
+  background: $trail_difficulty_hard_bg;
+  color: $trail_difficulty_hard_text;
+  border-color: $trail_difficulty_hard_border;
 }
 
+.nearby-card__trail-difficulty--easy.nearby-card__trail-difficulty:before {
+  background-color: $trail_difficulty_easy_border;
+}
+
+.nearby-card__trail-difficulty--moderate.nearby-card__trail-difficulty:before {
+  background-color: $trail_difficulty_moderate_border;
+}
+
+.nearby-card__trail-difficulty--difficult.nearby-card__trail-difficulty:before,
+.nearby-card__trail-difficulty--hard.nearby-card__trail-difficulty:before,
+.nearby-card__trail-difficulty--challenging.nearby-card__trail-difficulty:before {
+  background-color: $trail_difficulty_hard_border;
+}
 
 // ---------------------------------------------------------------------------
 // Paid-tier quick-facts pad
@@ -14726,7 +14675,7 @@ margin-top: 0;
   flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
-  gap: 20px;
+  gap: 10px;
 }
 
 
@@ -15040,10 +14989,18 @@ margin-top: 0;
   padding: 30px 40px 7px 0;
 }
 
+.directions-modal__date {
+  font-size: 15px;
+  color: $nn_purple1;
+  margin: 0 0 3px 0;
+  padding-right: 40px;
+  line-height: 1.4;
+}
+
 .directions-modal__category {
   font-size: 15px;
   color: $nn_purple1;
-  margin: 0 0 16px 0;
+  margin: 0 0 3px 0;
   padding-right: 40px;
   line-height: 1.4;
 }
@@ -15052,13 +15009,14 @@ margin-top: 0;
   font-size: 14px;
   color: $nn_gray;
   margin: 0 0 20px 0;
+  padding-top: 6px;
   line-height: 1.4;
 }
 
 .directions-modal__copy-section {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .directions-modal__copy-btn {
@@ -15088,7 +15046,7 @@ margin-top: 0;
   font-family: $font_poppins;
   font-size: 12px;
   color: $nn_gray;
-  margin: 5px 0 15px 0;
+  margin: 0 0 15px 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -15132,11 +15090,20 @@ margin-top: 0;
   gap: 6px; 
 }
 
-.acc_list_group_1 { 
-  display: flex; 
-  flex-wrap: wrap; 
-  gap: 8px; 
-  // font-size: 14px; 
+.acc_list_group_1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  // font-size: 14px;
+}
+
+.poi_category_chip_link {
+  color: $nn_teal1;
+  text-decoration: underline;
+}
+
+.poi_category_chip_link:hover {
+  color: $nn_teal2;
 }
 
 

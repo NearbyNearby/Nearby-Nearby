@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { MapPin, Navigation, Copy, Check, ExternalLink } from 'lucide-react';
+import { MapPin, Navigation, Copy, Check, ExternalLink, Globe, Phone } from 'lucide-react';
 
 import {
-  AccSection, ContentGroup, ChipList, QuickInfoRow, InfoPair,
+  AccSection, ContentGroup, ChipList, CategoryChipList, QuickInfoRow, InfoPair,
   POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox, SocialLinksGroup, hasSocialLinks,
   hasVal, asArray, copyToClipboard, getCoordinates, getImages,
   isYes,
@@ -21,7 +21,7 @@ import { sanitizeHtml } from '../../utils/sanitize';
 function buildSections(poi, helpers) {
   const {
     displayLoc, handleDirections, handleCopyAddress, handleCopyCoords,
-    copiedAddress, copiedCoords,
+    copiedAddress, copiedCoords, handleCopyPhone, copiedPhone, handleCopyEmail, copiedEmail,
   } = helpers;
 
   const out = [];
@@ -52,6 +52,9 @@ function buildSections(poi, helpers) {
       idealFor && <ContentGroup key="ideal_local" title="Local Special" when={hasVal(idealFor.local_special)}><ChipList items={idealFor.local_special} /></ContentGroup>,
       !idealFor && Array.isArray(poi.ideal_for) && poi.ideal_for.length > 0 && (
         <ContentGroup key="ideal_arr" title="Ideal For"><ChipList items={poi.ideal_for} /></ContentGroup>
+      ),
+      Array.isArray(poi.categories) && poi.categories.length > 0 && (
+        <ContentGroup key="cats" title="Categories"><CategoryChipList categories={poi.categories} /></ContentGroup>
       ),
     ].filter(Boolean);
 
@@ -213,14 +216,14 @@ function buildSections(poi, helpers) {
     if (col1.length || col2.length) out.push({ id: 'mobility_access', title: 'Wheelchair and Mobility Access', col1, col2 });
   }
 
-  /* PET POLICY */
+  /* PET POLICY — single column per Rhonda's punch list (#144/#139/#145) */
   if (hasVal(poi.pet_options) || hasVal(poi.pet_policy)) {
     const col1 = [
       hasVal(poi.pet_options) && <ContentGroup key="po" title="Pet Options"><ChipList items={poi.pet_options} /></ContentGroup>,
       hasVal(poi.pet_policy) && <ContentGroup key="pp"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pet_policy) }} /></ContentGroup>,
+      <div className="acc_content_group" key="sa"><ServiceAnimalAlert /></div>,
     ].filter(Boolean);
-    const col2 = [<div className="acc_content_group" key="sa"><ServiceAnimalAlert /></div>];
-    out.push({ id: 'pet_policy', title: 'Pet Policy', col1, col2 });
+    out.push({ id: 'pet_policy', title: 'Pet Policy', col1, col2: [], singleColumn: true });
   }
 
   /* DRONE POLICY */
@@ -337,18 +340,38 @@ function buildSections(poi, helpers) {
   if (hasVal(poi.website_url) || hasVal(poi.phone_number) || hasVal(poi.email) || hasSocialLinks(poi)) {
     const col1 = [
       hasVal(poi.phone_number) && (
-        <ContentGroup key="ph" title="Phone"><div className="acc_list_group_1"><a href={`tel:${poi.phone_number}`}>{poi.phone_number}</a></div></ContentGroup>
+        <ContentGroup key="ph" title="Phone">
+          <div className="acc_list_group_1 poi_contact_row">
+            <Phone size={16} />
+            <a href={`tel:${poi.phone_number}`}>{poi.phone_number}</a>
+            <button type="button" className="btn_reset poi_contact_copy_btn" onClick={handleCopyPhone}>
+              {copiedPhone ? <Check size={14} /> : <Copy size={14} />} {copiedPhone ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </ContentGroup>
       ),
       hasVal(poi.website_url) && (
         <ContentGroup key="web" title="Website">
-          <div className="acc_list_group_1">
-            <a href={poi.website_url.startsWith('http') ? poi.website_url : `https://${poi.website_url}`} target="_blank" rel="noopener noreferrer">{poi.website_url}</a>
+          <div className="acc_list_group_1 poi_contact_row">
+            <Globe size={16} />
+            <a href={poi.website_url.startsWith('http') ? poi.website_url : `https://${poi.website_url}`} target="_blank" rel="noopener noreferrer">
+              Visit {poi.name} Website
+            </a>
           </div>
         </ContentGroup>
       ),
     ].filter(Boolean);
     const col2 = [
-      hasVal(poi.email) && <ContentGroup key="em" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>,
+      hasVal(poi.email) && (
+        <ContentGroup key="em" title="Email">
+          <div className="acc_list_group_1 poi_contact_row">
+            <a href={`mailto:${poi.email}`}>{poi.email}</a>
+            <button type="button" className="btn_reset poi_contact_copy_btn" onClick={handleCopyEmail}>
+              {copiedEmail ? <Check size={14} /> : <Copy size={14} />} {copiedEmail ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </ContentGroup>
+      ),
       hasSocialLinks(poi) && <SocialLinksGroup key="soc" poi={poi} />,
       <div className="acc_content_group" key="fb"><div className="acc_content_text"><a href="/feedback" className="pd-link">Questions or Feedback?</a></div></div>,
     ].filter(Boolean);
@@ -365,6 +388,8 @@ function buildSections(poi, helpers) {
 export default function ParkDetail({ poi }) {
   const [copiedCoords, setCopiedCoords] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
   const [directionsOpen, setDirectionsOpen] = useState(false);
 
   const displayLoc = getDisplayableLocation(poi);
@@ -391,8 +416,20 @@ export default function ParkDetail({ poi }) {
       setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2000);
     }
   };
+  const handleCopyPhone = async () => {
+    if (!poi.phone_number) return;
+    if (await copyToClipboard(poi.phone_number)) {
+      setCopiedPhone(true); setTimeout(() => setCopiedPhone(false), 2000);
+    }
+  };
+  const handleCopyEmail = async () => {
+    if (!poi.email) return;
+    if (await copyToClipboard(poi.email)) {
+      setCopiedEmail(true); setTimeout(() => setCopiedEmail(false), 2000);
+    }
+  };
 
-  const subtitle = poi.park?.primary_type || poi.primary_type?.name || asArray(poi.outdoor_types)[0] || '';
+  const subtitle = poi?.categories?.[0]?.name || asArray(poi.outdoor_types)[0] || '';
 
   const thingsToDo = (() => {
     const list = asArray(poi.things_to_do).length > 0 ? asArray(poi.things_to_do) : asArray(poi.park?.activities);
@@ -402,6 +439,24 @@ export default function ParkDetail({ poi }) {
   const idealForLocal = (poi.ideal_for && !Array.isArray(poi.ideal_for))
     ? asArray(poi.ideal_for.local_special).join(', ') : null;
   const costValue = poi.park?.cost || poi.cost || (poi.listing_type === 'free' ? 'Free' : null);
+
+  const amenitiesFlat = useMemo(() => {
+    const a = poi?.amenities;
+    const out = [];
+    if (a && typeof a === 'object') {
+      Object.values(a).forEach((v) => {
+        if (Array.isArray(v)) v.forEach((x) => hasVal(x) && out.push(typeof x === 'object' ? (x.name || x.label || '') : String(x)));
+      });
+    }
+    // Server-computed icon booleans, shown as plain-text pills alongside the rest.
+    if (poi?.icon_public_restroom) out.push('Public Restroom');
+    if (poi?.icon_free_wifi) out.push('Wi-Fi Access');
+    if (poi?.icon_wheelchair_accessible) out.push('Wheelchair Accessible');
+    if (poi?.icon_pet_friendly) out.push('Pet Friendly');
+    if (poi?.playground_available || (Array.isArray(poi?.playground_types) && poi.playground_types.length > 0)) out.push('Playgrounds');
+    if (Array.isArray(poi?.parking_types) && poi.parking_types.length > 0) out.push('Parking Facilities');
+    return Array.from(new Set(out.filter(Boolean)));
+  }, [poi]);
   const petSummary = asArray(poi.pet_options).join(', ');
 
   // Accordions hidden per the POI Accordion show/hide doc. Park keeps About+Hours,
@@ -413,6 +468,7 @@ export default function ParkDetail({ poi }) {
   ]);
   const sections = buildSections(poi, {
     displayLoc, handleDirections, handleCopyAddress, handleCopyCoords, copiedAddress, copiedCoords,
+    handleCopyPhone, copiedPhone, handleCopyEmail, copiedEmail,
   }).filter((s) => !HIDDEN_ACCORDIONS.has(s.id));
 
   return (
@@ -422,6 +478,7 @@ export default function ParkDetail({ poi }) {
       mainCategory={subtitle}
       statusVariant={_statusVariant || undefined}
       statusLabel={_statusLabel}
+      hideStatus
     >
       {({ images: imgs, openLightbox }) => (
         <>
@@ -439,7 +496,7 @@ export default function ParkDetail({ poi }) {
             onOpenLightbox={openLightbox}
           />
 
-          <AmenitiesBox poi={poi} />
+          <AmenitiesBox title="Amenities" amenitiesList={amenitiesFlat} />
 
           {thingsToDo.length > 0 && (
             <div id="poi_things_to_do_box" className="box_style_1">
@@ -453,7 +510,9 @@ export default function ParkDetail({ poi }) {
           <div id="accordion_1_box" className="poi_accordion_box">
             <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
               {sections.map((s) => (
-                <AccSection key={s.id} title={s.title} defaultOpen={false} col1={s.col1} col2={s.col2} />
+                s.singleColumn
+                  ? <AccSection key={s.id} title={s.title} defaultOpen={false}>{s.col1}</AccSection>
+                  : <AccSection key={s.id} title={s.title} defaultOpen={false} col1={s.col1} col2={s.col2} />
               ))}
             </div>
           </div>

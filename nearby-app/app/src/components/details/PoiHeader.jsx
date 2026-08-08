@@ -161,6 +161,11 @@ export default function PoiHeader({
   extraButtons = [],     // [{ label, svg, onClick, href, target, rel, extraClass }]
   titleLeader = null,    // optional node before h1 (e.g., status banner)
   subtitleExtras = null, // optional extra content after main category (e.g., venue line)
+  hideStatus = false,    // Business/Park/Trail hide the admin Status + Status Message
+                          // block until user profiles ship (#139/#144/#145); Event keeps
+                          // its own status system and doesn't set this.
+  typeInfoBox = null,    // type-specific info block in poi_col2, before the verified badge
+                          // (Trail: route/length/difficulty; Event will use this too)
 }) {
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const [copiedCoords, setCopiedCoords] = useState(false);
@@ -264,10 +269,10 @@ export default function PoiHeader({
         <div className="poi_col1">
           {titleLeader}
 
-          {statusTopText && (
+          {!hideStatus && statusTopText && (
             <div className="poi_status">{statusTopText}</div>
           )}
-          {statusMessage && (
+          {!hideStatus && statusMessage && (
             <div className="poi_status_message">{statusMessage}</div>
           )}
 
@@ -369,6 +374,8 @@ export default function PoiHeader({
         </div>{/* end poi_col1 */}
 
         <div className="poi_col2">
+          {typeInfoBox}
+
           {paid && poi?.is_verified && (
             <div className="poi_verified_box">
               <div className="poi_verified_badge button">

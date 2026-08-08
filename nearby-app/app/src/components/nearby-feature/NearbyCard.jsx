@@ -1,9 +1,7 @@
 import { forwardRef } from 'react';
 import { Navigation, Toilet, Wifi, PawPrint, Accessibility } from 'lucide-react';
 import { getDisplayableLocation } from '../../utils/getDisplayableLocation';
-import { isPaidTier } from '../../utils/poiTier';
 import { getOpenCloseStatusLabel, getEffectiveHoursForDate, formatDayHours } from '../../utils/hoursUtils';
-import AmenityPillStrip from '../details/AmenityPillStrip';
 
 // Helper to convert meters to miles
 function formatDistance(meters) {
@@ -34,7 +32,7 @@ function hasAmenity(values) {
   });
 }
 
-function getAmenities(poi) {
+export function getAmenities(poi) {
   const amenities = [];
   // Prefer the registry computed icon_* booleans (card fields); fall back to the
   // loose array heuristic so we never drop an amenity that already showed.
@@ -141,48 +139,6 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
   // Location display gating - hide exact location for POIs that opt out
   const displayLoc = getDisplayableLocation(poi);
 
-  // Paid-tier listing cards get the yellow quick-facts pad + amenity pills
-  const paid = isPaidTier(poi);
-
-  const buildQuickFacts = () => {
-    const fmtList = (v) => (Array.isArray(v) && v.length > 0 ? v.join(', ') : (v || null));
-    if (isBusiness) {
-      return [
-        { label: 'Price Range', value: poi.business?.price_range || poi.price_range || null },
-        { label: 'Good For',    value: fmtList(poi.ideal_for?.age_group || poi.ideal_for) },
-        { label: 'Pets',        value: fmtList(poi.pet_options) },
-      ];
-    }
-    if (isEvent) {
-      return [
-        { label: 'Cost',        value: poi.event?.cost || poi.cost || null },
-        { label: 'At-A-Glance', value: poi.description_short || null },
-        { label: 'Pets',        value: fmtList(poi.pet_options) },
-      ];
-    }
-    if (isTrail) {
-      const rows = [
-        { label: 'Cost',        value: poi.trail?.cost || poi.cost || null },
-        { label: 'At-A-Glance', value: poi.description_short || null },
-        { label: 'Pets',        value: fmtList(poi.pet_options) },
-      ];
-      if (poi.trail?.payphone) rows.push({ label: 'PayPhone', value: poi.trail.payphone });
-      return rows;
-    }
-    if (isPark) {
-      return [
-        { label: 'Cost',        value: poi.park?.cost || poi.cost || null },
-        { label: 'At-A-Glance', value: poi.description_short || null },
-        { label: 'Pets',        value: fmtList(poi.pet_options) },
-      ];
-    }
-    return [];
-  };
-
-  const quickFacts = paid
-    ? buildQuickFacts().filter((r) => r.value != null && r.value !== '')
-    : [];
-
   // Stop card-level navigation when interacting with inner controls
   const stop = (e) => e.stopPropagation();
   const handleCardKey = (e) => {
@@ -243,7 +199,7 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
       {/* Event-specific: Date */}
       {isEvent && eventStart && (
         <div className="nearby-card__event-date">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
             <line x1="16" y1="2" x2="16" y2="6"/>
             <line x1="8" y1="2" x2="8" y2="6"/>
@@ -300,25 +256,6 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
           </div>
         )}
       </div>
-
-      {/* Paid-tier quick facts */}
-      {paid && quickFacts.length > 0 && (
-        <div className="nearby-card__quick-facts">
-          {quickFacts.map(({ label, value }) => (
-            <div className="nearby-card__quick-facts-row" key={label}>
-              <div className="nearby-card__quick-facts-label">{label}</div>
-              <div className="nearby-card__quick-facts-value">{value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Paid-tier amenity pill strip */}
-      {paid && (
-        <div className="nearby-card__amenity-strip-wrap">
-          <AmenityPillStrip poi={poi} />
-        </div>
-      )}
 
       {/* Action Buttons */}
       <div className="one_search_map_result_single_buttons" onClick={stop}>
