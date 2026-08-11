@@ -15186,3 +15186,108 @@ margin-top: 0;
   border-radius: 6px;
   display: block;
 }
+
+
+/* ===================================================================== *
+ *  ISSUE #142: Event POI page punch list (additive, app team)
+ *  Appended block: nothing above this line is modified or reordered.
+ * ===================================================================== */
+
+/* Item 6: the Share button was the only off-brand (blue) action button.
+   It now matches the teal outline / gold hover the rest of the row uses. */
+.btn_poi_button_1.btn_share {
+  border: 2px solid $nn_teal1 !important;
+  color: $nn_teal1 !important;
+}
+.btn_share .poi_button_icon {
+  fill: $nn_teal1 !important;
+}
+.btn_poi_button_1.btn_share:hover {
+  border: 2px solid $nn_teal1 !important;
+  background-color: $nn_gold !important;
+  color: $nn_teal1 !important;
+}
+.btn_poi_button_1.btn_share:hover .poi_button_icon {
+  fill: $nn_teal1 !important;
+}
+
+/* Item 6: keep the header action row on ONE line once there is room for it.
+   Below 980px the group still wraps (mobile needs it to). */
+@media (min-width: 980px) {
+  .poi_button_group_1 {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .poi_button_group_1 > * {
+    flex: 0 0 auto;
+  }
+}
+
+/* Item 3: "Ended" rides behind the date instead of the status block. */
+.ed-ended-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba($red, 0.1);
+  color: $red;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Item 4: replaces the removed "show all hours" toggle for recurring events. */
+.ed-recurring-note {
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: $nn_teal1;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ed-recurring-note:hover {
+  color: $nn_teal2;
+}
+
+/* Item 11: the next occurrences of a repeating series. */
+.ed-date-chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba($nn_teal1, 0.35);
+  background: rgba($nn_teal1, 0.08);
+  color: $nn_dark;
+  font-size: 14px;
+}
+
+/* Item 17: the bottom notice, restyled to the on-brand note card the other
+   three POI pages already use for the ADA Service Animal alert. */
+.ed-disclaimer {
+  margin: 35px 0 0;
+  padding: 30px 35px;
+  border: 1px solid rgba($nn_teal1, 0.35);
+  border-radius: 5px;
+  background: rgba($nn_teal1, 0.08);
+  color: $nn_dark;
+  text-align: left;
+
+  p {
+    margin: 0 0 8px;
+    font-weight: normal;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+}
+.ed-disclaimer__title {
+  margin: 0 0 8px;
+  padding-top: 0;
+  font-family: $font_poppins;
+  font-size: clamp(1.2rem, 3vw, 1.7rem);
+  color: $nn_teal1;
+}

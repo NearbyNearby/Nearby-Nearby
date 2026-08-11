@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import EventDetail from '../EventDetail';
@@ -177,6 +177,36 @@ describe('EventDetail', () => {
       renderDetail({ event: weeklySince2023 });
       expect(screen.queryByText('Ended', { hidden: true })).not.toBeInTheDocument();
     });
+
+    it('lists the upcoming occurrence dates in About + Details (#142 item 11)', () => {
+      renderDetail({ event: weeklySince2023 });
+      const panel = document.getElementById('acc_panel_about_details');
+      expect(panel).toHaveTextContent('Upcoming Dates');
+      const chips = panel.querySelectorAll('.ed-date-chip');
+      expect(chips.length).toBe(5);
+      expect(chips[0].textContent).toContain('Aug 16th');
+      // A recurring series is ONE listing, so the dates are not links.
+      expect(chips[0].querySelector('a')).toBeNull();
+    });
+
+    it('renders without crashing once the series is past its recurrence_end_date', () => {
+      // getNextOccurrence returns null here, so the Date/Time rows drop out.
+      // Locking in no-crash plus the Ended badge; the missing rows are a known
+      // gap, not something this change redesigns.
+      renderDetail({ event: { ...weeklySince2023, recurrence_end_date: '2024-01-01' } });
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Test Event');
+      expect(document.querySelector('.ed-ended-badge')).toHaveTextContent('Ended');
+    });
+
+    it('offers a recurring-event note that opens About + Details (#142 item 4)', () => {
+      renderDetail({ event: weeklySince2023 });
+      const note = screen.getByRole('button', { name: /recurring event/i });
+      const about = screen.getByRole('button', { name: /about \+ details/i });
+      fireEvent.click(about); // close the initially open section
+      expect(about).toHaveAttribute('aria-expanded', 'false');
+      fireEvent.click(note);
+      expect(about).toHaveAttribute('aria-expanded', 'true');
+    });
   });
 
   // --- B2: Cost renders as an InfoRow inside About + Details ---
@@ -199,15 +229,35 @@ describe('EventDetail', () => {
     expect(screen.getByText('$10 - $40', { hidden: true })).toBeInTheDocument();
   });
 
+  it('renders a zero poi.cost as "Free", never the literal "0"', () => {
+    // The seeded farmers market stores cost: "0" with no event.cost_type, which
+    // used to fall through and print a bare "0" (#142 follow-up).
+    renderDetail({ cost: '0' });
+    const col2 = document.querySelector('#acc_panel_about_details .acc_col_2');
+    expect(col2).toHaveTextContent('Free');
+    expect(col2.textContent).not.toContain('Cost0');
+  });
+
+  it('renders a zero poi.cost written as "0.00" as "Free"', () => {
+    renderDetail({ cost: '0.00' });
+    expect(document.querySelector('#acc_panel_about_details .acc_col_2')).toHaveTextContent('Free');
+  });
+
+  it('still passes a real poi.cost amount through untouched', () => {
+    renderDetail({ cost: '$15' });
+    expect(document.querySelector('#acc_panel_about_details .acc_col_2')).toHaveTextContent('$15');
+  });
+
   it('renders a single ticket link as a clickable GET TICKETS anchor', () => {
     renderDetail({
       event: { ticket_links: [{ platform: 'Eventbrite', url: 'https://tickets.example.com' }] },
     });
-    // ticket_links (array of {platform, url}) replaced the old singular ticket_link;
-    // a single link renders a GET TICKETS header button as an anchor.
-    const link = screen.getByRole('link', { name: /get tickets/i });
-    expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', 'https://tickets.example.com');
+    // ticket_links (array of {platform, url}) replaced the old singular ticket_link.
+    // #142 item 11 adds a second copy inside the Cost group, so both the header
+    // button and the accordion button point at the same URL.
+    const links = screen.getAllByRole('link', { name: /get tickets/i, hidden: true });
+    expect(links.length).toBe(2);
+    links.forEach((l) => expect(l).toHaveAttribute('href', 'https://tickets.example.com'));
   });
 
   it('does not render COST & TICKETS section when no cost data exists', () => {
@@ -215,21 +265,29 @@ describe('EventDetail', () => {
     expect(screen.queryByRole('button', { name: /cost & tickets/i })).not.toBeInTheDocument();
   });
 
-  // --- B2: EVENT DETAILS section with organizer info ---
+  // --- #142 item 16: organizer info lives in the Contact accordion ---
 
-  it('shows organizer name in EVENT DETAILS section', () => {
+  it('shows organizer name in the Contact accordion', () => {
     renderDetail({ event: { organizer_name: 'Amazing Org' } });
-    expect(screen.getByText('Amazing Org')).toBeInTheDocument();
+    const contact = document.getElementById('poi_acc_contact');
+    expect(contact).toBeInTheDocument();
+    expect(contact).toHaveTextContent('Amazing Org');
   });
 
-  it('shows organizer email in EVENT DETAILS when provided', () => {
+  it('shows organizer email in Contact when provided', () => {
     renderDetail({ event: { organizer_name: 'Org', organizer_email: 'org@example.com' } });
-    expect(screen.getByText('org@example.com')).toBeInTheDocument();
+    expect(document.getElementById('poi_acc_contact')).toHaveTextContent('org@example.com');
   });
 
-  it('shows organizer phone in EVENT DETAILS when provided', () => {
+  it('shows organizer phone in Contact when provided', () => {
     renderDetail({ event: { organizer_name: 'Org', organizer_phone: '555-1234' } });
-    expect(screen.getByText('555-1234')).toBeInTheDocument();
+    expect(document.getElementById('poi_acc_contact')).toHaveTextContent('555-1234');
+  });
+
+  it('does not repeat the organizer inside About + Details', () => {
+    // #142 item 10: Organizer (and Repeats) were removed from About + Details.
+    renderDetail({ event: { organizer_name: 'Amazing Org' } });
+    expect(document.getElementById('poi_acc_about_details')).not.toHaveTextContent('Amazing Org');
   });
 
   // --- B2: Venue link ---
@@ -337,16 +395,159 @@ describe('EventDetail', () => {
 
   it('renders the venue address in the Venue Address + Parking accordion', () => {
     renderDetail({
-      event: {
-        venue_address_street: '123 Main St',
-        venue_address_city: 'Pittsboro',
-        venue_address_state: 'NC',
-      },
+      address_street: '123 Main St',
+      address_city: 'Pittsboro',
+      address_state: 'NC',
     });
-    // Event address comes from the event.venue_address_* snapshot fields (top-level
-    // poi.address_street is no longer read here). Panel is closed but in the DOM.
+    // #142 item 12: the address comes from the POI's own address columns. When
+    // the event links to a venue with address inheritance the backend has
+    // already resolved the venue's address into them (#124); there are no
+    // event.venue_address_* fields in the public payload.
     const addr = screen.getByText(/123 Main St/, { hidden: true });
     expect(addr).toBeInTheDocument();
+  });
+
+  // --- #142: Rhonda's Event page punch list ---
+
+  describe('#142 punch list', () => {
+    it('never renders a featured image at the top of the page', () => {
+      // item 1
+      renderDetail({
+        featured_image: 'https://example.com/hero.jpg',
+        images: [{ id: 'i1', url: 'https://example.com/hero.jpg', thumbnail_url: 'https://example.com/t.jpg' }],
+      });
+      expect(document.getElementById('poi_quick_info_photos_box')).toBeNull();
+      expect(document.querySelectorAll('img').length).toBe(0);
+    });
+
+    it('hides the admin status and status message block', () => {
+      // item 2: EventStatusBanner is the event's status treatment.
+      renderDetail({ status: 'Fully Open', status_message: 'Doors open at noon.' });
+      expect(document.querySelector('.poi_status')).toBeNull();
+      expect(screen.queryByText('Doors open at noon.')).not.toBeInTheDocument();
+    });
+
+    it('shows the venue name directly under the date line', () => {
+      // item 3
+      renderDetail({ event: { venue_name: 'Grand Hall' } });
+      const main = document.querySelector('.poi_page_main_category');
+      const venue = document.querySelector('.ed-venue-line');
+      expect(venue).toHaveTextContent('Grand Hall');
+      expect(main.compareDocumentPosition(venue) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('puts the ENDED badge behind the date for a past event', () => {
+      // item 3: "Ended" moved out of the status block and behind the date.
+      renderDetail({ event: { start_datetime: '2020-06-01T10:00:00', end_datetime: '2020-06-01T18:00:00' } });
+      expect(document.querySelector('.poi_page_main_category .ed-ended-badge')).toHaveTextContent('Ended');
+    });
+
+    it('does not show the ENDED badge for an upcoming event', () => {
+      renderDetail();
+      expect(document.querySelector('.ed-ended-badge')).toBeNull();
+    });
+
+    it('drops the "show all hours" toggle even when the POI carries hours', () => {
+      // item 4
+      renderDetail({ hours: { monday: [{ open: '09:00', close: '17:00' }] } });
+      expect(document.getElementById('poi_page_hours_toggle')).toBeNull();
+    });
+
+    it('does not offer the recurring-event note for a one-off event', () => {
+      renderDetail();
+      expect(screen.queryByRole('button', { name: /recurring event/i })).not.toBeInTheDocument();
+    });
+
+    it('flashes "Copied!" on the header Lat + Long button', async () => {
+      // item 5: the header button used to copy silently on every POI page.
+      Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      renderDetail();
+      const buttons = screen.getAllByRole('button', { name: /lat \+ long/i, hidden: true });
+      fireEvent.click(buttons[0]);
+      expect(await screen.findByText('Copied!')).toBeInTheDocument();
+      expect(writeText).toHaveBeenCalledWith('35.7, -79.1');
+    });
+
+    it('does not flash "Copied!" when the copy fails', async () => {
+      // The clipboard write rejects and the execCommand fallback is unavailable,
+      // so copyToClipboard reports false and the button has to stay silent.
+      Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+      const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      document.execCommand = vi.fn(() => { throw new Error('unavailable'); });
+
+      renderDetail();
+      const buttons = screen.getAllByRole('button', { name: /lat \+ long/i, hidden: true });
+      fireEvent.click(buttons[0]);
+      await waitFor(() => expect(writeText).toHaveBeenCalled());
+      expect(screen.queryByText('Copied!')).not.toBeInTheDocument();
+      delete document.execCommand;
+    });
+
+    it('flashes "Copied!" on the accordion Lat + Long button', async () => {
+      Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true,
+      });
+      renderDetail();
+      const buttons = screen.getAllByRole('button', { name: /lat \+ long/i, hidden: true });
+      fireEvent.click(buttons[buttons.length - 1]);
+      expect(await screen.findByText('Copied!')).toBeInTheDocument();
+    });
+
+    it('renders About + Details as two columns', () => {
+      // item 7
+      renderDetail({ description_long: 'About this event.' });
+      const panel = document.getElementById('acc_panel_about_details');
+      expect(panel).toHaveClass('column_grid_5050');
+      expect(panel.querySelector('.acc_col_1')).toHaveTextContent('About this event.');
+      expect(panel.querySelector('.acc_col_2')).toHaveTextContent('Date');
+    });
+
+    it('keeps the teaser paragraph out of About + Details', () => {
+      // item 8
+      renderDetail({ teaser_paragraph: 'Teaser copy here.', description_long: 'Long copy.' });
+      expect(document.getElementById('poi_acc_about_details')).not.toHaveTextContent('Teaser copy here.');
+    });
+
+    it('renders Categories and Ideal For as links', () => {
+      // item 9
+      renderDetail({
+        categories: [{ id: 'c1', name: 'Music', slug: 'music' }],
+        ideal_for: { atmosphere: ['Family Friendly'] },
+      });
+      expect(screen.getByRole('link', { name: 'Music', hidden: true }).getAttribute('href'))
+        .toContain('category=music');
+      expect(screen.getByRole('link', { name: 'Family Friendly', hidden: true }).getAttribute('href'))
+        .toContain('/explore?q=');
+    });
+
+    it('shows Date, Time and Wifi rows in the second column', () => {
+      // item 11
+      renderDetail({ wifi_options: ['Free Public WiFi'] });
+      const col2 = document.querySelector('#acc_panel_about_details .acc_col_2');
+      expect(col2).toHaveTextContent('Date');
+      expect(col2).toHaveTextContent('Time');
+      expect(col2).toHaveTextContent('Wifi');
+      expect(col2).toHaveTextContent('Free Public WiFi');
+    });
+
+    it('renders the Public Restrooms and Playground accordions', () => {
+      // items 13 and 15
+      renderDetail({ public_toilets: ['Portable'], playground_types: ['Swings'] });
+      expect(screen.getByRole('button', { name: /public restrooms/i, hidden: true })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /playground/i, hidden: true })).toBeInTheDocument();
+    });
+
+    it('renders the bottom notice as an on-brand note card', () => {
+      // item 17
+      renderDetail();
+      const notice = document.querySelector('.ed-disclaimer');
+      expect(notice.tagName).toBe('ASIDE');
+      expect(notice.querySelector('.ed-disclaimer__title')).toHaveTextContent('Before You Go');
+    });
   });
 
   // --- Accordion group: first section opens on load, single-open thereafter ---

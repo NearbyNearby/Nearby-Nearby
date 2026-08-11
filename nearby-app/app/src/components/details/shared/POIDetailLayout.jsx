@@ -61,12 +61,16 @@ export default function POIDetailLayout({
   const typeLabel = _typeRaw ? _typeRaw.charAt(0).toUpperCase() + _typeRaw.slice(1).toLowerCase() : '';
 
   const handleDirections = () => setDirectionsOpen(true);
+  // Returns whether the copy landed so PoiHeader's "Copied!" flash can stay
+  // honest when the clipboard write fails (#142 item 5).
   const handleCopyCoords = async () => {
-    if (!coords) return;
-    if (await copyToClipboard(`${coords.lat}, ${coords.lng}`)) {
+    if (!coords) return false;
+    const ok = await copyToClipboard(`${coords.lat}, ${coords.lng}`);
+    if (ok) {
       setCopiedCoords(true);
       setTimeout(() => setCopiedCoords(false), 2000);
     }
+    return ok;
   };
   const handleShare = async () => {
     const url = window.location.href;

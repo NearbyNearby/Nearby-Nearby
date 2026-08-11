@@ -161,9 +161,9 @@ export default function PoiHeader({
   extraButtons = [],     // [{ label, svg, onClick, href, target, rel, extraClass }]
   titleLeader = null,    // optional node before h1 (e.g., status banner)
   subtitleExtras = null, // optional extra content after main category (e.g., venue line)
-  hideStatus = false,    // Business/Park/Trail hide the admin Status + Status Message
-                          // block until user profiles ship (#139/#144/#145); Event keeps
-                          // its own status system and doesn't set this.
+  hideStatus = false,    // All four POI types hide the admin Status + Status Message
+                          // block until user profiles ship (#139/#144/#145); Event sets
+                          // it too (#142 item 2) because EventStatusBanner owns its status.
   typeInfoBox = null,    // type-specific info block in poi_col2, before the verified badge
                           // (Trail: route/length/difficulty; Event will use this too)
 }) {
@@ -200,14 +200,24 @@ export default function PoiHeader({
     );
   });
 
-  const handleCopyLatLong = onCopyLatLong || (async () => {
-    if (!coords) return;
-    const ok = await copyToClipboard(`${coords.lat}, ${coords.lng}`);
-    if (ok) {
-      setCopiedCoords(true);
-      setTimeout(() => setCopiedCoords(false), 2000);
+  // #142 item 5: the "Copied!" flash reads this component's own state, so it has
+  // to fire for a parent-supplied handler too. POIDetailLayout always passes
+  // onCopyLatLong, which used to leave the button silent on every POI page.
+  // A parent handler reports failure by returning false (undefined means "no
+  // signal", so treat it as success); a throw never flashes and never escapes.
+  const handleCopyLatLong = async () => {
+    let ok;
+    try {
+      ok = onCopyLatLong
+        ? await onCopyLatLong()
+        : (coords ? await copyToClipboard(`${coords.lat}, ${coords.lng}`) : false);
+    } catch {
+      return;
     }
-  });
+    if (ok === false) return;
+    setCopiedCoords(true);
+    setTimeout(() => setCopiedCoords(false), 2000);
+  };
 
   const handleShare = onShare || (async () => {
     const shareData = { title: poi?.name || 'Nearby Nearby', url: typeof window !== 'undefined' ? window.location.href : '' };
