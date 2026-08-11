@@ -85,8 +85,12 @@ def multi_signal_search(
 
     parsed = parse_query(query)
 
-    # If explicit poi_type param, override any type hint from the query
-    effective_type = poi_type.upper() if poi_type else parsed.poi_type_hint
+    # An explicit poi_type (caller / filter pill) overrides any type hint the
+    # query text implies. Track it separately from the effective type: it is
+    # the only kind of type filter allowed to constrain the name-match signals
+    # below (Issue #166).
+    explicit_type = poi_type.upper() if poi_type else None
+    effective_type = explicit_type or parsed.poi_type_hint
 
     # Issue #137: "pet friendly" (and friends) is a filter, not a phrase to
     # fuzzy-match. Answer it from the computed amenity boolean and stop —
@@ -99,12 +103,17 @@ def multi_signal_search(
     # Each signal returns {poi_id: score} where score is 0..1
     candidates = {}  # poi_id -> {signal_name: score}
 
-    # --- Signal 1: Exact name match ---
-    exact_scores = _signal_exact_name(db, parsed.original_query, effective_type)
+    # --- Signal 1 & 2: Exact + trigram name match ---
+    # Issue #166: a query word can imply a type ("market" -> EVENT) even when
+    # the query is actually the exact name of a POI of a different type
+    # ("Riverside Market", a business). An INFERRED type must not hide a name
+    # hit that strong, so these two signals only honor an EXPLICIT type filter
+    # (a caller-passed poi_type / filter pill); the inferred hint still shapes
+    # every other signal below.
+    exact_scores = _signal_exact_name(db, parsed.original_query, explicit_type)
     _merge_scores(candidates, "exact_name", exact_scores)
 
-    # --- Signal 2: Keyword / trigram name match ---
-    keyword_scores = _signal_keyword_name(db, parsed.original_query, effective_type)
+    keyword_scores = _signal_keyword_name(db, parsed.original_query, explicit_type)
     _merge_scores(candidates, "keyword_name", keyword_scores)
 
     # --- Signal 3: Full-text search (tsvector) ---

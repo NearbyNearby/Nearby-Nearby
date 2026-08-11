@@ -117,7 +117,12 @@ function* ruleOccurrences(start, pattern, horizon) {
   const interval = Math.max(1, Number(pattern?.interval) || 1);
 
   if (frequency === 'weekly') {
-    const rawDays = pattern?.days_of_week || pattern?.days || [];
+    // Mirror shared/utils/recurring_events.py: `days_of_week or days`, where a
+    // present-but-EMPTY days_of_week array is falsy and falls through to days.
+    // Plain `||` would not do that here, since [] is truthy in JS.
+    const daysOfWeek = pattern?.days_of_week;
+    const hasDays = Array.isArray(daysOfWeek) ? daysOfWeek.length > 0 : Boolean(daysOfWeek);
+    const rawDays = hasDays ? daysOfWeek : (pattern?.days || []);
     const days = [...new Set(
       (Array.isArray(rawDays) ? rawDays : [rawDays])
         .map(toWeekdayIndex)
@@ -230,6 +235,63 @@ export function getNextOccurrence(event, now = new Date()) {
   }
 
   return best ? withEnd(best) : null;
+}
+
+/**
+ * eventOccursOnDate: does `event` have an occurrence overlapping the given
+ * calendar date (a "YYYY-MM-DD" string)? Used by the Nearby date filter
+ * (Today / Tomorrow / This Weekend / custom) to test a specific day rather
+ * than "today", the way getNextOccurrence does. A repeating event is resolved
+ * through the same rule engine (repeat_pattern, recurrence_end_date,
+ * excluded_dates), just checked against the target date instead of now.
+ */
+export function eventOccursOnDate(event, dateStr) {
+  const target = parseLocalish(dateStr);
+  const start = parseLocalish(event?.start_datetime);
+  if (!target || !start) return false;
+
+  const rawEnd = parseLocalish(event?.end_datetime);
+  const end = rawEnd && rawEnd > start ? rawEnd : null;
+  const durationMs = end ? end.getTime() - start.getTime() : 0;
+
+  const dayStart = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const spansDay = (occStart) => {
+    const occEnd = durationMs > 0 ? new Date(occStart.getTime() + durationMs) : occStart;
+    return occStart < dayEnd && occEnd >= dayStart;
+  };
+
+  if (!event?.is_repeating) return spansDay(start);
+
+  const recurrenceEnd = parseLocalish(event?.recurrence_end_date);
+  const excluded = new Set(
+    (Array.isArray(event?.excluded_dates) ? event.excluded_dates : [])
+      .map((d) => String(d).slice(0, 10)),
+  );
+
+  for (const candidate of ruleOccurrences(start, event?.repeat_pattern, dayEnd)) {
+    if (recurrenceEnd && candidate > recurrenceEnd) break;
+    if (excluded.has(toDateKey(candidate))) continue;
+    if (spansDay(candidate)) return true;
+  }
+
+  // Manual dates are explicit one-off additions to the series (see
+  // getNextOccurrence); they are not bounded by the recurrence rule.
+  for (const manual of (Array.isArray(event?.manual_dates) ? event.manual_dates : [])) {
+    const raw = typeof manual === 'object' && manual !== null ? manual.date : manual;
+    const day = parseLocalish(raw);
+    if (!day) continue;
+    let candidate = atTimeOf(day, start);
+    const startTime = typeof manual === 'object' && manual !== null ? manual.start_time : null;
+    if (typeof startTime === 'string' && startTime.includes(':')) {
+      const [h, m] = startTime.split(':');
+      candidate = new Date(day.getFullYear(), day.getMonth(), day.getDate(), Number(h), Number(m));
+    }
+    if (excluded.has(toDateKey(candidate))) continue;
+    if (spansDay(candidate)) return true;
+  }
+
+  return false;
 }
 
 /**

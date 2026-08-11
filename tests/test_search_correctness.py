@@ -377,11 +377,19 @@ class TestIssue127PastEventsInSuggestions:
 
     def test_event_started_earlier_today_still_suggested(self, db_session, app_client):
         """"Past" is measured from the start of today, so an event that began
-        this morning is still happening today."""
+        this morning is still happening today.
+
+        The module-level _TODAY_START is fixed at import time; a run whose
+        import and execution straddle UTC midnight would make it stale by the
+        time this test runs (the engine's own cutoff is computed fresh, per
+        request). Compute today_start here, at execution time, instead."""
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         orm_create_event(
             db_session, name="Riverbend Craft Fair Today", published=True,
             event_fields={
-                "start_datetime": _TODAY_START + timedelta(minutes=1),
+                "start_datetime": today_start + timedelta(minutes=1),
                 "end_datetime": None,
             },
         )
@@ -466,3 +474,59 @@ class TestIssue127PastEventsInSuggestions:
         resp = app_client.get(f"/api/pois/{past.id}")
         assert resp.status_code == 200
         assert resp.json()["name"] == "Riverbend Craft Fair Archive"
+
+
+# ---------------------------------------------------------------------------
+# #166: an inferred type filter must not hide an exact/near-exact name match
+# ---------------------------------------------------------------------------
+#
+# "market" is a keyword that infers poi_type=EVENT (POI_TYPE_SYNONYMS), so a
+# business literally named "Riverside Market" was invisible to its own name:
+# every signal, including the exact-name match, was filtered down to EVENT
+# candidates only. The fix scopes that inferred filter to the fuzzier signals
+# (fulltext, semantic, structured filter, type/city boost) and lets the
+# exact-name and trigram name-match signals run unfiltered, so a strong name
+# hit of any type still surfaces. An EXPLICIT poi_type (a filter pill) still
+# constrains every signal, including the name-match ones.
+
+class TestIssue166ExactNameOverridesInferredType:
+    def test_exact_name_business_survives_market_keyword_inference(
+        self, db_session, app_client
+    ):
+        """"riverside market" is the business's exact name, but "market" alone
+        infers EVENT: the business must still come back, ranked first."""
+        orm_create_business(db_session, name="Riverside Market", published=True)
+        orm_create_event(
+            db_session, name="Pittsboro Saturday Farmers Market", published=True,
+            event_fields={"start_datetime": _FUTURE},
+        )
+        db_session.commit()
+
+        names = _names(_search(app_client, "riverside market"))
+        assert names[0] == "Riverside Market"
+
+    def test_inferred_type_still_favors_events_for_generic_query(
+        self, db_session, app_client
+    ):
+        """A generic query that only implies a type (no exact name match on
+        either side) keeps ranking that inferred type first."""
+        orm_create_business(db_session, name="Riverside Market", published=True)
+        orm_create_event(
+            db_session, name="Pittsboro Saturday Farmers Market", published=True,
+            event_fields={"start_datetime": _FUTURE},
+        )
+        db_session.commit()
+
+        names = _names(_search(app_client, "market"))
+        assert names[0] == "Pittsboro Saturday Farmers Market"
+
+    def test_explicit_type_filter_still_excludes_a_strong_name_match(
+        self, db_session, app_client
+    ):
+        """A caller-passed poi_type (filter pill) is not "inferred", it must
+        keep excluding strictly even when the name match is exact."""
+        orm_create_business(db_session, name="Riverside Market", published=True)
+        db_session.commit()
+
+        names = _names(_search(app_client, "riverside market", poi_type="EVENT"))
+        assert "Riverside Market" not in names

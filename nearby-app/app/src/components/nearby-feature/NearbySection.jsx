@@ -9,6 +9,7 @@ import NearbyFacets from './NearbyFacets';
 import DirectionsModal from '../common/DirectionsModal';
 import { getApiUrl } from '../../config';
 import { getPOIUrl } from '../../utils/slugify';
+import { eventOccursOnDate } from '../../utils/eventSchedule';
 
 const RADIUS_OPTIONS = [1, 3, 5, 10, 15];
 
@@ -182,9 +183,11 @@ function NearbySection({ currentPOI }) {
       }
     }
 
-    if (selectedDate && nearbyPoi.poi_type?.toLowerCase() === 'event' && nearbyPoi.event?.start_datetime) {
-      const eventDate = new Date(nearbyPoi.event.start_datetime).toISOString().split('T')[0];
-      if (eventDate !== selectedDate) {
+    // Event cards carry their schedule as flat fields (start_datetime plus the
+    // recurrence block), not a nested `event` object, so a repeating event is
+    // resolved to whichever occurrence (if any) falls on the selected date.
+    if (selectedDate && nearbyPoi.poi_type?.toLowerCase() === 'event') {
+      if (!eventOccursOnDate(nearbyPoi, selectedDate)) {
         return false;
       }
     }
