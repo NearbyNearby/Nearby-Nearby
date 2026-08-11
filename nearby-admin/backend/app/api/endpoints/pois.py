@@ -222,6 +222,18 @@ def autosave_poi(
         k: v for k, v in (payload or {}).items()
         if k in AUTOSAVE_ALLOWED_FIELDS and k not in AUTOSAVE_DENIED_FIELDS
     }
+
+    # Issue #163: validate the EVENT-publish invariant FIRST, before anything is
+    # applied to `poi` or synced to the DB. poi_type is autosave-denied (it
+    # cannot change here), but publication_status is autosave-allowed; refuse to
+    # autosave an EVENT POI into 'published' with no events row. Checked before
+    # any mutation so a rejected request never leaves partial writes staged on
+    # the session (this endpoint has no wrapping try/rollback either).
+    from app.crud.crud_poi import assert_event_publish_invariant
+    _poi_type_str = poi.poi_type.value if hasattr(poi.poi_type, 'value') else str(poi.poi_type)
+    _effective_publication_status = filtered.get('publication_status', poi.publication_status)
+    assert_event_publish_invariant(_poi_type_str, _effective_publication_status, poi.event is not None)
+
     coerce_empty_literals(filtered, schemas.PointOfInterestUpdate)
 
     # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, not

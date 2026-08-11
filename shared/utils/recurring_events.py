@@ -16,12 +16,35 @@ _FREQ_MAP = {
     "yearly": YEARLY,
 }
 
-_DAY_MAP = {
-    "MO": MO, "TU": TU, "WE": WE, "TH": TH, "FR": FR, "SA": SA, "SU": SU,
-}
+# Full weekday names, used to resolve both the dateutil two-letter vocabulary
+# (MO/TU/WE/...) and the admin form's vocabulary (Mon/Tue/Thu/... or full
+# names like "Monday"), case-insensitively. Mirrors the matching in
+# nearby-app/app/src/utils/eventSchedule.js (toWeekdayIndex): a token matches
+# if it is a case-insensitive prefix of exactly one weekday name.
+_WEEKDAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+_WEEKDAY_OBJS = [MO, TU, WE, TH, FR, SA, SU]
 
 # Maximum expansion horizon: 60 months from start
 _MAX_MONTHS = 60
+
+
+def _parse_weekday(token):
+    """Resolve a day-of-week token to a dateutil weekday object, or None.
+
+    Accepts the dateutil two-letter vocabulary (MO/TU/WE/TH/FR/SA/SU), the
+    admin form's three-letter vocabulary (Mon/Tue/Wed/...), and full names
+    (Monday/Tuesday/...), all case-insensitively. A token shorter than 2
+    characters is rejected (single letters are ambiguous, e.g. "T").
+    """
+    if not isinstance(token, str):
+        return None
+    t = token.strip().lower()
+    if len(t) < 2:
+        return None
+    for name, obj in zip(_WEEKDAY_NAMES, _WEEKDAY_OBJS):
+        if name.startswith(t):
+            return obj
+    return None
 
 
 def expand_recurring_dates(
@@ -76,10 +99,15 @@ def expand_recurring_dates(
         "until": effective_end,
     }
 
-    # Weekly with specific days
-    days = repeat_pattern.get("days")
+    # Weekly with specific days. The admin form writes "days_of_week" (Mon/Tue/
+    # Thu tokens); older callers use "days" (MO/TU/WE tokens). Accept both keys
+    # and both vocabularies so a multi-day-per-week series (e.g. Wed + Sat)
+    # expands correctly regardless of which side wrote the pattern.
+    days = repeat_pattern.get("days_of_week") or repeat_pattern.get("days")
     if days and freq == WEEKLY:
-        byweekday = [_DAY_MAP[d] for d in days if d in _DAY_MAP]
+        if not isinstance(days, list):
+            days = [days]
+        byweekday = [wd for wd in (_parse_weekday(d) for d in days) if wd is not None]
         if byweekday:
             kwargs["byweekday"] = byweekday
 

@@ -4,7 +4,7 @@ from sqlalchemy import or_, func
 from fastapi import HTTPException
 import uuid
 import re
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app import models, schemas
 from app.crud.crud_category import get_category
@@ -19,6 +19,29 @@ from shared.utils.event_status import validate_status_transition
 # Sentinel distinguishing "key absent from the update payload" (leave the column
 # untouched) from "key present with value null" (clear the column). Task 2.4.
 _UNSET = object()
+
+
+def assert_event_publish_invariant(
+    poi_type_str: str, publication_status: Optional[str], has_event: bool
+) -> None:
+    """Issue #163: an EVENT POI must have an events row (it carries the
+    required start_datetime) before it can be published. Without one, the
+    public API returns event: null, the POI has no date anywhere, and it
+    bypasses every event filter (past-event exclusion, date range).
+
+    start_datetime is NOT NULL with no defensible default, so there is no
+    safe placeholder row to auto-create; enforce the invariant at publish
+    time instead. Draft EVENT POIs with no event data are still allowed
+    (the form is a multi-step draft flow), only publishing is refused.
+    """
+    if poi_type_str == 'EVENT' and publication_status == 'published' and not has_event:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Cannot publish an EVENT POI with no event data (missing "
+                "start_datetime). Add event details before publishing."
+            ),
+        )
 
 
 def _poi_location_lat_lng(location):
@@ -620,6 +643,27 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
 
 def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.PointOfInterestUpdate, user_id=None) -> models.PointOfInterest:
     update_data = obj_in.model_dump(exclude_unset=True)
+
+    # Issue #163: validate the EVENT-publish invariant FIRST, before anything is
+    # applied to db_obj. A rejected request must never leave partial writes
+    # staged on the session: this function has no wrapping try/rollback around
+    # its early setattr calls, so a later query on the same session could
+    # autoflush a half-applied change even though this call itself never commits.
+    _current_poi_type = db_obj.poi_type.value if hasattr(db_obj.poi_type, 'value') else str(db_obj.poi_type)
+    _effective_poi_type = update_data.get('poi_type', _current_poi_type)
+    _effective_poi_type = _effective_poi_type.value if hasattr(_effective_poi_type, 'value') else str(_effective_poi_type)
+    _effective_publication_status = update_data.get('publication_status', db_obj.publication_status)
+    # Mirrors the subtype-assignment condition further below: an 'event' payload
+    # only attaches when the POI's CURRENT (pre-update) type is already EVENT.
+    # Presence of the 'event' key is not enough: models.Event(**event_data) still
+    # needs a non-null start_datetime (NOT NULL column), so an incoming payload
+    # only counts as "will have event" when it actually carries one -- otherwise
+    # the request would sail past this guard and die on a raw IntegrityError
+    # (400) instead of this guard's clean 422.
+    _incoming_event = update_data.get('event') if _current_poi_type == 'EVENT' else None
+    _incoming_has_start_datetime = isinstance(_incoming_event, dict) and _incoming_event.get('start_datetime') is not None
+    _will_have_event = db_obj.event is not None or _incoming_has_start_datetime
+    assert_event_publish_invariant(_effective_poi_type, _effective_publication_status, _will_have_event)
 
     # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, NOT as
     # JSONB. Pop the top-level link fields that were provided in THIS request so
