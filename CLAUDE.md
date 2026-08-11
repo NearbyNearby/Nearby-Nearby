@@ -6,6 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ---
 
+## Working Principles
+
+Guardrails to cut common LLM coding mistakes. They bias toward caution over speed; use judgment on trivial tasks.
+
+1. **Think before coding.** State assumptions; if uncertain, ask. If multiple interpretations exist, surface them instead of silently picking one. If a simpler approach exists, say so and push back when warranted. If something is unclear, stop, name what's confusing, and ask.
+2. **Simplicity first.** Write the minimum code that solves the problem, nothing speculative: no unrequested features, no abstractions for single-use code, no configurability nobody asked for, no error handling for impossible cases. If 200 lines could be 50, rewrite it. If a senior engineer would call it overcomplicated, simplify.
+3. **Surgical changes.** Touch only what the request requires; every changed line should trace directly to it. Match existing style even if you'd do it differently. Don't "improve" adjacent code, refactor what isn't broken, or reformat working code. Remove only the imports/vars/functions your own change orphaned; mention pre-existing dead code, don't delete it unless asked.
+4. **Goal-driven execution.** Turn tasks into verifiable goals ("fix the bug" becomes "write a test that reproduces it, then make it pass"; "refactor X" becomes "tests pass before and after"). For multi-step work, state a brief numbered plan with a verify check per step, then loop until verified.
+5. **Be concise.** Keep prose, comments, commit messages, and docs as short as the content allows. Cut filler; don't pad.
+6. **No em dashes.** Do not use em dashes in prose, comments, commit messages, or docs. Use commas, parentheses, colons, or separate sentences instead.
+
+---
+
 ## Documentation Reference (Source of Truth)
 
 The `docs/` folder contains the authoritative documentation for each system:
@@ -226,6 +239,8 @@ Both applications share the same production PostgreSQL database. Documentation l
 - Never perform INSERT, UPDATE, DELETE, or any data modification operations on production data
 - All write operations should only target development or test databases
 - Database migrations should be tested locally first, then carefully applied to production
+- **Before applying any Alembic migration to prod**: take a manual RDS snapshot first (`aws rds create-db-snapshot --db-instance-identifier nearby-admin-db --db-snapshot-identifier pre-migration-<rev>-<date> --profile nn-prod`)
+- **Expand/contract only**: never rename or drop a column that live code reads in the same release. Sequence: add new, deploy code reading both, backfill, stop writing old, drop old in a later release (the `m_payphone` rename outage is the precedent)
 
 This rule ensures data integrity and prevents accidental modifications to live production data.
 
@@ -234,6 +249,18 @@ This rule ensures data integrity and prevents accidental modifications to live p
 ## Run Only in Docker
 
 **Always run the apps, scripts, migrations, and tests inside Docker — never directly on the host** (no Python venv; only a partial `node_modules`).
+
+This includes frontend tests and builds. Do NOT run `npx vitest` / `npx vite build` on the host, even if a host `node_modules` happens to work. Host runs are unreproducible and hide platform-specific breakage (example: macOS is case-insensitive, so a host build can pass or fail differently than the Linux Docker build that actually ships). Use the compose `frontend` service:
+
+```bash
+cd nearby-app
+docker compose -f docker-compose.dev.yml run --rm frontend npx vitest run
+docker compose -f docker-compose.dev.yml run --rm frontend npx vite build
+```
+
+`docker compose run` does NOT rebuild an existing image. After any `package.json` change (or if a dependency seems missing in the container), rebuild first: `docker compose -f docker-compose.dev.yml build frontend`.
+
+Known exception: the root `tests/` Python integration suite has no runner container yet (`tests/docker-compose.test.yml` only provides PostGIS + MinIO), so `pytest` runs from the host `.venv-test` against those containers. That is the only tooling allowed on the host.
 
 ---
 
@@ -266,7 +293,9 @@ Internet → Cloudflare (HTTPS) → ALB (HTTP port 80) → ECS Fargate
 
 ### How to Deploy
 
-**Automatic**: Push code changes to `main` branch. GitHub Actions builds, tests, and deploys.
+> **⚠️ CI auto-deploy is BROKEN (repo moved to `NearbyNearby/Nearby-Nearby` on 2026-07-01); deploy manually until you update Terraform `github_repo`→new org + `terraform apply` + re-add the `AWS_ROLE_TO_ASSUME` secret. AWS unaffected.**
+
+**Automatic** (once CI OIDC is re-enabled): Push code changes to `main` branch. GitHub Actions builds, tests, and deploys.
 - `nearby-app/**` or `shared/**` changes → triggers app workflow
 - `nearby-admin/**` or `shared/**` changes → triggers admin workflow
 

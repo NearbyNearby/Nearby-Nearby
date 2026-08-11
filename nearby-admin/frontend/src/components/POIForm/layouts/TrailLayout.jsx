@@ -21,9 +21,10 @@ import {
   CommunityConnectionsSection, CorporateComplianceSection
 } from '../sections/MiscellaneousSections';
 import HoursSelector from '../../HoursSelector';
-import { FeaturedImageUpload, shouldUseImageUpload } from '../ImageIntegration';
+import { FeaturedImageUpload, DownloadableMapsUpload, shouldUseImageUpload } from '../ImageIntegration';
 
 import { ParkingLocationGroup } from '../components/ParkingLocationGroup';
+import ParkingLotLinkGroup from '../components/ParkingLotLinkGroup';
 import { RestroomLocationGroup } from '../components/RestroomLocationGroup';
 import ServiceAnimalAlert from '../components/ServiceAnimalAlert';
 import {
@@ -231,6 +232,7 @@ export default function TrailLayout({ form, userRole, poiId }) {
         <Accordion.Control><Text fw={600}>Parking</Text></Accordion.Control>
         <Accordion.Panel>
           <ParkingLocationGroup form={form} id={poiId} isTrail label="Parking Locations" />
+          <ParkingLotLinkGroup form={form} />
         </Accordion.Panel>
       </Accordion.Item>
 
@@ -375,12 +377,12 @@ export default function TrailLayout({ form, userRole, poiId }) {
               </SimpleGrid>
             </Checkbox.Group>
 
-            <TextInput
-              label="Downloadable Trail Map"
-              placeholder="URL to trail map PDF or image"
-              value={form.values.downloadable_trail_map || ''}
-              onChange={(e) => form.setFieldValue('downloadable_trail_map', e.currentTarget.value)}
-            />
+            <Divider my="sm" label="Downloadable Trail Map" />
+            {shouldUseImageUpload(poiId) ? (
+              <DownloadableMapsUpload poiId={poiId} form={form} />
+            ) : (
+              <Text size="sm" c="dimmed">Save the trail first to enable trail map/guide upload.</Text>
+            )}
           </Stack>
         </Accordion.Panel>
       </Accordion.Item>

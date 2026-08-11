@@ -34,20 +34,38 @@ import { modals } from '@mantine/modals';
 import { api } from '../../utils/api';
 
 const IMAGE_TYPE_CONFIG = {
-  main: { maxCount: 1, maxSizeMB: 10, label: 'Main Image' },
-  gallery: { maxCount: 20, maxSizeMB: 10, label: 'Gallery Images' },
-  entry: { maxCount: 3, maxSizeMB: 5, label: 'Entry Photos' },
-  parking: { maxCount: 5, maxSizeMB: 5, label: 'Parking Photos' },
-  restroom: { maxCount: 10, maxSizeMB: 5, label: 'Restroom Photos' },
-  rental: { maxCount: 10, maxSizeMB: 5, label: 'Rental Photos' },
-  playground: { maxCount: 10, maxSizeMB: 5, label: 'Playground Photos' },
-  menu: { maxCount: 10, maxSizeMB: 10, label: 'Menu Photos' },
-  trail_head: { maxCount: 10, maxSizeMB: 5, label: 'Trail Head Photos' },
-  trail_exit: { maxCount: 10, maxSizeMB: 5, label: 'Trail Exit Photos' },
-  access_point: { maxCount: 5, maxSizeMB: 5, label: 'Access Point Photos' },
+  main: { maxCount: 1, maxSizeMB: 15, label: 'Main Image' },
+  gallery: { maxCount: 20, maxSizeMB: 15, label: 'Gallery Images' },
+  entry: { maxCount: 3, maxSizeMB: 15, label: 'Entry Photos' },
+  parking: { maxCount: 5, maxSizeMB: 15, label: 'Parking Photos' },
+  restroom: { maxCount: 10, maxSizeMB: 15, label: 'Restroom Photos' },
+  rental: { maxCount: 10, maxSizeMB: 15, label: 'Rental Photos' },
+  playground: { maxCount: 10, maxSizeMB: 15, label: 'Playground Photos' },
+  menu: { maxCount: 10, maxSizeMB: 15, label: 'Menu Photos' },
+  trail_head: { maxCount: 10, maxSizeMB: 15, label: 'Trail Head Photos' },
+  trail_exit: { maxCount: 10, maxSizeMB: 15, label: 'Trail Exit Photos' },
+  access_point: { maxCount: 10, maxSizeMB: 15, label: 'Access Point Photos' },
   map: { maxCount: 5, maxSizeMB: 20, label: 'Maps' },
-  downloadable_map: { maxCount: 5, maxSizeMB: 50, label: 'Downloadable Maps' }
+  downloadable_map: { maxCount: 5, maxSizeMB: 50, label: 'Downloadable Maps' },
+  sponsor_logo: { maxCount: 1, maxSizeMB: 15, label: 'Sponsor Logo' }
 };
+
+// Map a react-dropzone rejection to a human-readable sentence. Exported for tests.
+export function rejectionMessage(fileRejection, maxSizeMB) {
+  const name = fileRejection?.file?.name || 'File';
+  const codes = (fileRejection?.errors || []).map((e) => e.code);
+  if (codes.includes('file-too-large')) {
+    return `${name} is larger than the ${maxSizeMB} MB limit.`;
+  }
+  if (codes.includes('file-invalid-type')) {
+    return `${name} isn't a supported image format.`;
+  }
+  if (codes.includes('too-many-files')) {
+    return `${name} exceeds the number of files allowed.`;
+  }
+  const first = fileRejection?.errors?.[0]?.message;
+  return `${name} was rejected${first ? `: ${first}` : '.'}`;
+}
 
 export function ImageUploadField({
   poiId,
@@ -64,6 +82,7 @@ export function ImageUploadField({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const openRef = useRef(() => {});
+  const metadataTimers = useRef(new Map());
 
   const config = IMAGE_TYPE_CONFIG[imageType] || {};
   const maxCount = config.maxCount || 1;
@@ -77,6 +96,14 @@ export function ImageUploadField({
     }
   }, [poiId, imageType, context]);
 
+  useEffect(() => {
+    const timers = metadataTimers.current;
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
   const loadExistingImages = async () => {
     try {
       const response = await api.get(`/images/poi/${poiId}`);
@@ -84,31 +111,26 @@ export function ImageUploadField({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
+      // Backend returns only original images (variants are excluded server-side)
+      // and attaches variant URLs to each original, so no client-side dedup is
+      // needed. Every row here is an original, so its id is safe to delete/edit.
       let filteredImages = data.filter(img => img.image_type === imageType);
 
       if (context) {
         filteredImages = filteredImages.filter(img => img.image_context === context);
       }
 
-      // Remove duplicate images - keep only unique original uploads
-      // Backend might return multiple variants (original, medium, thumbnail)
-      const uniqueImages = filteredImages.reduce((acc, img) => {
-        const existingImg = acc.find(i =>
-          i.original_filename === img.original_filename &&
-          i.upload_timestamp === img.upload_timestamp
-        );
-        if (!existingImg) {
-          acc.push(img);
-        }
-        return acc;
-      }, []);
-
-      setImages(uniqueImages);
+      setImages(filteredImages);
       if (onImagesChange) {
-        onImagesChange(uniqueImages);
+        onImagesChange(filteredImages);
       }
     } catch (error) {
       console.error('Error loading images:', error);
+      notifications.show({
+        title: 'Could not refresh images',
+        message: 'The image list may be out of date. Reload the page to see the latest.',
+        color: 'yellow'
+      });
     }
   };
 
@@ -160,7 +182,15 @@ export function ImageUploadField({
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          // Surface the real backend reason (e.g. "Maximum N images allowed",
+          // "File too large", "S3 not configured") instead of a generic message.
+          const errBody = await response.json().catch(() => ({}));
+          let message = errBody.detail || `Upload failed (status ${response.status})`;
+          if (response.status === 413 && !errBody.detail) {
+            // nginx rejects oversized bodies with an HTML page, not JSON.
+            message = 'File too large for the server. Please use a smaller image.';
+          }
+          throw new Error(message);
         }
 
         const uploadedImage = await response.json();
@@ -182,7 +212,7 @@ export function ImageUploadField({
     } catch (error) {
       notifications.show({
         title: 'Upload Failed',
-        message: error.response?.data?.detail || 'Failed to upload images',
+        message: error.message || 'Failed to upload images',
         color: 'red'
       });
     } finally {
@@ -235,22 +265,41 @@ export function ImageUploadField({
       img.id === imageId ? { ...img, [field]: value } : img
     ));
 
-    // Debounced API call to update metadata
-    clearTimeout(handleUpdateMetadata.timer);
-    handleUpdateMetadata.timer = setTimeout(async () => {
+    // Debounce the API call per image+field so concurrent edits to different
+    // fields or cards do not cancel each other's pending save.
+    const timerKey = `${imageId}:${field}`;
+    const timers = metadataTimers.current;
+    if (timers.has(timerKey)) {
+      clearTimeout(timers.get(timerKey));
+    }
+    timers.set(timerKey, setTimeout(async () => {
+      timers.delete(timerKey);
       try {
-        const response = await api.put(`/images/image/${imageId}`, {
-          [field]: value
-        });
-
+        const response = await api.put(`/images/image/${imageId}`, { [field]: value });
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(errBody.detail || `Save failed (status ${response.status})`);
         }
       } catch (error) {
         console.error('Error updating image metadata:', error);
+        notifications.show({
+          title: 'Save Failed',
+          message: error.message || 'Failed to save image details',
+          color: 'red'
+        });
       }
-    }, 1000);
+    }, 1000));
   }, []);
+
+  const handleReject = useCallback((fileRejections) => {
+    fileRejections.forEach((rejection) => {
+      notifications.show({
+        title: 'File not accepted',
+        message: rejectionMessage(rejection, maxSizeMB),
+        color: 'red'
+      });
+    });
+  }, [maxSizeMB]);
 
   const handleReorder = useCallback(async (result) => {
     if (!result.destination) return;
@@ -371,6 +420,7 @@ export function ImageUploadField({
         <Dropzone
           openRef={openRef}
           onDrop={handleDrop}
+          onReject={handleReject}
           maxSize={maxSizeMB * 1024 * 1024}
           accept={imageType === 'downloadable_map' ? [...IMAGE_MIME_TYPE, 'application/pdf'] : IMAGE_MIME_TYPE}
           loading={uploading}
@@ -502,11 +552,19 @@ function ImageCard({ image, onDelete, onUpdateMetadata, dragHandleProps, showDra
           </>
         ) : (
           <>
-            {image.original_filename && (
+            {/* Issue #121: show the saved alt text / caption (what editors
+                actually annotated) instead of the raw filename, so it's
+                obvious at a glance which photos still need metadata. Falls
+                back to the filename when neither has been set. */}
+            {image.caption ? (
+              <Text size="xs" truncate>{image.caption}</Text>
+            ) : image.alt_text ? (
+              <Text size="xs" truncate>{image.alt_text}</Text>
+            ) : image.original_filename ? (
               <Text size="xs" c="dimmed" truncate>
                 {image.original_filename}
               </Text>
-            )}
+            ) : null}
             <Button
               size="xs"
               variant="subtle"

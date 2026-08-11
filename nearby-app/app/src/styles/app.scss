@@ -13,6 +13,7 @@
 @use 'sass:color';
 
 
+
 /* ===================================================================== *
  *  TOKENS — SCSS $ variables (from styles/nn/options.scss)
  * ===================================================================== */
@@ -33,6 +34,7 @@ $nn_purple3: #DFBFDF;
 $nn_teal1:   #245B4E;
 $nn_teal2:   #328170;
 $nn_teal3:   #1d4a3f;
+$nn_teal4:   #e9f6f3;
 $nn_gold:    #FEC764;
 
 // ── Spectrum ─────────────────────────────────────────────────────
@@ -77,22 +79,42 @@ $color_etsy:      #F16521;
 $color_vimeo:     #1a8acb;
 
 // ── Semantic tokens ───────────────────────────────────────────────
-$color_text:       $nn_slate;
 $link_color:       $nn_teal1;
 $link_color_hover: #1f5046;
 $color_bg:         #F4F2F7;
 $color_border:      #4a4a4a;
-$color_error:      $red;
-$color_success:    $green;
-$color_focus:      #0066cc;
 
 // $color_bg: #ffffff;
 $color_primary: #0056b3;
 $color_error: #c70000;
 $color_success: #006400;
 $color_border: #4a4a4a;
-$color_focus: #0056b3;
+$color_focus: #0066cc;
 $color_hint: #3c3c3c;
+
+// ── Soft/tint + missing brand variants (added 2026-07-23 during var()-to-$variable conversion) ──
+$light_yellow4:   #fff6e0;
+$mobile_nav_height: 75px;
+$nn_green3:       #226226;
+$nn_orange3:      #7A4E00;
+$nn_bg_soft:      #faf9f5;
+$nn_border:       #e5e7eb;
+$nn_gold_hover:   #fdb93e;
+$nn_gold_soft:    #fef8e5;
+$nn_purple_soft:  #f3e8f3;
+
+// ── Trail difficulty badge colors (nearby-card__trail-difficulty) — placeholder values, Barry to tune for AAA contrast ──
+$trail_difficulty_easy_bg:        #ffffff;
+$trail_difficulty_easy_border:    #65af20;
+$trail_difficulty_easy_text:      $green;
+
+$trail_difficulty_moderate_bg:      #ffffff;
+$trail_difficulty_moderate_border:  $orange;
+$trail_difficulty_moderate_text:    #8A4700;
+
+$trail_difficulty_hard_bg:        #ffffff;
+$trail_difficulty_hard_border:    $red;
+$trail_difficulty_hard_text:      $red2;
 
 // ── Font stacks ──────────────────────────────────────────────────
 $font_sansserif:        Arial, Helvetica, sans-serif;
@@ -115,6 +137,73 @@ $purple_teal_gradient_1: linear-gradient(180deg, rgba(86, 37, 86, 1) 0%, rgba(50
 // Breakpoints (document only, CSS can't store as variables):
 //   600px, 700px, 980px, 1200px, 1400px, 1600px, 1900px, 2400px
 // ==========================================================================
+
+
+// ── Accessible menu system variables (moved from styles/nn/accessible-menu.scss) ──
+// $menu-breakpoint: 1200px;
+$menu-transition-speed: 0.3s;
+$menu-easing: ease-in-out;
+
+// Colors
+$dropdown-shadow: rgba(0, 0, 0, 0.11);
+
+$menu-bg-mobile: white;
+$menu-text-mobile: $nn_teal1;
+$menu-hover-bg-mobile: $nn_teal1;
+$menu-active-bg-mobile: color.adjust($nn_teal1, $lightness: -8%);
+$dropdown-bg-mobile: #ffffff;
+
+$menu-bg-desktop: $nn_gold;
+$menu-text-desktop: black;
+$menu-hover-bg-desktop: $nn_gold;
+$menu-active-bg-desktop: $nn_gold;
+$dropdown-bg-desktop: $nn_gold;
+
+
+// Spacing
+$menu-padding: 15px 20px;
+$submenu-indent: 10px;
+
+// Fonts
+$fontfamily1: 'Poppins', Arial, Helvetica, sans-serif;
+$fontfamily2: 'Roboto', Arial, Helvetica, sans-serif;
+
+
+// Custom Colors (optional - if you want to make it even easier)
+$client-hover-color: #FEB42F;
+$client-active-color: #FEB42F;
+// $client-text-color: tomato; 
+$client-bg-color: $nn_gold;
+
+// ── Overlay system variables (moved from styles/nn/overlay.scss) ──
+// ─── Variables ──────────────────────────────────────
+// Brand / theme
+// NOTE: named $overlay-color-primary, not $color-primary, because Sass treats
+// `-` and `_` as the same character in identifiers — $color-primary would
+// silently overwrite the $color_primary defined above in this same block.
+$overlay-color-primary:   #1a1a2e;
+$color-active-bg:         hsla(350, 75%, 40%, 1);   // AAA-safe active state
+$color-active-text:       hsla(0, 0%, 100%, 1);
+
+// AAA contrast
+$color-text-body:         #333;
+$color-text-close-btn:    hsla(0, 0%, 25%, 1);
+$color-placeholder-text:  hsla(210, 25%, 40%, 1);
+$color-scroll-block-text: hsla(210, 20%, 42%, 1);
+
+// Focus ring
+$focus-color:             hsla(220, 90%, 56%, 1);
+$focus-width:             3px;
+$focus-offset:            2px;
+
+// Overlay
+$backdrop-color:          hsla(0, 0%, 0%, 0.55);
+$panel-bg:                hsla(0, 0%, 100%, 1);
+$mobile-nav-height:       75px;
+
+// Chevron indicator
+$chevron-height:          55px;
+$chevron-border-color:    $color-text-close-btn;   // stays in sync with close btn
 
 :root {
   // ── Font stacks ─────────────────────────────────────────────────
@@ -184,25 +273,17 @@ $purple_teal_gradient_1: linear-gradient(180deg, rgba(86, 37, 86, 1) 0%, rgba(50
   --color-vimeo:     #1a8acb;
 
   // ── Semantic tokens ───────────────────────────────────────────────
-  --color-text:        var(--nn-slate);
-  --color-text-light:  var(--nn-gray);
-  --color-heading:     var(--nn-dark);
-  --link-color:        var(--nn-teal1);
+  --color-text:        $nn_slate;
+  --color-text-light:  $nn_gray;
+  --color-heading:     $nn_dark;
+  --link-color:        $nn_teal1;
   --link-color-hover:  #1f5046;
   --color-bg:          #F4F2F7;
-  --color-error:       var(--nn-red);
-  --color-success:     var(--nn-green);
+  --color-error:       $red;
+  --color-success:     $green;
   --color-focus:       #0066cc;
 
 
-$color_text: #1A2128;
-$color_bg: #ffffff;
-$color_primary: #0056b3;
-$color_error: #c70000;
-$color_success: #006400;
-$color_border: #4a4a4a;
-$color_focus: #0056b3;
-$color_hint: #3c3c3c;
 
 
   // ── Gradients ─────────────────────────────────────────────────────
@@ -213,6 +294,73 @@ $color_hint: #3c3c3c;
   --overlay-backdrop:  hsla(0, 0%, 0%, 0.55);
   --overlay-panel-bg:  #ffffff;
 }
+
+/* ── Reset ─────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+
+body {
+  color: $nn_slate;
+  background-color: white;
+  font-family: $font_roboto;
+  font-size: 18px;
+  padding: 0;
+  min-height: 100vh;
+  min-width: 320px;
+  text-rendering: optimizeSpeed;
+  line-height: 1.5;
+  overflow: auto;
+  overflow-x: hidden !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (min-width: 980px) {
+    font-size: 1.1em;
+  }
+  @media (min-width: 1400px) {
+    font-size: 1.2em;
+  }
+  @media (min-width: 1600px) {
+    font-size: 1.24em;
+  }
+  @media (min-width: 1900px) {
+    font-size: 1.3em;
+  }
+  @media (min-width: 2400px) {
+    font-size: 1.4em;
+  }
+}
+@media (min-width: 980px)  { body { font-size: 1.1em; } }
+@media (min-width: 1400px) { body { font-size: 1.2em; } }
+@media (min-width: 1600px) { body { font-size: 1.24em; } }
+@media (min-width: 1900px) { body { font-size: 1.3em; } }
+@media (min-width: 2400px) { body { font-size: 1.4em; } }
+
+/* Body scroll lock when overlay is open */
+body.overlay_lock {
+  overflow: hidden;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Semantic HTML5 elements */
+article, aside, details, figcaption, figure, footer, header, main, nav, section {
+  display: block;
+}
+
+/* Template base reset: inputs/buttons inherit font (size + family). */
+input, button, textarea, select {
+  font: inherit;
+}
+
 
 
 /* ===================================================================== *
@@ -792,15 +940,6 @@ img, picture {
   height: auto;
 
 }
-input, button, textarea, select {
-    font: inherit;
-
-}
-b,
-strong {
-  font-weight: bold;
-
-}
 [type=button],
 [type=reset],
 [type=submit],
@@ -897,42 +1036,12 @@ html {
 
 }
 
-body {
-  color: $color_text;
-  background-color: white;
-  font-family: $font_roboto;
-  font-size: 18px;
-  padding: 0;
-
-  min-height: 100vh;
-  text-rendering: optimizeSpeed;
-  line-height: 1.5;
-  overflow: auto;
-  overflow-x: hidden !important;
-  
-  @media (min-width: 980px) {
-    font-size: 1.1em;
-  }
-  @media (min-width: 1400px) {
-    font-size: 1.2em;
-  }
-  @media (min-width: 1600px) {
-    font-size: 1.24em;
-  }
-  @media (min-width: 1900px) {
-    font-size: 1.3em;
-  }
-  @media (min-width: 2400px) {
-    font-size: 1.4em;
-  }
-}
 
 address {
   font-style: normal;
 
 }
 
-img         { border:0; }
 
 .text_align_center { text-align: center; }
 
@@ -971,8 +1080,6 @@ a:visited   { color: $link_color; }
 a:hover,
 a:active    { color: $link_color_hover; }
 a:focus     { outline:0; }
-a:hover,
-a:active    { outline: 0; }
 
 b, strong {
   font-weight: bold;
@@ -1376,6 +1483,7 @@ ul + h5 {
   color: white;
   background-color: transparent !important;
   text-decoration: none !important;
+  border-radius: 3px !important;
   
   @media (min-width: 700px) {
     
@@ -1505,11 +1613,14 @@ ul + h5 {
   justify-content: center;
   align-items: center;
 
+  .overlay_content {
+    min-width: 300px;
+  }
 }
 
 .nav_overlay_box {
-  width: 90%;
-  max-width: 800px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
 
   @media (min-width: 1200px) {
@@ -1526,14 +1637,23 @@ input[type="submit"],
 .added_to_cart, 
 .widget a.button,
 .btn_default,
-.button {
+.button,
+
+input[type="button"]:visited, 
+input[type="reset"]:visited, 
+input[type="submit"]:visited, 
+.button:visited, 
+.added_to_cart:visited, 
+.widget a.button:visited,
+.btn_default:visited,
+.button:visited,{
   background-color: $link_color;
   border-radius: 3px;
   border: 0;
   color: white;
   cursor: pointer;
   display: inline-flex;
-  flex-wrap: no-wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
   gap: 11px;
@@ -1576,13 +1696,11 @@ input[type="submit"]:hover,
 .btn_outline_purple:hover {
   background-color: $nn_purple1 !important;
   color: white !important;
-
 }
 
 .btn_outline_teal:hover {
   background-color: $nn_teal1 !important;
   color: white !important;
-
 }
 
 .overlay_center,
@@ -2396,7 +2514,7 @@ blockquote:before {
   position: absolute;
   left: -20px;
   top: -30px;
-  color: color.adjust($color_text, $lightness: 25%);
+  color: color.adjust($nn_slate, $lightness: 25%);
 
   @media (min-width: 1200px) {
     top: -35px;
@@ -2968,6 +3086,104 @@ section,
 
 }
 
+/* ===================================================================== *
+ *  UPDATES (blog) — DISABLED for now (site design-system styles cover these).
+ * ===================================================================== */
+
+// --- index card extras (used on /updates, layered on .query_*_style3) ---
+.query_date_style3 {
+  font-size: 80%;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: $nn_teal1;
+  margin: 0 0 6px 0;
+}
+
+.query_read_more_style3 {
+  display: inline-block;
+  margin-top: 12px;
+  font-weight: 600;
+  color: $nn_teal1;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// --- homepage "view all updates" button wrapper ---
+.blog_view_all {
+  padding-top: 40px;
+}
+
+//--- single update post header + body ---
+// Post image screened into the purple header. Scoped to .update_header_hero so
+// other pages using .page_header_style_1 are untouched.
+.update_header_hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.update_header_image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .06;
+  pointer-events: none;
+}
+
+.update_header {
+  position: relative;
+  z-index: 1;
+  text-align: left;
+}
+
+.update_meta {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: white;
+  color: rgba($color: #FFF, $alpha: .77);
+}
+
+.update_excerpt {
+  margin-top: 14px;
+}
+
+.update_inline_image {
+  margin: 30px 0;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+
+  figcaption {
+    margin-top: 8px;
+    font-size: 85%;
+    color: $nn_gray;
+    text-align: center;
+  }
+}
+
+.update_quote {
+  margin: 30px 0;
+  padding: 10px 0 10px 22px;
+  border-left: 4px solid $nn_teal1;
+  font-style: italic;
+  color: $nn_slate;
+}
+
+.update_back {
+  margin-top: 45px;
+}
+
 #sponsor_layer_1 {
   width: 100%;
   display: block;
@@ -3194,7 +3410,7 @@ section,
   text-decoration: underline;
   text-transform: none;
   letter-spacing: 0;
-
+  cursor: pointer;
 }
 
 .poi_quick_info_title,
@@ -3218,6 +3434,16 @@ section,
   padding: 0 0 20px 0;
 
 }
+
+
+// ACCORDION SPECIFIC TWEAKS
+
+#acc_panel_about_hours .acc_content_group .acc_content_text .hours-display .hours-display__section .hours-display__header {
+  display: none !important;
+}
+
+
+
 
 #one_search_magic {
   display: block;
@@ -3271,16 +3497,10 @@ section,
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-
-}
-
-.one_search_1 {
-  display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   padding: 8px;
-
 }
+
 
 
 .one_search_2 {
@@ -3401,6 +3621,7 @@ section,
   border: 1px solid #ccc;
   border-radius: 4px;
   cursor: pointer;
+  color: $nn_dark;
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
   transition: all 0.2s ease;
@@ -3445,10 +3666,18 @@ section,
   border: 1px solid #ccc;
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
+  min-width: 230px;
+  max-width: 230px;
   z-index: 1000;
   padding: 8px 0;
 
+  /* #136: on mobile, anchor to the button's right edge and cap width so the
+     dropdown (and the date field's calendar icon) stay inside the viewport */
+  @media (max-width: 640px) {
+    left: auto;
+    right: 0;
+    max-width: calc(100vw - 24px);
+  }
 }
 
 .dropdown_show_event_options[hidden] {
@@ -3463,6 +3692,7 @@ section,
   border: none;
   text-align: left;
   cursor: pointer;
+  color: $nn_dark;
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
   transition: background 0.2s ease;
@@ -3513,20 +3743,74 @@ section,
 }
 
 .date_dropdown_date_label span {
-  display: block;
+  display: flex;
   margin-bottom: 6px;
   font-weight: 500;
 
 }
 
 .date_dropdown_date_input {
+  position: relative;
   width: 100%;
-  padding: 8px;
+  min-width: 0;    /* date inputs have an intrinsic min width; without this width:100% can't shrink and the field overflows the dropdown */
+  max-width: 100%;
+  padding: 10px 38px 10px 12px; /* right room for the calendar icon */
   border: 1px solid #ccc;
   border-radius: 4px;
   font-family: 'Poppins', sans-serif;
-  font-size: 14px;
+  font-size: 15px; /* 16px avoids iOS focus-zoom and renders the placeholder reliably */
+  /* #136: iOS rendered this as a blank grey box. Force a white field with dark,
+     left-aligned text so the mm/dd/yyyy placeholder shows like desktop, and add a
+     custom calendar icon so iOS gets one too (iOS omits the native indicator). */
+  background-color: #fff;
+  color: $nn_dark;
+  -webkit-text-fill-color: $nn_dark;
+  min-height: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%231A2128' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px 18px;
+}
 
+/* Left-align the value/placeholder that iOS renders in the shadow DOM */
+.date_dropdown_date_input::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+/* Make the WHOLE field open the picker on click: stretch the (invisible) native
+   indicator across the field. Fixes desktop, where only the tiny native icon was
+   clickable; our custom calendar icon shows underneath as the visual. */
+.date_dropdown_date_input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* #136: iOS Safari renders NOTHING for an empty date input (no placeholder).
+   So we overlay our own "mm/dd/yyyy" span when the field is empty (React state),
+   and hide the native empty placeholder on desktop so it doesn't double up. */
+.date_dropdown_date_field {
+  position: relative;
+  display: block;
+}
+.date_dropdown_date_ph {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999; /* browser-like placeholder grey */
+  font-size: 16px;
+  font-family: 'Poppins', sans-serif;
+  pointer-events: none; /* clicks pass through to the input/picker */
+}
+.date_dropdown_date_input.is-empty {
+  color: transparent;
+  -webkit-text-fill-color: transparent; /* hide native empty placeholder (desktop) */
 }
 
 .date_dropdown_date_input:focus {
@@ -3551,6 +3835,7 @@ section,
   border: 1px solid #ccc;
   border-radius: 4px;
   cursor: pointer;
+  color: $nn_dark;
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
   transition: all 0.2s ease;
@@ -3607,6 +3892,7 @@ section,
   border: none;
   text-align: left;
   cursor: pointer;
+  color: $nn_dark;
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
   transition: background 0.2s ease;
@@ -3704,7 +3990,6 @@ section,
 
 .map_result_single_category {
   font-size: 90%;
-
 }
 
 .map_result_single_distance {
@@ -4160,7 +4445,6 @@ section,
 }
 .icon_pinterest {
   background-color: $color_pinterest;
-
 }
 .icon_youtube {
   background-color: $color_youtube;
@@ -4172,10 +4456,6 @@ section,
 }
 .icon_vimeo {
   background-color: $color_vimeo;
-
-}
-.icon_pinterest {
-  background-color: $color_pinterest;
 
 }
 
@@ -4233,7 +4513,7 @@ section,
       font-size: 1.25rem;
       font-weight: 700;
       padding: 0 0.5rem;
-      color: $color_text;
+      color: $nn_slate;
     }
 
     fieldset {
@@ -4261,7 +4541,7 @@ section,
     display: block;
     font-weight: 600;
     margin-bottom: 0.5rem;
-    color: $color_text;
+    color: $nn_slate;
 
     .required {
       color: $color_error;
@@ -4281,7 +4561,7 @@ section,
     padding: 0.75rem;
     font-size: 1rem;
     line-height: 1.5;
-    color: $color_text;
+    color: $nn_slate;
     background-color: $color_bg;
     border: 2px solid $color_border;
     border-radius: 4px;
@@ -4431,7 +4711,7 @@ section,
 
       li {
         margin-bottom: 0.5rem;
-        color: $color_text;
+        color: $nn_slate;
 
         a {
           color: $color_primary;
@@ -4728,40 +5008,6 @@ section,
 // --------------------------------------------
 // CONFIGURATION VARIABLES
 // --------------------------------------------
-// $menu-breakpoint: 1200px;
-$menu-transition-speed: 0.3s;
-$menu-easing: ease-in-out;
-
-// Colors
-$dropdown-shadow: rgba(0, 0, 0, 0.11);
-
-$menu-bg-mobile: white;
-$menu-text-mobile: $nn_teal1;
-$menu-hover-bg-mobile: $nn_teal1;
-$menu-active-bg-mobile: color.adjust($nn_teal1, $lightness: -8%);
-$dropdown-bg-mobile: #ffffff;
-
-$menu-bg-desktop: $nn_gold;
-$menu-text-desktop: black;
-$menu-hover-bg-desktop: tomato;
-$menu-active-bg-desktop: red;
-$dropdown-bg-desktop: $nn_gold;
-
-
-// Spacing
-$menu-padding: 15px 20px;
-$submenu-indent: 10px;
-
-// Fonts
-$fontfamily1: 'Poppins', Arial, Helvetica, sans-serif;
-$fontfamily2: 'Roboto', Arial, Helvetica, sans-serif;
-
-
-// Custom Colors (optional - if you want to make it even easier)
-$client-hover-color: #FEB42F;
-$client-active-color: #FEB42F;
-// $client-text-color: tomato; 
-$client-bg-color: $nn_gold;
 
 
 // darken($nn_gold, 8%)
@@ -5301,17 +5547,17 @@ $client-bg-color: $nn_gold;
         padding: 12px 20px;
         // REMOVED: padding-right: 50px; - Don't apply to all
         white-space: nowrap;
-        color: white !important;
+        color: $nn_dark !important;
         font-size: 17px;
     }
     @media(min-width:1400px) {
-        
+
     }
     @media(min-width:1600px) {
         font-size: 18px;
     }
     @media(min-width:1900px) {
-        
+
     }
     @media(min-width:2400px) {
         font-size: 19px;
@@ -5482,33 +5728,6 @@ $client-bg-color: $nn_gold;
 // CUSTOM COLOR OVERRIDES - CLIENT SPECIFIC
 // ============================================
 // Drop down link color
-.aaa_menu_1_sub_menu .aaa_menu_1_link {
-
-  @media(min-width:600px) {
-    
-  }
-  @media(min-width:700px) {
-    
-  }
-  @media(min-width:980px) {
-    
-  }
-  @media(min-width:1200px) {
-        color: $nn_dark !important;
-  }
-  @media(min-width:1400px) {
-    
-  }
-  @media(min-width:1600px) {
-    
-  }
-  @media(min-width:1900px) {
-    
-  }
-  @media(min-width:2400px) {
-    
-  }
-}
 
 // Hover color
 .aaa_menu_1_sub_menu .aaa_menu_1_link:hover {
@@ -5678,8 +5897,8 @@ $client-bg-color: $nn_gold;
     
   }
   @media(min-width:1200px) {
-        left: auto;
-        right: 0;
+    left: auto;
+    right: 0;
   }
   @media(min-width:1400px) {
     
@@ -5705,31 +5924,6 @@ $client-bg-color: $nn_gold;
 // ═══════════════════════════════════════════════════
 
 
-// ─── Variables ──────────────────────────────────────
-// Brand / theme
-$color-primary:           #1a1a2e;
-$color-active-bg:         hsla(350, 75%, 40%, 1);   // AAA-safe active state
-$color-active-text:       hsla(0, 0%, 100%, 1);
-
-// AAA contrast
-$color-text-body:         #333;
-$color-text-close-btn:    hsla(0, 0%, 25%, 1);
-$color-placeholder-text:  hsla(210, 25%, 40%, 1);
-$color-scroll-block-text: hsla(210, 20%, 42%, 1);
-
-// Focus ring
-$focus-color:             hsla(220, 90%, 56%, 1);
-$focus-width:             3px;
-$focus-offset:            2px;
-
-// Overlay
-$backdrop-color:          hsla(0, 0%, 0%, 0.55);
-$panel-bg:                hsla(0, 0%, 100%, 1);
-$mobile-nav-height:       75px;
-
-// Chevron indicator
-$chevron-height:          55px;
-$chevron-border-color:    $color-text-close-btn;   // stays in sync with close btn
 
 
 // ─── Reset & Base ───────────────────────────────────
@@ -5780,7 +5974,7 @@ body.overlay_lock {
   h1 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: $color-primary;
+    color: $overlay-color-primary;
     letter-spacing: -0.02em;
   }
 
@@ -6431,7 +6625,7 @@ body.overlay_lock {
   cursor: pointer;
 
   &:focus-visible {
-    outline: 3px solid var(--color-focus);
+    outline: 3px solid $color_focus;
     outline-offset: 2px;
   }
 }
@@ -6534,9 +6728,9 @@ body.overlay_lock {
 
 
 .btn_search {
-  background: var(--nn-purple1);
+  background: $nn_purple1;
   color: #fff;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 600;
   padding: 15px 20px;
   border-radius: 6px;
@@ -6545,7 +6739,7 @@ body.overlay_lock {
   font-size: .95em;
 
   &:hover {
-    background-color: var(--nn-purple2);
+    background-color: $nn_purple2;
     color: white;
   }
 
@@ -6624,17 +6818,17 @@ body.overlay_lock {
 // ── Default button ──────────────────────────────────────────────────────
 .button,
 .btn_default {
-  background: var(--nn-teal1);
+  background: $nn_teal1;
   border-radius: 3px;
   border: none;
   color: #fff;
   cursor: pointer;
   display: inline-flex;
-  flex-wrap: no-wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
   gap: 11px;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -6677,21 +6871,21 @@ body.overlay_lock {
   }
 
   &:hover {
-    background: var(--nn-teal3);
+    background: $nn_teal3;
     color: #fff;
   }
 
   &:focus-visible {
-    outline: 3px solid var(--color-focus);
+    outline: 3px solid $color_focus;
     outline-offset: 2px;
   }
 }
 
 // ── Subscribe button (footer email layer) ───────────────────────────────
 // .btn_subscribe {
-//   background: var(--nn-gold);
-//   color: var(--nn-dark);
-//   font-family: var(--font-poppins);
+//   background: $nn_gold;
+//   color: $nn_dark;
+//   font-family: $font_poppins;
 //   font-weight: 600;
 //   padding: 12px 30px;
 //   border-radius: 6px;
@@ -6700,23 +6894,23 @@ body.overlay_lock {
 //   font-size: 0.95em;
 
 //   &:hover {
-//     background: var(--nn-gold-hover, #fdb93e);
+//     background: $nn_gold_hover;
 //   }
 // }
 
 .btn_subscribe {
   padding: 15px 20px;
-  background: var(--nn-gold);
-  color: var(--nn-dark) !important;
-  border: 1px solid var(--nn-gold) !important;
+  background: $nn_gold;
+  color: $nn_dark !important;
+  border: 1px solid $nn_gold !important;
 
   &:hover {
-    color: var(--nn-dark) !important;
-    background: var(--nn-gold-hover, #fdb93e) !important;
+    color: $nn_dark !important;
+    background: $nn_gold_hover !important;
   }
 
   &:focus {
-    outline: 2px solid var(--nn-gold);
+    outline: 2px solid $nn_gold;
     outline-offset: 2px;
   }
 
@@ -6809,15 +7003,6 @@ body.overlay_lock {
 
 /* -----------------------------------  FORM STYLES   ----------------------------------- */
 
-// Variables for AAA compliance
-$color_text: #1a1a1a;
-$color_bg: #ffffff;
-$color_primary: #0056b3;
-$color_error: #c70000;
-$color_success: #006400;
-$color_border: #4a4a4a;
-$color_focus: #0056b3;
-$color_hint: #3c3c3c;
 
 // AAA compliant color contrast ratios
 // Text: 7:1 minimum
@@ -6842,7 +7027,7 @@ $color_hint: #3c3c3c;
       font-size: 1.25rem;
       font-weight: 700;
       padding: 0 0.5rem;
-      color: $color_text;
+      color: $nn_slate;
     }
 
     // Nested fieldsets (for radio/checkbox groups)
@@ -6873,7 +7058,7 @@ $color_hint: #3c3c3c;
     display: block;
     font-weight: 600;
     margin-bottom: 0.5rem;
-    color: $color_text;
+    color: $nn_slate;
 
     .required {
       color: $color_error;
@@ -6894,7 +7079,7 @@ $color_hint: #3c3c3c;
     padding: 0.75rem;
     font-size: 1rem;
     line-height: 1.5;
-    color: $color_text;
+    color: $nn_slate;
     background-color: $color_bg;
     border: 2px solid $color_border;
     border-radius: 4px;
@@ -7052,7 +7237,7 @@ $color_hint: #3c3c3c;
 
       li {
         margin-bottom: 0.5rem;
-        color: $color_text;
+        color: $nn_slate;
 
         a {
           color: $color_primary;
@@ -7160,8 +7345,13 @@ $color_hint: #3c3c3c;
 // Page wrapper for form pages
 .form_page {
   min-height: 100vh;
-  background: var(--color-bg, #f5f3f0);
+  background: $color_bg;
   padding: 60px 20px 80px;
+  // Clear the fixed mobile nav bar so the bottom of the form isn't hidden
+  // behind it. Below 1200px the nav is fixed to the viewport bottom.
+  @media (max-width: 1199px) {
+    padding-bottom: calc(80px + $mobile_nav_height);
+  }
 }
 
 .form_page__container {
@@ -7172,18 +7362,18 @@ $color_hint: #3c3c3c;
 .form_page__header {
   text-align: center;
   margin-bottom: 32px;
-  color: var(--nn-purple1);
+  color: $nn_purple1;
 
   h1 {
-    font-family: var(--font-poppins);
+    font-family: $font_poppins;
     font-size: 32px;
     font-weight: 700;
-    color: var(--nn-dark);
+    color: $nn_dark;
     margin: 12px 0 8px;
   }
 
   p {
-    color: var(--nn-gray);
+    color: $nn_gray;
     font-size: 15px;
     margin: 0;
   }
@@ -7191,14 +7381,14 @@ $color_hint: #3c3c3c;
 
 .form_page__success {
   background: white;
-  border: 2px solid var(--nn-gold);
+  border: 2px solid $nn_gold;
   border-radius: 16px;
   padding: 40px 28px;
   text-align: center;
-  color: var(--nn-dark);
+  color: $nn_dark;
 
   h2 {
-    font-family: var(--font-poppins);
+    font-family: $font_poppins;
     margin: 16px 0 12px;
   }
 }
@@ -7206,7 +7396,7 @@ $color_hint: #3c3c3c;
 .form_page__back-link {
   display: inline-block;
   margin-top: 18px;
-  color: var(--nn-purple1);
+  color: $nn_purple1;
   font-weight: 600;
   text-decoration: underline;
 }
@@ -7214,7 +7404,7 @@ $color_hint: #3c3c3c;
 // Fieldsets (outer)
 .accessible_form fieldset,
 .form_fieldset {
-  border: 1.5px solid var(--nn-gold);
+  border: 1.5px solid $nn_gold;
   border-radius: 8px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -7228,8 +7418,8 @@ $color_hint: #3c3c3c;
   font-size: 1.25rem;
   font-weight: 700;
   padding: 0 0.5rem;
-  color: var(--nn-dark);
-  font-family: var(--font-poppins);
+  color: $nn_dark;
+  font-family: $font_poppins;
 }
 
 // Nested fieldset (radio/checkbox group) — no border
@@ -7262,16 +7452,16 @@ $color_hint: #3c3c3c;
 .accessible_form label,
 .form_label {
   display: block;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin-bottom: 0;
 }
 
 .accessible_form label .required,
 .form_label .required,
 .required {
-  color: var(--nn-red);
+  color: $red;
   font-weight: 700;
 }
 
@@ -7292,11 +7482,11 @@ $color_hint: #3c3c3c;
   padding: 12px 14px;
   font-size: 1rem;
   line-height: 1.5;
-  color: var(--nn-dark);
+  color: $nn_dark;
   background-color: #fff;
-  border: 1.5px solid var(--nn-purple1);
+  border: 1.5px solid $nn_purple1;
   border-radius: 6px;
-  font-family: var(--font-roboto);
+  font-family: $font_roboto;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
   box-sizing: border-box;
 }
@@ -7308,14 +7498,14 @@ $color_hint: #3c3c3c;
 .form_textarea:focus,
 .form_select:focus {
   outline: none;
-  border-color: var(--nn-gold);
+  border-color: $nn_gold;
   box-shadow: 0 0 0 3px rgba(254, 199, 100, 0.25);
 }
 
 .accessible_form input[aria-invalid="true"],
 .accessible_form textarea[aria-invalid="true"],
 .accessible_form select[aria-invalid="true"] {
-  border-color: var(--nn-red);
+  border-color: $red;
 }
 
 .accessible_form textarea,
@@ -7362,7 +7552,7 @@ $color_hint: #3c3c3c;
     margin-bottom: 0;
     cursor: pointer;
     font-weight: 400;
-    font-family: var(--font-roboto);
+    font-family: $font_roboto;
   }
 }
 
@@ -7371,7 +7561,7 @@ $color_hint: #3c3c3c;
   display: block;
   margin-top: 0.25rem;
   font-size: 0.875rem;
-  color: var(--nn-gray);
+  color: $nn_gray;
 }
 
 .error_message,
@@ -7379,7 +7569,7 @@ $color_hint: #3c3c3c;
   display: block;
   margin-top: 0.25rem;
   font-size: 0.9rem;
-  color: var(--nn-red);
+  color: $red;
   font-weight: 600;
 
   &:empty {
@@ -7415,20 +7605,20 @@ $color_hint: #3c3c3c;
 .btn_primary {
   display: inline-block;
   padding: 12px 24px;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 600;
   font-size: 1rem;
   color: #fff;
-  background-color: var(--nn-purple1);
-  border: 2px solid var(--nn-purple1);
+  background-color: $nn_purple1;
+  border: 2px solid $nn_purple1;
   border-radius: 6px;
   cursor: pointer;
   text-decoration: none;
   transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
 
   &:hover:not(:disabled) {
-    background-color: var(--nn-purple2);
-    border-color: var(--nn-purple2);
+    background-color: $nn_purple2;
+    border-color: $nn_purple2;
   }
 
   &:disabled {
@@ -7440,21 +7630,21 @@ $color_hint: #3c3c3c;
 .btn_secondary {
   display: inline-block;
   padding: 12px 24px;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 600;
   font-size: 1rem;
-  color: var(--nn-dark);
+  color: $nn_dark;
   background-color: #fff;
-  border: 2px solid var(--nn-dark);
+  border: 2px solid $nn_dark;
   border-radius: 6px;
   cursor: pointer;
   text-decoration: none;
   transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
 
   &:hover:not(:disabled) {
-    background-color: var(--nn-purple1);
+    background-color: $nn_purple1;
     color: #fff;
-    border-color: var(--nn-purple1);
+    border-color: $nn_purple1;
   }
 }
 
@@ -7497,60 +7687,6 @@ $color_hint: #3c3c3c;
 
 
 
-/* ── Reset ─────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  overflow-y: scroll;
-  scrollbar-gutter: stable;
-  scroll-behavior: smooth;
-}
-
-body {
-  color: var(--color-text);
-  background-color: white;
-  font-family: var(--font-roboto);
-  font-size: 18px;
-  padding: 0;
-  min-height: 100vh;
-  min-width: 320px;
-  text-rendering: optimizeSpeed;
-  line-height: 1.5;
-  overflow: auto;
-  overflow-x: hidden !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-@media (min-width: 980px)  { body { font-size: 1.1em; } }
-@media (min-width: 1400px) { body { font-size: 1.2em; } }
-@media (min-width: 1600px) { body { font-size: 1.24em; } }
-@media (min-width: 1900px) { body { font-size: 1.3em; } }
-@media (min-width: 2400px) { body { font-size: 1.4em; } }
-
-/* Body scroll lock when overlay is open */
-body.overlay_lock {
-  overflow: hidden;
-}
-
-img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* Semantic HTML5 elements */
-article, aside, details, figcaption, figure, footer, header, main, nav, section {
-  display: block;
-}
-
-/* Template base reset: inputs/buttons inherit font (size + family). */
-input, button, textarea, select {
-  font: inherit;
-}
 
 
 /* ===================================================================== *
@@ -7558,7 +7694,7 @@ input, button, textarea, select {
  * ===================================================================== */
 /* ── Styles sourced from stylez.scss ────────────────────────────────────── */
 .poi_accordion_box {
-  margin: 0;
+  margin: 20px 0;
   padding: 0;
   position: relative;
   z-index: 2;
@@ -7567,7 +7703,7 @@ input, button, textarea, select {
 .poi_accordion_parent {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 10px;
   margin: 0;
   padding: 0;
 }
@@ -7637,7 +7773,7 @@ input, button, textarea, select {
 
 /* ── Section ───────────────────────────────────────────────────── */
 .accordionjs .acc_section {
-  border: 2px solid var(--nn-purple1);
+  border: 2px solid $nn_purple1;
   border-radius: 11px;
   position: relative;
   z-index: 10;
@@ -7649,13 +7785,13 @@ input, button, textarea, select {
 .accordionjs .acc_section .acc_head {
   position: relative;
   background: white;
-  color: var(--nn-purple1);
+  color: $nn_purple1;
   margin: 0;
   padding: 20px 30px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 24px;
   letter-spacing: 1px;
   cursor: pointer;
@@ -7669,14 +7805,14 @@ input, button, textarea, select {
   border-bottom: 0;
 }
 .acc_head:focus {
-  outline: 3px solid var(--nn-gold);
+  outline: 3px solid $nn_gold;
   outline-offset: 0;
 }
 .acc_head:focus:not(:focus-visible) {
   outline: none;
 }
 .acc_head:focus-visible {
-  outline: 3px solid var(--nn-gold);
+  outline: 3px solid $nn_gold;
   outline-offset: 0;
 }
 .accordionjs .acc_section .acc_head h3.acc_title,
@@ -7686,7 +7822,7 @@ input, button, textarea, select {
   margin: 0;
   padding: 0;
   position: relative;
-  color: var(--nn-purple1);
+  color: $nn_purple1;
   font-size: 19px;
   font-weight: 600;
   @media (min-width: 980px) {
@@ -7700,7 +7836,7 @@ input, button, textarea, select {
 
 /* ── Active state (open) ───────────────────────────────────────── */
 .accordionjs .acc_section.acc_active > .acc_head {
-  background: var(--nn-purple1);
+  background: $nn_purple1;
   color: white;
 }
 .accordionjs .acc_section.acc_active .acc_head h3.acc_title,
@@ -7714,13 +7850,15 @@ input, button, textarea, select {
   justify-content: center;
   align-items: center;
   padding-left: 5%;
+  color: $nn_slate;
+  transition: transform .2s;
 }
 .acc_toggle_icon {
   display: block;
   height: 25px;
   width: 25px;
-  color: var(--nn-purple1);
-  fill: var(--nn-purple1);
+  color: $nn_purple1;
+  fill: $nn_purple1;
   transition: transform 0.3s ease, color 0.3s ease;
   transform: rotate(0deg);
   @media (prefers-reduced-motion: reduce) {
@@ -7754,18 +7892,8 @@ input, button, textarea, select {
 }
 
 /* ── Content layout helpers ────────────────────────────────────── */
-.acc_col_1,
-.acc_col_2 {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-gap: 40px;
-  justify-content: flex-start;
-  align-items: flex-start;
-}
-.acc_content_title_style_1 {
-  font-family: var(--font-poppins);
-  font-weight: bold;
-}
+
+
 .acc_content.basic_column_parent {
   align-items: flex-start;
 }
@@ -7822,7 +7950,7 @@ input, button, textarea, select {
    are owned by src/styles/nn/stylez.css (the template). No overrides here. */
 
 /* ── Scoped override ──────────────────────────────────────────────
-   SearchOverlay.css defines `.search_terms_text { color: var(--nn-gray) }`
+   SearchOverlay.css defines `.search_terms_text { color: $nn_gray }`
    as a generic rule that bleeds into the Hero's terms paragraph (which
    reuses the same `.search_terms_text` class). When the Hero's <p> also
    carries `.text_color_white`, that intent must win. We scope by the
@@ -7844,13 +7972,13 @@ input, button, textarea, select {
    ========================================================================== */
 
 .nn-info {
-  background: var(--color-bg);
+  background: $color_bg;
   padding: 40px 20px 80px;
   @media (max-width: 768px) {
     padding: 32px 16px 60px;
   }
   @media (max-width: 1199px) {
-    padding-bottom: calc(80px + var(--mobile-nav-height));
+    padding-bottom: calc(80px + $mobile_nav_height);
   }
 }
 
@@ -7872,12 +8000,12 @@ input, button, textarea, select {
   gap: 16px;
   padding: 16px 20px;
   background: white;
-  color: var(--nn-purple1);
-  font-family: var(--font-poppins);
+  color: $nn_purple1;
+  font-family: $font_poppins;
   font-weight: 700;
   font-size: 18px;
   text-align: left;
-  border: 2px solid var(--nn-purple1);
+  border: 2px solid $nn_purple1;
   border-radius: 12px;
   cursor: pointer;
   transition: background 0.2s;
@@ -7888,7 +8016,7 @@ input, button, textarea, select {
 }
 
 .nn-faq__header:hover {
-  background: var(--light-yellow2);
+  background: $light_yellow2;
 }
 
 .nn-faq__q {
@@ -7898,7 +8026,7 @@ input, button, textarea, select {
 
 .nn-faq__content {
   background: white;
-  border: 1px solid var(--gray-d);
+  border: 1px solid $grayD;
   border-top: none;
   border-radius: 0 0 12px 12px;
   padding: 20px 24px;
@@ -7910,7 +8038,7 @@ input, button, textarea, select {
 
 .nn-faq__content p {
   line-height: 1.8;
-  color: var(--nn-slate);
+  color: $nn_slate;
   margin: 0 0 14px;
 }
 .nn-faq__content p:last-child {
@@ -7925,7 +8053,7 @@ input, button, textarea, select {
   display: inline-flex;
   align-items: center;
   /* gap: 8px; */
-  /* background: var(--nn-teal1); */
+  /* background: $nn_teal1; */
   /* color: white; */
   /* padding: 12px 20px; */
   /* border-radius: 8px; */
@@ -7938,7 +8066,7 @@ input, button, textarea, select {
 }
 
 .install-button:hover {
-  background: var(--nn-teal1);
+  background: $nn_teal1;
   transform: translateY(-1px);
 }
 
@@ -7947,26 +8075,26 @@ input, button, textarea, select {
 }
 
 .install-button--installed {
-  background: var(--nn-gray);
+  background: $nn_gray;
   cursor: default;
 }
 
 .install-button--installed:hover {
-  background: var(--nn-gray);
+  background: $nn_gray;
   transform: none;
 }
 
 .install-button--footer {
   background: transparent;
-  border: 2px solid var(--nn-teal1);
-  color: var(--nn-teal2);
+  border: 2px solid $nn_teal1;
+  color: $nn_teal2;
   padding: 10px 18px;
   font-size: 13px;
 }
 
 .install-button--footer:hover {
-  background: var(--nn-teal3);
-  border: 2px solid var(--nn-teal3);
+  background: $nn_teal3;
+  border: 2px solid $nn_teal3;
   color: white;
 }
 
@@ -8006,27 +8134,27 @@ input, button, textarea, select {
   background: none;
   border: none;
   font-size: 28px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   cursor: pointer;
   line-height: 1;
   padding: 4px;
 }
 
 .install-modal__close:hover {
-  color: var(--nn-slate);
+  color: $nn_slate;
 }
 
 .install-modal__title {
   font-size: 22px;
   font-weight: 700;
-  font-family: var(--font-poppins);
-  color: var(--nn-dark);
+  font-family: $font_poppins;
+  color: $nn_dark;
   margin: 0 0 20px;
 }
 
 .install-modal__instructions p {
   font-size: 15px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   line-height: 1.6;
   margin: 0 0 16px;
 }
@@ -8038,18 +8166,18 @@ input, button, textarea, select {
 
 .install-modal__instructions li {
   font-size: 15px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   line-height: 1.8;
   margin-bottom: 12px;
 }
 
 .install-modal__instructions strong {
-  color: var(--nn-dark);
+  color: $nn_dark;
 }
 
 .install-modal__note {
   font-size: 13px;
-  background: var(--light-yellow1);
+  background: $light_yellow1;
   padding: 12px 16px;
   border-radius: 8px;
   margin-top: 16px;
@@ -8066,7 +8194,7 @@ input, button, textarea, select {
   border-radius: 0;
   overflow: hidden;
   position: relative;
-  background: var(--gray-d);
+  background: $grayD;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   @media (max-width: 768px) {
     height: 350px; /* Still good visibility on mobile */
@@ -8083,14 +8211,21 @@ input, button, textarea, select {
   z-index: 1;
 }
 
+/* #160: numbered pins are square images with an inscribed circle, so a
+   neighbouring pin's transparent corner sat over the pin you could see and stole
+   the click (highlighting the next card). Clip paint AND hit area to the circle. */
+.map-marker-numbered {
+  clip-path: circle(50%);
+}
+
 .map-placeholder {
   width: 100%;
   height: 500px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--gray-d);
-  color: var(--nn-gray);
+  background: $grayD;
+  color: $nn_gray;
   font-size: 16px;
   @media (max-width: 768px) {
     height: 350px;
@@ -8118,20 +8253,20 @@ input, button, textarea, select {
 }
 
 .popup-content {
-  padding: 12px 14px;
+  padding: 7px 20px 7px 10px;
 }
 
 .popup-content strong {
   display: block;
-  color: var(--nn-dark);
-  font-size: 14px;
+  color: $nn_dark;
+  font-size: 15px;
   font-weight: 700;
-  margin-bottom: 4px;
+  // margin-bottom: 4px;
   line-height: 1.3;
 }
 
 .popup-label {
-  color: var(--nn-gold);
+  color: $nn_gold;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -8139,32 +8274,40 @@ input, button, textarea, select {
   margin: 4px 0 0;
 }
 
-.popup-distance {
-  color: var(--nn-teal2);
-  font-size: 12px;
-  font-weight: 600;
-  margin: 4px 0;
-}
+// .popup-distance {
+//   color: $nn_teal2;
+//   font-size: 12px;
+//   font-weight: 600;
+//   margin: 4px 0;
+// }
 
-.popup-city {
-  color: var(--nn-gray);
-  font-size: 11px;
-  margin: 4px 0 0;
-}
+// .popup-city {
+//   color: $nn_gray;
+//   font-size: 11px;
+//   margin: 4px 0 0;
+// }
 
 .leaflet-popup-tip-container {
-  display: none;
+  display: block;
 }
 
 .leaflet-popup-close-button {
-  color: var(--nn-gray) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  top: 0 !important;
+  right: 0 !important;
+  color: $red2 !important;
   font-size: 18px !important;
-  padding: 6px 10px !important;
+  // padding: 6px 10px !important;
   font-weight: 600 !important;
+  // background-color: pink !important;
+  height: 48px !important;
+  width: 48px !important;
 }
 
 .leaflet-popup-close-button:hover {
-  color: var(--nn-dark) !important;
+  color: $nn_dark !important;
 }
 
 /* Zoom Controls - Larger and more visible */
@@ -8177,7 +8320,7 @@ input, button, textarea, select {
 
 .leaflet-control-zoom a {
   background: white !important;
-  color: var(--nn-purple1) !important;
+  color: $nn_purple1 !important;
   border: none !important;
   width: 36px !important;
   height: 36px !important;
@@ -8195,12 +8338,12 @@ input, button, textarea, select {
 
 
 .leaflet-control-zoom a:hover {
-  background: var(--light-yellow1) !important;
-  color: var(--nn-purple1) !important;
+  background: $light_yellow1 !important;
+  color: $nn_purple1 !important;
 }
 
 .leaflet-control-zoom-in {
-  border-bottom: 1px solid var(--gray-d) !important;
+  border-bottom: 1px solid $grayD !important;
 }
 
 /* Attribution - Subtle */
@@ -8209,12 +8352,12 @@ input, button, textarea, select {
   border-radius: 4px !important;
   padding: 2px 6px !important;
   font-size: 10px !important;
-  color: var(--nn-gray) !important;
+  color: $nn_gray !important;
   margin: 0 8px 8px 0 !important;
 }
 
 .leaflet-control-attribution a {
-  color: var(--nn-teal2) !important;
+  color: $nn_teal2 !important;
   text-decoration: none;
 }
 
@@ -8227,7 +8370,7 @@ input, button, textarea, select {
   opacity: 0;
   transition: opacity 0.2s ease;
 }
-:hover > .map-scroll-hint {
+.leaflet-container:hover .map-scroll-hint {
   opacity: 1;
 }
 
@@ -8276,7 +8419,7 @@ input, button, textarea, select {
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--gray-a);
+  color: $nn_teal1;
   display: flex;
   align-items: center;
   pointer-events: none;
@@ -8287,22 +8430,22 @@ input, button, textarea, select {
   width: 100%;
   padding: 14px 20px 14px 48px;
   font-size: 16px;
-  font-family: var(--font-roboto);
+  font-family: $font_roboto;
   border: 2px solid transparent;
   border-radius: 10px;
   background: white;
-  color: var(--nn-dark);
+  color: $nn_dark;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .search-bar-input input:focus {
-  border-color: var(--nn-purple1);
+  border-color: $nn_purple1;
   box-shadow: 0 0 0 3px rgba(86, 37, 86, 0.1);
 }
 
 .search-bar-input input::placeholder {
-  color: var(--gray-a);
+  color: $grayA;
 }
 
 /* Autocomplete dropdown */
@@ -8324,7 +8467,7 @@ input, button, textarea, select {
 .search-bar-autocomplete__empty {
   padding: 16px 20px;
   text-align: center;
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-size: 14px;
 }
 
@@ -8338,7 +8481,7 @@ input, button, textarea, select {
   padding: 12px 20px;
   cursor: pointer;
   transition: background-color 0.15s ease;
-  border-bottom: 1px solid var(--gray-3);
+  border-bottom: 1px solid $gray3;
 }
 
 .search-bar-autocomplete__item:last-child {
@@ -8347,7 +8490,7 @@ input, button, textarea, select {
 
 .search-bar-autocomplete__item:hover,
 .search-bar-autocomplete__item--selected {
-  background-color: var(--light-yellow1);
+  background-color: $light_yellow1;
 }
 
 .search-bar-autocomplete__item-content {
@@ -8358,13 +8501,13 @@ input, button, textarea, select {
 
 .search-bar-autocomplete__name {
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_dark;
   font-size: 15px;
 }
 
 .search-bar-autocomplete__city {
   font-size: 13px;
-  color: var(--nn-gray);
+  color: $nn_gray;
 }
 
 
@@ -8373,7 +8516,7 @@ input, button, textarea, select {
  * ===================================================================== */
 .search-dropdown {
   background: #fff;
-  border: 2px solid var(--nn-teal2);
+  border: 2px solid $nn_teal2;
   border-radius: 14px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
   overflow: hidden;
@@ -8385,17 +8528,17 @@ input, button, textarea, select {
   gap: 8px;
   padding: 12px 16px;
   font-weight: 700;
-  color: var(--nn-teal2);
-  border-bottom: 1px solid var(--gray-d);
+  color: $nn_teal2;
+  border-bottom: 1px solid $grayD;
 }
 
 .search-dropdown__header-icon {
-  color: var(--nn-teal2);
+  color: $nn_teal2;
 }
 
 .search-dropdown__state {
   padding: 14px 16px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-size: 14px;
 }
 
@@ -8412,7 +8555,7 @@ input, button, textarea, select {
   align-items: flex-start;
   padding: 12px 16px;
   cursor: pointer;
-  border-bottom: 1px solid var(--gray-3);
+  border-bottom: 1px solid $gray3;
 }
 
 .search-dropdown__item:last-child {
@@ -8421,7 +8564,7 @@ input, button, textarea, select {
 
 .search-dropdown__item:hover,
 .search-dropdown__item--selected {
-  background: var(--light-yellow1);
+  background: $light_yellow1;
 }
 
 .search-dropdown__content {
@@ -8440,7 +8583,7 @@ input, button, textarea, select {
 
 .search-dropdown__name {
   font-weight: 700;
-  color: var(--nn-dark);
+  color: $nn_dark;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8450,15 +8593,15 @@ input, button, textarea, select {
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 600;
-  color: var(--nn-purple1);
-  background: var(--light-yellow1);
+  color: $nn_purple1;
+  background: $light_yellow1;
   padding: 2px 8px;
   border-radius: 100px;
   white-space: nowrap;
 }
 
 .search-dropdown__city {
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-size: 13px;
 }
 
@@ -8468,16 +8611,16 @@ input, button, textarea, select {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid var(--gray-d);
-  color: var(--nn-teal2);
-  font-size: 14px;
+  border-top: 1px solid $grayD;
+  color: $nn_teal2;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .search-dropdown__footer:hover {
-  background: var(--light-yellow1);
+  background: $light_yellow1;
 }
 
 /* "Not found" empty state */
@@ -8487,14 +8630,14 @@ input, button, textarea, select {
 }
 
 .search-dropdown__empty-text {
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-size: 14px;
   margin: 0 0 8px;
 }
 
 .search-dropdown__suggest-link {
   display: inline-block;
-  color: var(--nn-teal2);
+  color: $nn_teal2;
   font-weight: 600;
   font-size: 14px;
   text-decoration: underline;
@@ -8502,7 +8645,7 @@ input, button, textarea, select {
 }
 
 .search-dropdown__suggest-link:hover {
-  color: var(--nn-teal1);
+  color: $nn_teal1;
 }
 
 
@@ -8708,10 +8851,11 @@ input, button, textarea, select {
   left: 20px;
   top: 50%;
   transform: translateY(-50%);
-  color: gray;
+  color: $nn_teal1;
   pointer-events: none;
   display: flex;
   align-items: center;
+  z-index: 2; /* sit above SearchBar's relatively-positioned white input, which otherwise paints over the icon */
 
   @media(min-width:600px) {
     
@@ -8833,16 +8977,16 @@ input, button, textarea, select {
 .search_input_wrapper .search-bar-input input {
   width: 100%;
   padding: 17px 20px 17px 52px;
-  border: 1px solid var(--nn-teal1);
+  border: 1px solid $nn_teal1;
   font-size: 17px;
   line-height: 1;
-  color: var(--nn-dark);
+  color: $nn_dark;
   background: white;
   border-radius: 3px;
   -webkit-appearance: none;
   appearance: none;
   outline: none;
-  font-family: var(--font-sans);
+  font-family: $font_sansserif;
   box-shadow: none;
   box-sizing: border-box;
   @media (min-width: 600px) {
@@ -8865,7 +9009,7 @@ input, button, textarea, select {
 }
 
 .search_terms_text a {
-  color: var(--link-color);
+  color: $link_color;
 }
 
 
@@ -8877,7 +9021,7 @@ input, button, textarea, select {
    ========================================================================== */
 
 .nn-signup {
-  background: var(--nn-gold);
+  background: $nn_gold;
   padding: 16px 16px 22px;
   @media (max-width: 768px) {
     padding: 14px 16px 20px;
@@ -8895,11 +9039,11 @@ input, button, textarea, select {
 }
 
 .nn-signup__title {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 32px;
   margin: 0 0 14px;
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_dark;
   @media (max-width: 768px) {
     font-size: 26px;
   }
@@ -8918,7 +9062,7 @@ input, button, textarea, select {
   display: grid;
   grid-template-columns: 1fr auto;
   width: min(720px, 100%);
-  border: 2px solid var(--nn-purple1);
+  border: 2px solid $nn_purple1;
   border-radius: 12px;
   background: #fff;
   overflow: hidden;
@@ -8936,8 +9080,8 @@ input, button, textarea, select {
   border-radius: 0;
   outline: none;
   background: #fff;
-  color: var(--nn-slate);
-  font-family: var(--font-roboto);
+  color: $nn_slate;
+  font-family: $font_roboto;
   @media (max-width: 768px) {
     padding: 12px 16px;
     font-size: 15px;
@@ -8945,17 +9089,17 @@ input, button, textarea, select {
   }
 }
 
-.su-input::placeholder { color: var(--nn-gray); }
+.su-input::placeholder { color: $nn_gray; }
 
 .su-button {
-  background: var(--nn-teal2);
+  background: $nn_teal2;
   color: #fff;
   font-weight: 700;
-  border: 2px solid var(--nn-teal1);
+  border: 2px solid $nn_teal1;
   border-radius: 10px;
   padding: 10px 18px;
   margin: 6px;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   cursor: pointer;
   transition: background 0.2s;
   @media (max-width: 768px) {
@@ -8966,7 +9110,7 @@ input, button, textarea, select {
   }
 }
 
-.su-button:hover { background: var(--nn-teal1); }
+.su-button:hover { background: $nn_teal1; }
 
 /* Feedback messages */
 .su-message {
@@ -8984,7 +9128,7 @@ input, button, textarea, select {
 }
 .su-message--error {
   background: #fdecea;
-  color: var(--nn-red);
+  color: $red;
   border: 1px solid #f87171;
 }
 
@@ -8997,7 +9141,7 @@ input, button, textarea, select {
    ========================================================================== */
 
 .nn-simple {
-  background: var(--color-bg);
+  background: $color_bg;
   padding: 40px 20px 80px;
 }
 
@@ -9007,13 +9151,13 @@ input, button, textarea, select {
 }
 
 .nn-simple__title {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   text-align: center;
   font-size: 46px;
   line-height: 1.1;
   margin: 0 0 8px;
   font-weight: 800;
-  color: var(--nn-dark);
+  color: $nn_dark;
   @media (max-width: 768px) {
     font-size: 34px;
   }
@@ -9026,7 +9170,7 @@ input, button, textarea, select {
 .nn-simple__step {
   text-align: center;
   font-size: 22px;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0 0 22px;
   @media (max-width: 768px) {
     font-size: 18px;
@@ -9034,7 +9178,7 @@ input, button, textarea, select {
 }
 
 .nn-simple__step strong { font-weight: 800; }
-.nn-simple__dash { color: var(--nn-gray); }
+.nn-simple__dash { color: $nn_gray; }
 
 .nn-simple__block { margin: 18px auto 44px; }
 
@@ -9063,7 +9207,7 @@ input, button, textarea, select {
   flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
-
+  
   @media(min-width:600px) {
     
   }
@@ -9088,6 +9232,7 @@ input, button, textarea, select {
   @media(min-width:2400px) {
     
   }
+  
 }
 
 .poi_verified_badge  {
@@ -9118,7 +9263,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -9150,7 +9295,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -9203,20 +9348,9 @@ input, button, textarea, select {
 .poi_verified_badge .poi_button_icon {
   width: 22px;
   height: 22px;
-  fill: var(--nn-green);
+  fill: $green;
 }
 
-.poi_verified_badge_about,
-.poi_verified_badge_about:hover {
-  border: 0;
-  background-color: transparent;
-  color: var(--nn-teal1) !important;
-  padding: 15px 20px !important;
-  text-decoration: underline;
-  text-transform: none;
-  letter-spacing: 0;
-  cursor: pointer;
-}
 
 #poi_verified_tooltip.is_open {
   display: block;
@@ -9249,10 +9383,10 @@ input, button, textarea, select {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--nn-gray);
+  color: $nn_gray;
   margin: 0;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--gray-d);
+  border-bottom: 1px solid $grayD;
 }
 
 /* Day-by-day hours */
@@ -9266,18 +9400,19 @@ input, button, textarea, select {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 0.9rem;
+  font-size: 0.9em;
+
   padding: 4px 0;
-  @media (max-width: 600px) {
-    font-size: 0.85rem;
-  }
+  // @media (max-width: 600px) {
+  //   font-size: 0.85rem;
+  // }
 }
 
 
 .hours-display__day-row--today {
   // background-color: #f0f9ff;
-  background-color: var(--light-yellow4);
-  border: 1px solid var(--light-yellow1);
+  background-color: $light_yellow4;
+  border: 1px solid $light_yellow1;
   margin: 0 -8px;
   padding: 4px 8px;
   border-radius: 4px;
@@ -9285,13 +9420,13 @@ input, button, textarea, select {
 }
 
 .hours-display__day-row--modified {
-  color: #0d6efd;
+  color: $blue;
 }
 
 .hours-display__day-label {
   min-width: 45px;
   font-weight: 500;
-  color: var(--nn-dark);
+  color: $nn_dark;
   @media (max-width: 600px) {
     min-width: 40px;
   }
@@ -9299,20 +9434,21 @@ input, button, textarea, select {
 
 
 .hours-display__day-hours {
-  color: var(--nn-slate);
+  color: $nn_slate;
   flex: 1;
 }
 
 .hours-display__day-note {
-  font-size: 0.8rem;
-  color: #0d6efd;
-  font-style: italic;
+  // font-size: 0.8rem;
+  display: block;
+  color: $blue;
+  // font-style: italic;
 }
 
 /* General hour notes */
 .hours-display__notes {
   font-size: 0.9rem;
-  color: var(--nn-slate);
+  color: $nn_slate;
   line-height: 1.5;
 }
 
@@ -9330,7 +9466,7 @@ input, button, textarea, select {
 }
 
 .hours-display__notes-text {
-  color: var(--nn-gray);
+  color: $nn_gray;
 }
 
 .hours-display__notes-text p {
@@ -9346,16 +9482,19 @@ input, button, textarea, select {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  font-size: 0.9em;
 }
 
 .hours-display__holiday-row {
   display: grid;
-  grid-template-columns: 40px 1fr auto auto;
+  grid-template-columns: 100px 165px 125px auto 1fr;
   gap: 8px;
   align-items: center;
-  font-size: 0.875rem;
+  justify-content: flex-start;
+  // font-size: 0.875rem;
   padding: 6px 0;
-  border-bottom: 1px solid var(--gray-3);
+  border-bottom: 1px solid $gray3;
+  
   @media (max-width: 600px) {
     grid-template-columns: 35px 1fr;
     grid-template-rows: auto auto;
@@ -9369,21 +9508,23 @@ input, button, textarea, select {
 }
 
 .hours-display__holiday-prefix {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #0d6efd;
+  // font-size: 0.75rem;
+  font-weight: 700;
+  color: $nn_purple1;
+
   text-transform: uppercase;
+  
   @media (max-width: 600px) {
     grid-row: 1 / 3;
     align-self: start;
-    padding-top: 2px;
+    // padding-top: 2px;
   }
 }
 
 
 .hours-display__holiday-name {
   font-weight: 500;
-  color: var(--nn-dark);
+  color: $nn_dark;
   @media (max-width: 600px) {
     grid-column: 2;
   }
@@ -9391,18 +9532,62 @@ input, button, textarea, select {
 
 
 .hours-display__holiday-date {
-  font-size: 0.8rem;
-  color: var(--nn-gray);
+  // font-size: 0.8rem;
+  // color: $nn_purple1;
   white-space: nowrap;
 }
 
 .hours-display__holiday-status {
   font-size: 0.8rem;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 12px;
-  background-color: var(--gray-3);
-  color: var(--nn-slate);
+  background-color: #ffffff;
+  color: $nn_slate;
+  border: 1px solid $grayB;
   white-space: nowrap;
+}
+
+.hours-display__holiday-status--closed {
+  color: $red2;
+  border-color: $red;
+}
+
+.hours-display__holiday-status--24hours,
+.hours-display__holiday-status--open {
+  color: $green2;
+  border-color: $green2;
+}
+
+.hours-display__holiday-status--modified {
+  color: $blue;
+  border-color: $blue;
+}
+
+/* #116/#118: styles for the new hours elements. The row's existing
+   grid-template-columns already ends in 1fr, which the note cell fills. */
+.hours-display__no-regular {
+  color: $nn_slate;
+  font-style: italic;
+}
+
+.hours-display__holiday-note {
+  font-size: 0.8rem;
+  color: $nn_gray;
+
+  @media (max-width: 600px) {
+    grid-column: 2;
+  }
+}
+
+.hours-display__holiday-status--unconfirmed {
+  color: $nn_gray;
+  border-color: $grayB;
+}
+
+.hours-display__holiday-status--follows_regular {
+  color: $nn_slate;
+  border-color: $grayB;
 }
 
 /* SEE MORE button */
@@ -9414,7 +9599,7 @@ input, button, textarea, select {
   padding: 6px 0;
   background: none;
   border: none;
-  color: var(--nn-teal2);
+  color: $nn_teal2;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -9424,7 +9609,7 @@ input, button, textarea, select {
 }
 
 .hours-display__see-more:hover {
-  color: var(--nn-teal1);
+  color: $nn_teal1;
 }
 
 .hours-display__see-more-icon {
@@ -9453,7 +9638,7 @@ input, button, textarea, select {
   align-items: center;
   gap: 6px;
   padding: 10px 16px;
-  background-color: var(--nn-teal2);
+  background-color: $nn_teal2;
   color: white;
   border: none;
   border-radius: 6px;
@@ -9465,7 +9650,7 @@ input, button, textarea, select {
 }
 
 .hours-display__service-btn:hover {
-  background-color: var(--nn-teal1);
+  background-color: $nn_teal1;
   transform: translateY(-1px);
 }
 
@@ -9491,29 +9676,29 @@ input, button, textarea, select {
   margin: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 10px;
+  gap: 20px;
 }
 
 .poi_amenity_pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border: 1px solid var(--nn-purple1);
+  gap: 11px;
+  padding: 15px 20px;
+  border: 1px solid $nn_purple1;
   border-radius: 999px;
   background: #fff;
-  color: var(--nn-purple1);
-  font-family: var(--font-poppins);
-  font-weight: 600;
-  font-size: 0.9em;
-  line-height: 1.2;
+  color: $nn_purple1;
+  font-family: $font_poppins;
+  font-weight: 400;
+  font-size: 0.8em;
+  line-height: 1;
   white-space: nowrap;
 }
 
 .poi_amenity_pill_icon {
   display: inline-flex;
   align-items: center;
-  color: var(--nn-purple1);
+  color: $nn_purple1;
 }
 
 .poi_amenity_pill_icon svg {
@@ -9522,7 +9707,7 @@ input, button, textarea, select {
 }
 
 .poi_amenity_pill_label {
-  color: var(--nn-purple1);
+  color: $nn_purple1;
 }
 
 
@@ -9629,15 +9814,15 @@ input, button, textarea, select {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--nn-dark, #0f172a);
+  color: $nn_dark;
 }
 .ed-suggest-update { margin-top: 4px; }
 
 /* Tickets button */
 .ed-ticket-btn {
-  background: var(--nn-gold, #fec764) !important;
-  border-color: var(--nn-gold, #fec764) !important;
-  color: var(--nn-dark, #0f172a) !important;
+  background: $nn_gold !important;
+  border-color: $nn_gold !important;
+  color: $nn_dark !important;
 }
 .ed-ticket-btn:hover {
   background: #f6b947 !important;
@@ -9657,15 +9842,15 @@ input, button, textarea, select {
 
 /* Organizer block */
 .ed-organizer-block {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--gray-d, #e2e8f0);
+  margin-top: 25px;
+  padding-top: 25px;
+  border-top: 1px solid $grayD;
 }
 
 /* Vendor list */
 .ed-vendor-list { margin: 0; padding-left: 18px; }
 .ed-vendor-list li { margin: 2px 0; }
-.ed-vendor-list a { color: var(--nn-teal2, #1f7a8c); text-decoration: none; }
+.ed-vendor-list a { color: $nn_teal2; text-decoration: none; }
 .ed-vendor-list a:hover { text-decoration: underline; }
 
 /* Contact organizer button */
@@ -9675,17 +9860,17 @@ input, button, textarea, select {
   gap: 6px;
   margin-top: 10px;
   padding: 8px 14px;
-  border: 1px solid var(--nn-teal2, #1f7a8c);
+  border: 1px solid $nn_teal2;
   color: #fff;
-  background: var(--nn-teal2, #1f7a8c);
+  background: $nn_teal2;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
 }
 .ed-contact-organizer-btn:hover {
-  background: var(--nn-dark, #0f172a);
-  border-color: var(--nn-dark, #0f172a);
+  background: $nn_dark;
+  border-color: $nn_dark;
 }
 
 /* Sponsors */
@@ -9694,7 +9879,7 @@ input, button, textarea, select {
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--nn-gray, #64748b);
+  color: $nn_gray;
   margin-bottom: 10px;
 }
 .ed-sponsors__grid {
@@ -9708,7 +9893,7 @@ input, button, textarea, select {
   align-items: center;
   gap: 8px;
   padding: 14px;
-  border: 1px solid var(--gray-5, #e2e8f0);
+  border: 1px solid $gray5;
   border-radius: 8px;
   background: #fff;
   text-align: center;
@@ -9721,29 +9906,38 @@ input, button, textarea, select {
 .ed-sponsor-card__name {
   font-size: 14px;
   font-weight: 600;
-  color: var(--nn-dark, #0f172a);
+  color: $nn_dark;
   text-decoration: none;
 }
-.ed-sponsor-card__name:hover { color: var(--nn-teal2, #1f7a8c); }
+.ed-sponsor-card__name:hover { color: $nn_teal2; }
 .ed-sponsor-card__tier {
   display: inline-block;
   margin-top: 4px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .08em;
-  color: var(--nn-gray, #64748b);
+  color: $nn_gray;
 }
 
 /* Disclaimer */
 .ed-disclaimer {
-  margin: 24px 0;
-  padding: 12px 16px;
-  background: var(--gray-7, #f7f8fa);
-  border-left: 3px solid var(--gray-4, #94a3b8);
-  border-radius: 4px;
-  font-size: 13px;
-  color: var(--nn-gray, #475569);
-  line-height: 1.5;
+  margin: 35px 0;
+  padding: 25px 30px;
+  background: $light_yellow2;
+  border: 1px solid $nn_gold;
+  border-radius: 5px;
+  text-align: center;
+  // font-size: 13px;
+  // color: $nn_gray;
+  // line-height: 1.5;
+
+  p:first-child {
+    font-weight: bold;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
 }
 
 /* Tickets modal */
@@ -9775,14 +9969,14 @@ input, button, textarea, select {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: var(--nn-dark, #0f172a);
+  color: $nn_dark;
 }
 .ed-modal__close {
   background: none;
   border: 0;
   cursor: pointer;
   padding: 4px;
-  color: var(--nn-gray, #64748b);
+  color: $nn_gray;
 }
 .ed-modal__list { list-style: none; margin: 0; padding: 0; }
 .ed-modal__list li + li { margin-top: 8px; }
@@ -9791,16 +9985,16 @@ input, button, textarea, select {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border: 1px solid var(--gray-5, #e2e8f0);
+  border: 1px solid $gray5;
   border-radius: 8px;
-  color: var(--nn-dark, #0f172a);
+  color: $nn_dark;
   text-decoration: none;
   font-weight: 500;
 }
 .ed-modal__list a:hover {
-  background: var(--nn-teal2, #1f7a8c);
+  background: $nn_teal2;
   color: #fff;
-  border-color: var(--nn-teal2, #1f7a8c);
+  border-color: $nn_teal2;
 }
 .ed-modal__list a span { flex: 1; }
 
@@ -9810,21 +10004,21 @@ input, button, textarea, select {
   display: inline-block;
   padding: 4px 10px;
   border-radius: 999px;
-  background: var(--gray-e, #f1f5f9);
-  border: 1px solid var(--gray-5, #e2e8f0);
-  color: var(--nn-dark, #0f172a);
+  background: $grayE;
+  border: 1px solid $gray5;
+  color: $nn_dark;
   font-size: 0.8rem;
   text-decoration: none;
 }
-.poi_detail_event .poi_chip.ed-chip-link { color: var(--nn-teal2, #1f7a8c); }
-.poi_detail_event .poi_chip.ed-chip-link:hover { background: var(--nn-teal2, #1f7a8c); color: #fff; }
+.poi_detail_event .poi_chip.ed-chip-link { color: $nn_teal2; }
+.poi_detail_event .poi_chip.ed-chip-link:hover { background: $nn_teal2; color: #fff; }
 
 /* ADA sub-card (scoped) */
 .poi_detail_event .poi_ada_sub_card {
   margin-top: 10px;
   padding: 12px;
-  background: var(--nn-gold-soft, #fef8e5);
-  border-left: 3px solid var(--nn-gold, #f6c244);
+  background: $nn_gold_soft;
+  border-left: 3px solid $nn_gold;
   border-radius: 6px;
   font-size: 13px;
 }
@@ -9832,7 +10026,7 @@ input, button, textarea, select {
   margin: 0 0 6px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--nn-dark, #0f172a);
+  color: $nn_dark;
 }
 
 
@@ -10069,33 +10263,6 @@ input, button, textarea, select {
 
 
 /* ===================================================================== *
- *  components/details/HeroBanner.scss
- * ===================================================================== */
-/* HeroBanner — full-width image-only hero for POI detail pages */
-
-.poi_hero_banner {
-  position: relative;
-  width: 100%;
-  height: clamp(320px, 40vw, 480px);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  overflow: hidden;
-  @media (max-width: 480px) {
-    height: 320px;
-  }
-}
-
-
-.poi_hero_banner_overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(26, 33, 40, 0.0) 0%, rgba(26, 33, 40, 0.55) 100%);
-  pointer-events: none;
-}
-
-
-/* ===================================================================== *
  *  components/details/InfoRow.scss
  * ===================================================================== */
 /* InfoRow — ported from nn-templates .poi_info_row (label + value) */
@@ -10103,13 +10270,14 @@ input, button, textarea, select {
 .poi_info_row {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 4px 24px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--gray-e);
+  gap: 25px 25px;
+  padding: 25px 0;
+  border-bottom: 1px solid $grayE;
+
   @media (min-width: 700px) {
     grid-template-columns: minmax(140px, 1fr) 2.5fr;
     align-items: baseline;
-    padding: 12px 0;
+    padding: 25px 0;
   }
 }
 
@@ -10119,14 +10287,14 @@ input, button, textarea, select {
 }
 
 .poi_info_row_label {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_dark;
   font-size: 0.95em;
 }
 
 .poi_info_row_value {
-  color: var(--color-text);
+  color: $nn_slate;
   font-size: 0.95em;
   line-height: 1.5;
 }
@@ -10404,7 +10572,7 @@ input, button, textarea, select {
 }
 
 .lightbox-thumbnail--active {
-  border-color: var(--nn-teal2);
+  border-color: $nn_teal2;
 }
 
 .lightbox-thumbnail img {
@@ -10424,7 +10592,7 @@ input, button, textarea, select {
   flex-direction: column;
   gap: 0;
   padding: 16px 20px;
-  border: 1.5px solid var(--nn-gold);
+  border: 1.5px solid $nn_gold;
   border-radius: 10px;
   background: #fff;
 }
@@ -10434,7 +10602,7 @@ input, button, textarea, select {
   grid-template-columns: 1fr;
   gap: 4px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--gray-e);
+  border-bottom: 1px solid $grayE;
   @media (min-width: 700px) {
     grid-template-columns: 1fr 1px 1.2fr;
     gap: 14px;
@@ -10451,9 +10619,9 @@ input, button, textarea, select {
 }
 
 .poi_quick_facts_label {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_dark;
   font-size: 0.95em;
 }
 
@@ -10462,13 +10630,13 @@ input, button, textarea, select {
   @media (min-width: 700px) {
     display: block;
     align-self: stretch;
-    background: var(--gray-d);
+    background: $grayD;
   }
 }
 
 
 .poi_quick_facts_value {
-  color: var(--color-text);
+  color: $nn_slate;
   font-size: 0.95em;
   line-height: 1.4;
 }
@@ -10479,23 +10647,81 @@ input, button, textarea, select {
  * ===================================================================== */
 .poi_service_animal_alert {
   margin-top: 16px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  border: 1px solid #B9D8EA;
-  background: #EAF4FA;
-  color: var(--nn-dark);
+  padding: 30px 35px;
+  border-radius: 5px;
+  border: 1px solid rgba($nn_teal1, 0.35);
+  background: rgba($nn_teal1, 0.08);
+  color: $nn_dark;
+
+  h4 {
+    padding-top: 0;
+    margin-top: 0;
+  }
 }
 .poi_service_animal_alert_title {
-  margin: 0 0 6px;
-  font-family: var(--font-poppins);
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--nn-blue);
+  // margin: 0 0 6px;
+  font-family: $font_poppins;
+  font-size: clamp(1.2rem, 3vw, 1.7rem);
+  // font-weight: 600;
+  color: $nn_teal1;
 }
 .poi_service_animal_alert_body {
   margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  // font-size: 0.875rem;
+  // line-height: 1.5;
+}
+
+/* Contact accordion — social icons (#139/#144/#145 item 25) */
+.poi_social_icon_row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+.poi_social_icon_link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid $nn_teal1;
+  color: $nn_teal1;
+
+  svg path {
+    fill: $nn_teal1;
+  }
+
+  &:hover {
+    background: $nn_teal1;
+
+    svg path {
+      fill: white;
+    }
+  }
+}
+
+/* Contact accordion — website/phone icon + copy button (#139/#144/#145 items 22-24) */
+.poi_contact_row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  svg {
+    flex-shrink: 0;
+    color: $nn_teal1;
+  }
+}
+.poi_contact_copy_btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  border: none;
+  background: none;
+  color: $nn_teal1;
+  cursor: pointer;
+  font-size: 0.85em;
 }
 
 
@@ -10512,9 +10738,9 @@ input, button, textarea, select {
   padding: 6px 12px;
   border-radius: 999px;
   background: transparent;
-  border: 1px solid var(--nn-gold);
-  color: var(--nn-dark);
-  font-family: var(--font-poppins);
+  border: 1px solid $nn_gold;
+  color: $nn_dark;
+  font-family: $font_poppins;
   font-weight: 600;
   font-size: 0.9em;
   line-height: 1.2;
@@ -10522,12 +10748,12 @@ input, button, textarea, select {
 }
 
 .poi_sponsor_chip_icon {
-  color: var(--nn-gold);
+  color: $nn_gold;
   flex-shrink: 0;
 }
 
 .poi_sponsor_chip_text {
-  color: var(--nn-dark);
+  color: $nn_dark;
 }
 
 
@@ -10543,10 +10769,10 @@ input, button, textarea, select {
 }
 
 .se-overlay__title {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 28px;
   font-weight: 700;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0 0 24px 0;
 }
 
@@ -10557,14 +10783,14 @@ input, button, textarea, select {
   gap: 4px;
   margin-bottom: 24px;
   padding: 16px;
-  background: var(--gray-9, #f8f9fa);
+  background: $gray9;
   border-radius: 8px;
 }
 
 .se-overlay__location-label {
   font-size: 12px;
   font-weight: 700;
-  color: var(--nn-gray);
+  color: $nn_gray;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -10572,7 +10798,7 @@ input, button, textarea, select {
 .se-overlay__location-name {
   font-size: 16px;
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_dark;
 }
 
 /* Fieldset */
@@ -10583,13 +10809,13 @@ input, button, textarea, select {
 }
 
 .se-overlay__legend {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 16px;
   font-weight: 700;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin-bottom: 16px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--gray-d, #dee2e6);
+  border-bottom: 1px solid $grayD;
   width: 100%;
 }
 
@@ -10604,7 +10830,7 @@ input, button, textarea, select {
 .se-overlay__label {
   font-size: 14px;
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_dark;
 }
 
 .se-overlay__input,
@@ -10612,11 +10838,11 @@ input, button, textarea, select {
 .se-overlay__textarea {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid var(--gray-d, #dee2e6);
+  border: 1px solid $grayD;
   border-radius: 6px;
   font-size: 14px;
   font-family: inherit;
-  color: var(--nn-dark);
+  color: $nn_dark;
   background: white;
   transition: border-color 0.2s;
   box-sizing: border-box;
@@ -10626,7 +10852,7 @@ input, button, textarea, select {
 .se-overlay__select:focus,
 .se-overlay__textarea:focus {
   outline: none;
-  border-color: var(--nn-teal1);
+  border-color: $nn_teal1;
   box-shadow: 0 0 0 2px rgba(60, 125, 111, 0.15);
 }
 
@@ -10673,7 +10899,7 @@ input, button, textarea, select {
 .se-overlay__btn {
   padding: 14px 28px;
   border-radius: 55px;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -10682,14 +10908,14 @@ input, button, textarea, select {
 }
 
 .se-overlay__btn--primary {
-  background: var(--nn-teal1);
+  background: $nn_teal1;
   color: white;
-  border-color: var(--nn-teal1);
+  border-color: $nn_teal1;
 }
 
 .se-overlay__btn--primary:hover {
-  background: var(--nn-teal2, #2c6e5a);
-  border-color: var(--nn-teal2, #2c6e5a);
+  background: $nn_teal2;
+  border-color: $nn_teal2;
 }
 
 .se-overlay__btn--primary:disabled {
@@ -10699,13 +10925,13 @@ input, button, textarea, select {
 
 .se-overlay__btn--secondary {
   background: white;
-  color: var(--nn-gray);
-  border-color: var(--gray-d, #dee2e6);
+  color: $nn_gray;
+  border-color: $grayD;
 }
 
 .se-overlay__btn--secondary:hover {
-  background: var(--gray-9, #f8f9fa);
-  border-color: var(--nn-gray);
+  background: $gray9;
+  border-color: $nn_gray;
 }
 
 /* Success State */
@@ -10716,7 +10942,7 @@ input, button, textarea, select {
 
 .se-overlay__success p {
   font-size: 16px;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin-bottom: 20px;
 }
 
@@ -10783,6 +11009,7 @@ input, button, textarea, select {
   @media(min-width:2400px) {
     
   }
+  
 }
 
 /* -----------------------------------  Single POI Page Styles   ----------------------------------- */
@@ -10815,7 +11042,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -10824,6 +11051,7 @@ input, button, textarea, select {
   width: 100%;
   color: $nn_purple1;
   color: $blue2;
+  display: none;
 
   @media(min-width:600px) {
     
@@ -10884,30 +11112,44 @@ input, button, textarea, select {
 .poi_page_main_category {
   font-size: 1.2em;
 
+  .nearby-card__trail-difficulty {
+    display: inline-flex;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
   @media(min-width:600px) {
-    
+
   }
   @media(min-width:700px) {
-    
+
   }
   @media(min-width:980px) {
-  
+
   }
   @media(min-width:1200px) {
-    
+
   }
   @media(min-width:1400px) {
-    
+
   }
   @media(min-width:1600px) {
-    
+
   }
   @media(min-width:1900px) {
-    
+
   }
   @media(min-width:2400px) {
-    
+
   }
+}
+
+// Trail Level accordion row ("Out & Back, 1.5 miles [EASY]") — text + pill on one line.
+.poi_trail_level_row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .poi_intro_location {
@@ -10937,7 +11179,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -10968,7 +11210,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -11001,39 +11243,13 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
+  }
+  @media (max-width: 480px) {
+    gap: 8px;
   }
 }
 
-.poi_last_updated {
-  padding: 20px 0;
-  font-size: 90%;
-
-  @media(min-width:600px) {
-    
-  }
-  @media(min-width:700px) {
-    
-  }
-  @media(min-width:980px) {
-  
-  }
-  @media(min-width:1200px) {
-    
-  }
-  @media(min-width:1400px) {
-    
-  }
-  @media(min-width:1600px) {
-    
-  }
-  @media(min-width:1900px) {
-    
-  }
-  @media(min-width:2400px) {
-    
-  }
-}
 
 #poi_quick_info_photos_box {
   display: grid;
@@ -11066,7 +11282,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -11100,7 +11316,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -11129,8 +11345,12 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
+}
+
+.poi_quick_info_single_info {
+  color: $nn_gray;
 }
 
 .poi_photos {
@@ -11164,7 +11384,17 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
+  }
+
+  img {
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.2s;
+
+    &:hover { transform: scale(1.05); }
   }
 }
 
@@ -11198,8 +11428,54 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
+
+  a,
+  span {
+    color: $nn_teal1;
+    font-weight: 500;
+    text-decoration: none;
+  }
+}
+
+/* Amenities box (#139/#144/#145 item 10) — plain text list, not links/icons.
+   No columns — just a flowing list with even spacing. */
+.poi_amenities_text_list {
+  padding: 15px 0 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 25px;
+
+  @media(min-width:600px) {
+
+  }
+  @media(min-width:700px) {
+
+  }
+  @media(min-width:980px) {
+
+  }
+  @media(min-width:1200px) {
+
+  }
+  @media(min-width:1400px) {
+
+  }
+  @media(min-width:1600px) {
+
+  }
+  @media(min-width:1900px) {
+
+  }
+  @media(min-width:2400px) {
+
+  }
+}
+.poi_amenities_text_item {
+  color: $nn_dark;
+  font-weight: 400;
 }
 
 .acc_head {
@@ -11247,7 +11523,7 @@ input, button, textarea, select {
 
 .td-page {
   min-height: 60vh;
-  background: var(--nn-bg-soft, #faf9f5);
+  background: $nn_bg_soft;
   padding: 0 0 48px 0;
 }
 
@@ -11266,7 +11542,7 @@ input, button, textarea, select {
 
 .td-back-link {
   display: inline-block;
-  color: var(--nn-purple1, #6e4bff);
+  color: $nn_purple1;
   text-decoration: none;
   font-weight: 600;
   margin-bottom: 16px;
@@ -11281,7 +11557,7 @@ input, button, textarea, select {
 /* STATUS strip */
 .td-status-row {
   background: #fef2f2;
-  color: var(--nn-red, #b91c1c);
+  color: $red;
   padding: 8px 16px;
   border-radius: 4px;
   font-size: 13px;
@@ -11295,7 +11571,7 @@ input, button, textarea, select {
 }
 .td-status-label { font-weight: 700; }
 .td-status-value { font-weight: 700; }
-.td-status-msg { font-weight: 400; text-transform: none; color: var(--nn-slate, #334155); }
+.td-status-msg { font-weight: 400; text-transform: none; color: $nn_slate; }
 
 /* Intro grid: 2.5fr / 1fr per plan */
 .td-intro.page_header_poi_style_1 {
@@ -11303,7 +11579,7 @@ input, button, textarea, select {
   grid-template-columns: 1fr;
   gap: 20px;
   padding-bottom: 24px;
-  border-bottom: 1px solid var(--nn-border, #e5e7eb);
+  border-bottom: 1px solid $nn_border;
   margin-bottom: 24px;
   @media (min-width: 980px) {
     grid-template-columns: 2.5fr 1fr;
@@ -11313,9 +11589,9 @@ input, button, textarea, select {
 .td-title {
   font-size: 32px;
   font-weight: 800;
-  color: var(--nn-dark, #1f2937);
+  color: $nn_dark;
   margin: 0 0 6px 0;
-  font-family: var(--font-poppins, inherit);
+  font-family: $font_poppins;
   line-height: 1.2;
   @media (max-width: 768px) {
     font-size: 24px;
@@ -11323,13 +11599,13 @@ input, button, textarea, select {
 }
 
 .td-subtitle {
-  color: var(--nn-slate, #475569);
+  color: $nn_slate;
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: 500;
 }
 .td-location-line {
-  color: var(--nn-gray, #6b7280);
+  color: $nn_gray;
   font-size: 14px;
   margin: 0 0 12px 0;
 }
@@ -11338,15 +11614,15 @@ input, button, textarea, select {
 
 .td-suggest-update {
   background: none;
-  border: 1px solid var(--nn-purple1, #6e4bff);
-  color: var(--nn-purple1, #6e4bff);
+  border: 1px solid $nn_purple1;
+  color: $nn_purple1;
   font-size: 13px;
   padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
 }
-.td-suggest-update:hover { background: var(--nn-purple1, #6e4bff); color: #fff; }
+.td-suggest-update:hover { background: $nn_purple1; color: #fff; }
 
 /* Actions */
 .td-actions {
@@ -11360,32 +11636,20 @@ input, button, textarea, select {
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: 1px solid var(--nn-border, #e5e7eb);
+  border: 1px solid $nn_border;
   border-radius: 6px;
   background: #fff;
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  color: var(--nn-slate, #334155);
+  color: $nn_slate;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-.td-action-btn:hover { background: var(--nn-bg-soft, #faf9f5); border-color: var(--nn-purple1, #6e4bff); color: var(--nn-purple1, #6e4bff); }
+.td-action-btn:hover { background: $nn_bg_soft; border-color: $nn_purple1; color: $nn_purple1; }
 
 /* QuickFacts copy button lives inside the value cell */
-.td-qf-copy-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border: 1px solid var(--nn-border, #e5e7eb);
-  border-radius: 4px;
-  background: #fff;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--nn-purple1, #6e4bff);
-}
-.td-qf-copy-btn:hover { background: var(--nn-bg-soft, #faf9f5); }
+.td-qf-copy-btn:hover { background: $nn_bg_soft; }
 
 /* Photos */
 .td-photos { margin: 24px 0; }
@@ -11405,14 +11669,14 @@ input, button, textarea, select {
   border: none;
   padding: 0;
   cursor: pointer;
-  background: var(--nn-bg-soft, #faf9f5);
+  background: $nn_bg_soft;
 }
 .td-photo-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .td-see-all-photos {
   margin-top: 12px;
   background: none;
-  border: 1px solid var(--nn-purple1, #6e4bff);
-  color: var(--nn-purple1, #6e4bff);
+  border: 1px solid $nn_purple1;
+  color: $nn_purple1;
   padding: 8px 16px;
   border-radius: 6px;
   font-weight: 600;
@@ -11424,15 +11688,15 @@ input, button, textarea, select {
   margin: 24px 0;
   padding: 16px;
   background: #fff;
-  border: 1px solid var(--nn-border, #e5e7eb);
+  border: 1px solid $nn_border;
   border-radius: 10px;
 }
 .td-things-to-do__title {
-  font-family: var(--font-poppins, inherit);
+  font-family: $font_poppins;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: var(--nn-dark, #1f2937);
+  color: $nn_dark;
   margin: 0 0 12px 0;
   text-transform: uppercase;
 }
@@ -11448,13 +11712,13 @@ input, button, textarea, select {
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  background: var(--nn-bg-soft, #faf9f5);
-  border: 1px solid var(--nn-border, #e5e7eb);
+  background: $nn_bg_soft;
+  border: 1px solid $nn_border;
   border-radius: 999px;
   font-size: 13px;
-  color: var(--nn-dark, #1f2937);
+  color: $nn_dark;
 }
-.td-thing-pill svg { color: var(--nn-teal2, #0e7490); }
+.td-thing-pill svg { color: $nn_teal2; }
 
 /* Accordions container */
 .td-accordions { margin-top: 24px; }
@@ -11471,7 +11735,7 @@ input, button, textarea, select {
 }
 
 
-.td-about-description { color: var(--nn-slate, #334155); line-height: 1.6; margin-bottom: 12px; }
+.td-about-description { color: $nn_slate; line-height: 1.6; margin-bottom: 12px; }
 
 /* Tag groups */
 .td-tags-section { margin-bottom: 12px; }
@@ -11480,15 +11744,15 @@ input, button, textarea, select {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--nn-gray, #6b7280);
+  color: $nn_gray;
   margin-bottom: 6px;
   font-weight: 700;
 }
 .td-tags-grid { display: flex; flex-wrap: wrap; gap: 6px; }
 .td-tag {
-  background: var(--nn-bg-soft, #faf9f5);
-  border: 1px solid var(--nn-border, #e5e7eb);
-  color: var(--nn-slate, #334155);
+  background: $nn_bg_soft;
+  border: 1px solid $nn_border;
+  color: $nn_slate;
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
@@ -11500,7 +11764,7 @@ input, button, textarea, select {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--nn-gray, #6b7280);
+  color: $nn_gray;
   font-weight: 700;
   margin-bottom: 6px;
 }
@@ -11510,28 +11774,15 @@ input, button, textarea, select {
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: var(--nn-slate, #334155);
+  color: $nn_slate;
   margin-bottom: 10px;
 }
 .td-address-btns { display: flex; flex-wrap: wrap; gap: 6px; }
-.td-address-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--nn-border, #e5e7eb);
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--nn-slate, #334155);
-}
-.td-address-btn:hover { border-color: var(--nn-purple1, #6e4bff); color: var(--nn-purple1, #6e4bff); }
+.td-address-btn:hover { border-color: $nn_purple1; color: $nn_purple1; }
 
 .td-parking-notes,
 .td-section-notes {
-  color: var(--nn-slate, #334155);
+  color: $nn_slate;
   line-height: 1.6;
   font-size: 14px;
   margin-top: 8px;
@@ -11556,7 +11807,7 @@ input, button, textarea, select {
 .td-ada-sub-card__list {
   margin: 0;
   padding-left: 18px;
-  color: var(--nn-slate, #334155);
+  color: $nn_slate;
   font-size: 13px;
 }
 
@@ -11565,66 +11816,40 @@ input, button, textarea, select {
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--nn-purple1, #6e4bff);
+  color: $nn_purple1;
   margin: 16px 0 8px 0;
   font-weight: 700;
 }
 .td-trail-guide__notes {
-  color: var(--nn-slate, #334155);
+  color: $nn_slate;
   line-height: 1.6;
   font-size: 14px;
   margin-bottom: 12px;
 }
 .td-trail-in-park {
-  background: var(--nn-bg-soft, #faf9f5);
-  border-left: 3px solid var(--nn-purple1, #6e4bff);
+  background: $nn_bg_soft;
+  border-left: 3px solid $nn_purple1;
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 14px;
   margin-bottom: 12px;
-  color: var(--nn-slate, #334155);
-}
-.td-trail-in-park__link {
-  color: var(--nn-purple1, #6e4bff);
-  font-weight: 600;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  color: $nn_slate;
 }
 .td-trail-in-park__link:hover { text-decoration: underline; }
 
 /* Access point cards */
 .td-access-points { display: flex; flex-direction: column; gap: 12px; }
-.td-access-point-card {
-  background: #fff;
-  border: 1px solid var(--nn-border, #e5e7eb);
-  border-radius: 8px;
-  padding: 12px 14px;
-}
 .td-access-point-card__name {
   font-size: 14px;
   margin: 0 0 6px 0;
-  color: var(--nn-dark, #1f2937);
+  color: $nn_dark;
   font-weight: 700;
 }
 .td-access-point-card__notes {
-  color: var(--nn-slate, #334155);
+  color: $nn_slate;
   line-height: 1.5;
   font-size: 13px;
   margin-top: 6px;
-}
-.td-access-point-card__photos {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 6px;
-  margin-top: 8px;
-}
-.td-access-point-card__photos img {
-  aspect-ratio: 1;
-  width: 100%;
-  object-fit: cover;
-  border-radius: 4px;
 }
 
 /* Pricing / Discounts */
@@ -11632,7 +11857,7 @@ input, button, textarea, select {
 .td-discounts__list {
   margin: 4px 0 0 0;
   padding-left: 18px;
-  color: var(--nn-slate, #334155);
+  color: $nn_slate;
   font-size: 14px;
 }
 
@@ -11648,118 +11873,191 @@ input, button, textarea, select {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--nn-gray, #6b7280);
+  color: $nn_gray;
   font-weight: 700;
   margin: 0 0 6px 0;
 }
 
 /* Contact */
-.td-contact a { color: var(--nn-purple1, #6e4bff); text-decoration: none; font-weight: 600; }
+.td-contact a { color: $nn_purple1; text-decoration: none; font-weight: 600; }
 .td-contact a:hover { text-decoration: underline; }
 .td-contact-feedback {
   margin-top: 8px;
   background: none;
-  border: 1px solid var(--nn-purple1, #6e4bff);
-  color: var(--nn-purple1, #6e4bff);
+  border: 1px solid $nn_purple1;
+  color: $nn_purple1;
   padding: 8px 14px;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
-.td-contact-feedback:hover { background: var(--nn-purple1, #6e4bff); color: #fff; }
+
+.td-contact-feedback:hover { 
+background: $nn_purple1;
+color: #fff;
+}
+
 .page_header_poi_style_1 .poi_intro_wrapper {
-  display: grid; grid-template-columns: 1fr; gap: 20px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
   @media (min-width: 980px) {
     grid-template-columns: 2.5fr 1fr;
   }
 }
 
-.page_header_poi_style_1 .poi_col1 { display: flex; flex-direction: column; gap: 12px; }
-.page_header_poi_style_1 .poi_col2 { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-.btn_poi_button_1 {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 12px; border-radius: 6px; cursor: pointer; background: #fff;
-  border: 1px solid var(--nn-teal2, #0b6e6e); color: var(--nn-teal2, #0b6e6e);
-  font-weight: 600; font-size: 13px;
+.page_header_poi_style_1 .poi_col1 { 
+display: flex;
+flex-direction: column;
+gap: 12px;
 }
-.btn_poi_button_1:hover { background: var(--nn-teal2, #0b6e6e); color: #fff; }
 
-.poi_verified_box, .poi_sponsor_box { width: 100%; }
+.page_header_poi_style_1 .poi_col2 { 
+display: flex;
+flex-direction: column;
+align-items: flex-start;
+gap: 10px;
+}
+
+.btn_poi_button_1 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid $nn_teal2;
+  color: $nn_teal2;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.btn_poi_button_1:hover { 
+background: $nn_teal2;
+color: #fff;
+}
+
+.poi_verified_box, .poi_sponsor_box { 
+width: 100%;
+}
 
 .poi_quick_info_title {
-  font-family: var(--font-poppins); font-weight: 700; letter-spacing: 0.4px;
-  font-size: 15px; color: var(--nn-dark); margin-bottom: 10px;
+  font-family: $font_poppins;
+  font-weight: bold;
+  letter-spacing: 0.4px;
+  font-size: 18px;
+  color: $nn_dark;
+  margin-bottom: 10px;
 }
-.poi_quick_info_single_info { color: var(--nn-slate); }
-.poi_photo_thumb {
-  padding: 0; border: none; background: none; border-radius: 6px;
-  overflow: hidden; aspect-ratio: 1/1; cursor: pointer;
-}
-.poi_photo_thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-.poi_accordion_box { margin: 20px 0; }
-.poi_accordion_parent { display: flex; flex-direction: column; gap: 10px; }
+
+.poi_photo_thumb {
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  overflow: hidden;
+  aspect-ratio: 1/1;
+  cursor: pointer;
+}
+
+.poi_photo_thumb img { 
+width: 100%;
+height: 100%;
+object-fit: cover;
+display: block;
+}
+
+
+
 .acc_section {
-  border: 1px solid var(--gray-d, #e5e5e5); border-radius: 10px;
-  background: #fff; overflow: hidden;
+  border: 1px solid $grayD;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
 }
+
 .acc_title {
-  font-family: var(--font-poppins); margin: 0; font-size: 16px; font-weight: 700;
-  color: var(--nn-dark);
+  font-family: $font_poppins;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: $nn_dark;
 }
-.acc_toggles { display: flex; align-items: center; color: var(--nn-slate); transition: transform .2s; }
-.acc_section.acc_active .acc_toggles { transform: rotate(180deg); }
+
+/* Arrow rotation is handled by .acc_toggle_icon (rotate 90deg when open, see
+   the canonical Accordion block above). This legacy span-level 180deg rotation
+   compounded with that and pointed the open-state arrow the wrong way. */
+/* .acc_section.acc_active .acc_toggles { 
+transform: rotate(180deg);
+} */
 .acc_content {
   padding: 16px 18px 18px;
-  border-top: 1px solid var(--gray-d, #eee);
-  display: grid; grid-template-columns: 1fr; gap: 18px;
+  border-top: 3px solid $nn_gold;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 75px;
+
+  @media (min-width: 1400px) {
+    gap: 100px;
+  }
 }
-.basic_column_parent.column_grid_5050 { grid-template-columns: 1fr;
+
+.basic_column_parent.column_grid_5050 { 
+grid-template-columns: 1fr;
   @media (min-width: 760px) {
     grid-template-columns: 1fr 1fr;
   }
 }
 
-.acc_col_1, .acc_col_2 { display: flex; flex-direction: column; gap: 14px; }
-.acc_content_title_style_1 {
-  font-family: var(--font-poppins);
-  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-  color: var(--nn-dark);
+
+
+
+
+.acc_content_text { 
+
+  // color: $nn_slate;
+
+  // font-size: 14px;
+
+  // line-height: 1.55;
 }
-.acc_content_text { color: var(--nn-slate); font-size: 14px; line-height: 1.55; }
+
 .acc_list_item {
-  font-size: 12px; color: var(--nn-purple1);
-  padding: 4px 10px; background: var(--light-yellow1, #fff8e1);
-  border: 1px solid var(--nn-purple1); border-radius: 16px; white-space: nowrap;
+  font-size: 12px;
+
+  color: $nn_purple1;
+  padding: 4px 10px;
+
+  background: $light_yellow1;
+  border: 1px solid $nn_purple1;
+
+  border-radius: 16px;
+
+  white-space: nowrap;
 }
 
 /* Trail-local quick-facts copy-button & access point photos */
-.td-qf-copy-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 10px; border-radius: 6px; cursor: pointer;
-  background: var(--light-yellow1, #fff8e1); color: var(--nn-purple1);
-  border: 1px solid var(--nn-purple1); font-size: 13px;
+
+
+
+
+.td-access-point-card:first-child { 
+border-top: none;
+padding-top: 0;
+margin-top: 0;
 }
-.td-address-btn {
-  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
-  border-radius: 6px; cursor: pointer; background: #fff;
-  border: 1px solid var(--nn-teal2, #0b6e6e); color: var(--nn-teal2, #0b6e6e);
-  font-weight: 600; font-size: 13px;
-}
-.td-trail-in-park__link {
-  color: var(--nn-purple1); font-weight: 600; text-decoration: none;
-  display: inline-flex; align-items: center; gap: 4px;
-}
-.td-access-point-card { border-top: 1px dashed var(--gray-d); padding-top: 8px; margin-top: 8px; }
-.td-access-point-card:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+
 .td-access-point-card h5 {
-  margin: 0 0 4px; font-family: var(--font-poppins); font-size: 14px; color: var(--nn-dark);
+  margin: 0 0 4px;
+  font-family: $font_poppins;
+  font-size: 14px;
+  color: $nn_dark;
 }
-.td-access-point-card__photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.td-access-point-card__photos img {
-  width: 80px; height: 80px; object-fit: cover; border-radius: 6px;
-}
+
+
 
 
 /* ===================================================================== *
@@ -11773,7 +12071,7 @@ input, button, textarea, select {
 /* ── Gate (yes/no question) ─────────────────────────────────── */
 .claim-page__gate {
   background: white;
-  border: 2px solid var(--gray-d);
+  border: 2px solid $grayD;
   border-radius: 16px;
   padding: 36px 24px;
   text-align: center;
@@ -11782,10 +12080,10 @@ input, button, textarea, select {
 }
 
 .claim-page__gate-question {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 18px;
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0 0 24px;
 }
 
@@ -11802,22 +12100,22 @@ input, button, textarea, select {
   border-radius: 10px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
 .claim-page__gate-btn--yes {
-  background: var(--nn-teal2);
+  background: $nn_teal2;
   color: white;
 }
 .claim-page__gate-btn--yes:hover {
-  background: var(--nn-teal1);
+  background: $nn_teal1;
 }
 
 .claim-page__gate-btn--no {
-  background: var(--gray-d);
-  color: var(--nn-dark);
+  background: $grayD;
+  color: $nn_dark;
 }
 .claim-page__gate-btn--no:hover {
   background: #ccc;
@@ -11826,7 +12124,7 @@ input, button, textarea, select {
 /* ── Outside area message ───────────────────────────────────── */
 .claim-page__outside {
   background: white;
-  border: 2px solid var(--gray-d);
+  border: 2px solid $grayD;
   border-radius: 16px;
   padding: 36px 24px;
   text-align: center;
@@ -11835,7 +12133,7 @@ input, button, textarea, select {
 }
 
 .claim-page__outside p {
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-size: 15px;
   margin: 0 0 20px;
 }
@@ -11843,17 +12141,17 @@ input, button, textarea, select {
 .claim-page__cta-link {
   display: inline-block;
   padding: 14px 28px;
-  background: var(--nn-purple1);
+  background: $nn_purple1;
   color: white;
   border-radius: 10px;
   text-decoration: none;
   font-weight: 600;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   transition: background 0.2s ease;
 }
 
 .claim-page__cta-link:hover {
-  background: var(--nn-purple2);
+  background: $nn_purple2;
 }
 
 .claim-page__back-btn {
@@ -11861,7 +12159,7 @@ input, button, textarea, select {
   margin: 16px auto 0;
   background: none;
   border: none;
-  color: var(--nn-gray);
+  color: $nn_gray;
   cursor: pointer;
   font-size: 14px;
   text-decoration: underline;
@@ -11915,7 +12213,7 @@ input, button, textarea, select {
 .events-calendar__title {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--color-text, #1a1a2e);
+  color: $nn_slate;
   margin: 0;
   flex: 1 1 auto;
 }
@@ -12044,8 +12342,14 @@ input, button, textarea, select {
   grid-template-columns: 1fr;
 
   grid-gap: 0;
+  align-content: start;
   position: relative;
   cursor: pointer;
+  // Cards in a row are stretched to equal height by the parent grid. Without
+  // this, the auto rows stretch too and spread the content apart on cards with
+  // fewer lines (an Event has no hours row, so it sprawled). Keep content
+  // packed at the top and let the leftover height sit at the bottom.
+  align-content: start;
 
   @media(min-width:600px) {
     
@@ -12069,7 +12373,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -12114,12 +12418,12 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
 .one_search_map_result_type {
-  font-size: 90%;
+  // font-size: 90%;
 
   @media(min-width:600px) {
     
@@ -12143,7 +12447,7 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
@@ -12238,42 +12542,10 @@ input, button, textarea, select {
     
   }
   @media(min-width:2400px) {
-    
+
   }
 }
 
-.one_search_map_result_amenities {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 5px;
-
-  @media(min-width:600px) {
-    
-  }
-  @media(min-width:700px) {
-    
-  }
-  @media(min-width:980px) {
-  
-  }
-  @media(min-width:1200px) {
-    
-  }
-  @media(min-width:1400px) {
-    
-  }
-  @media(min-width:1600px) {
-    
-  }
-  @media(min-width:1900px) {
-    
-  }
-  @media(min-width:2400px) {
-    
-  }
-}
 
 .map_results_layout_1_right_col {
   // background-color: $green;
@@ -12316,6 +12588,10 @@ input, button, textarea, select {
   gap: 35px;
   justify-content: flex-start;
   align-items: stretch;
+  // The column fills the fixed height of #map_results_layout_1 (800px+ at
+  // 1200px up). Without this the auto rows stretch to share that height, so a
+  // short result set (Events, Trails) produced very tall cards.
+  align-content: start;
   position: relative;
   z-index: 0;
   padding: 35px 5%;
@@ -12376,7 +12652,7 @@ input, button, textarea, select {
   min-height: 60vh;
   background: #eee;
   @media (max-width: 1199px) {
-    padding-bottom: var(--mobile-nav-height, 75px);
+    padding-bottom: $mobile_nav_height;
   }
 }
 
@@ -12384,7 +12660,7 @@ input, button, textarea, select {
 /* ── Results title band ──────────────────────────────────────────────── */
 .explore__title-band {
   background: #fff;
-  border-bottom: 3px solid var(--nn-gold, #fec764);
+  border-bottom: 3px solid $nn_gold;
 }
 
 .explore__title-inner {
@@ -12407,7 +12683,7 @@ input, button, textarea, select {
   height: 38px;
   border-radius: 999px;
   border: 1px solid $red;
-  // background: var(--nn-teal1);
+  // background: $nn_teal1;
   background: white;
   color: $red;
   text-decoration: none;
@@ -12423,7 +12699,7 @@ input, button, textarea, select {
   }
 }
 .explore__back:focus-visible {
-  outline: 3px solid var(--nn-gold, #fec764);
+  outline: 3px solid $nn_gold;
   outline-offset: 2px;
 }
 
@@ -12433,10 +12709,10 @@ input, button, textarea, select {
 
 
 .explore__title {
-  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-family: $font_poppins;
   font-size: 22px;
   font-weight: 700;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0;
   padding: 0;
   line-height: 1.2;
@@ -12470,23 +12746,29 @@ input, button, textarea, select {
 }
 
 .explore__title-q {
-  color: var(--nn-purple1, #562556);
+  color: $nn_purple1;
   font-style: italic;
 }
 
 .explore__count {
-  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-family: $font_poppins;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--nn-purple1, #562556);
-  background: #f3ecf3;
-  padding: 8px 14px;
+  color: $nn_purple1;
+  // background: #f3ecf3;
+  background: $light_yellow2;
+  border: 1px solid $nn_gold;
+  padding: 13px 15px 11px 15px;
   border-radius: 999px;
   flex-shrink: 0;
+  line-height: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   @media (max-width: 640px) {
-    font-size: 11px; padding: 6px 12px;
+    font-size: 11px;
   }
 }
 
@@ -12498,7 +12780,7 @@ input, button, textarea, select {
   padding: 4px 10px;
   border-radius: 999px;
   background: #f3ecf3;
-  color: var(--nn-purple1, #562556);
+  color: $nn_purple1;
   font-size: 12px;
   font-weight: 500;
   text-transform: capitalize;
@@ -12509,19 +12791,35 @@ input, button, textarea, select {
   box-shadow: 0 10px 24px rgba(86, 37, 86, 0.12);
   border-color: #f0b84a;
 }
+@keyframes one_search_map_result_highlight_pulse {
+  0% {
+    border-color: $blue;
+    box-shadow: 0 10px 24px rgba($nn_teal1, 0.35);
+  }
+  // 50% {
+  //   border-color: $nn_purple1;
+  //   box-shadow: 0 10px 24px rgba($nn_gold, 0.35);
+  // }
+  100% {
+    border-color: $nn_gold;
+    box-shadow: none;
+  }
+}
 .one_search_map_result_single--highlighted {
-  border-color: var(--nn-gold) !important;
-  box-shadow: 0 10px 24px rgba(254, 199, 100, 0.35) !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  animation: one_search_map_result_highlight_pulse 3.2s ease forwards;
 }
 .one_search_map_result_single_buttons .btn_poi_button_1 {
+  text-decoration: none !important;
+  background-color: #fff !important;
+  color: #245b4e !important;
+  border: 2px solid #245b4e !important;
   text-decoration: none !important;
 }
 
 /* Whole-card click target — inner buttons stop propagation. */
 .one_search_map_result_single--clickable { cursor: pointer; }
 .one_search_map_result_single--clickable:focus-visible {
-  outline: 3px solid var(--nn-gold, #fec764);
+  outline: 3px solid $nn_gold;
   outline-offset: 2px;
 }
 .one_search_amenity_icon {
@@ -12531,7 +12829,7 @@ input, button, textarea, select {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  // background: var(--nn-purple-soft, #f3e8f3);
+  // background: $nn_purple_soft;
   background: transparent;
   transition: background-color .2s, transform .2s;
 }
@@ -12540,8 +12838,8 @@ input, button, textarea, select {
   height: 22px !important;
 }
 // .one_search_amenity_icon:hover {
-//   // background: var(--nn-purple1, #562556);
-//   background: var(--nn-gold1, #FEC764);
+//   // background: $nn_purple1;
+//   background: $nn_gold;
 //   // background: transparent;
 //   transform: translateY(-1px);
 //   color: #fff;
@@ -12555,7 +12853,7 @@ input, button, textarea, select {
   justify-content: center;
   gap: 14px;
   padding: 80px 20px 120px;
-  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-family: $font_poppins;
   font-size: 16px;
   color: #555;
   text-align: center;
@@ -12569,7 +12867,7 @@ input, button, textarea, select {
 .explore__state--error { color: #b00020; }
 .explore__state--empty .explore__state-msg {
   font-size: 18px;
-  color: var(--nn-dark, #1a2128);
+  color: $nn_dark;
   font-weight: 500;
   margin: 0;
 }
@@ -12579,9 +12877,9 @@ input, button, textarea, select {
   margin-top: 4px;
   padding: 12px 22px;
   border-radius: 999px;
-  background: var(--nn-teal1, #328170);
+  background: $nn_teal1;
   color: #fff !important;
-  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-family: $font_poppins;
   font-size: 14px;
   font-weight: 600;
   text-decoration: none !important;
@@ -12603,7 +12901,7 @@ input, button, textarea, select {
   height: 100%;
   min-height: 300px;
   color: #fff;
-  font-family: var(--font-poppins, "Poppins", sans-serif);
+  font-family: $font_poppins;
   font-size: 15px;
   padding: 40px 20px;
 }
@@ -12613,6 +12911,21 @@ input, button, textarea, select {
   width: 100%;
   height: 100%;
   min-height: inherit;
+}
+
+/* #115: the height:100% above only resolves once #map_results_layout_1 is a
+   fixed-height two-column grid (1200px up). Below that the row has no definite
+   height, so the map collapsed to 0 and vanished on mobile. */
+.map_results_layout_1_right_col .map-container,
+.map_results_layout_1_right_col .leaflet-container {
+  height: 350px;
+
+  @media(min-width: 700px) {
+    height: 500px;
+  }
+  @media(min-width: 1200px) {
+    height: 100%;
+  }
 }
 
 
@@ -12632,12 +12945,6 @@ input, button, textarea, select {
 /* Directions / Details pill buttons on each card — template uses
    .btn_outline_teal + .btn_poi_button_1. Reset the purple-filled
    app-wide .button so the teal outline shows. */
-.one_search_map_result_single_buttons .btn_poi_button_1 {
-  background-color: #fff !important;
-  color: #245b4e !important;
-  border: 2px solid #245b4e !important;
-  text-decoration: none !important;
-}
 .one_search_map_result_single_buttons .btn_poi_button_1:hover {
   background-color: #245b4e !important;
   color: #fff !important;
@@ -12664,21 +12971,21 @@ input, button, textarea, select {
   justify-content: center;
   gap: 8px;
   padding: 28px 16px;
-  border: 2px dashed var(--gray-d);
+  border: 2px dashed $grayD;
   border-radius: 10px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
 
 .feedback-page__dropzone:hover {
-  border-color: var(--nn-purple1);
+  border-color: $nn_purple1;
   background: #faf8ff;
 }
 
 .feedback-page__dropzone-hint {
   font-size: 12px;
-  color: var(--nn-gray);
+  color: $nn_gray;
 }
 
 .feedback-page__file-input {
@@ -12704,7 +13011,7 @@ input, button, textarea, select {
   height: 72px;
   object-fit: cover;
   border-radius: 8px;
-  border: 2px solid var(--gray-d);
+  border: 2px solid $grayD;
 }
 
 .feedback-page__preview-remove {
@@ -12714,7 +13021,7 @@ input, button, textarea, select {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--nn-red, #e53e3e);
+  background: $red;
   color: white;
   border: none;
   display: flex;
@@ -12727,15 +13034,11 @@ input, button, textarea, select {
 .feedback-page__preview-name {
   display: block;
   font-size: 10px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   margin-top: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}.form_page {
-  @media (max-width: 1199px) {
-    padding-bottom: calc(80px + var(--mobile-nav-height));
-  }
 }
 
 
@@ -12756,6 +13059,8 @@ input, button, textarea, select {
 /* ── #show_back_or_breadcrumbs ──────────────────────────────────────────── */
 
 #show_back_or_breadcrumbs {
+  padding: 20px 0 0 0 ;
+
   .poi_breadcrumbs {
     display: flex;
     align-items: center;
@@ -12778,7 +13083,7 @@ input, button, textarea, select {
     }
 
     .poi_breadcrumb_type {
-      color: $color_text;
+      color: $nn_slate;
     }
 
     [aria-current="page"] {
@@ -12792,12 +13097,6 @@ input, button, textarea, select {
 /* -----------------------------------  Single POI Page Styles   ----------------------------------- */
 
 
-.page_header_poi_style_1 {
-  width: 100%;
-  display: block;
-  position: relative;
-  padding: 35px 0;
-}
 
 .poi_intro_wrapper {
   display: grid;
@@ -12827,40 +13126,20 @@ input, button, textarea, select {
   align-items: flex-start;
 }
 
-.poi_status {
+
+.poi_status_message {
   display: block;
   width: 100%;
-  color: $nn_purple1;
-  color: $blue2;
+  font-size: 14px;
+  color: $nn_slate;
 }
 
-.poi_page_title {
-  font-size: 30px;
-  padding-bottom: 10px;
 
-  @media (min-width: 600px)  { font-size: 33px; }
-  @media (min-width: 700px)  { font-size: 36px; }
-  @media (min-width: 980px)  { font-size: 40px; }
-  @media (min-width: 1200px) { font-size: 45px; }
-  @media (min-width: 1400px) { font-size: 50px; }
-  @media (min-width: 1600px) { font-size: 55px; }
-  @media (min-width: 1900px) { font-size: 60px; }
-  @media (min-width: 2400px) { font-size: 65px; }
-}
-
-.poi_page_main_category {
-  font-size: 1.2em;
-}
 
 .poi_intro {}
 
 .poi_page_excerpt {}
 
-.poi_intro_location {
-  padding: 10px 0;
-  color: $nn_dark;
-  font-weight: bold;
-}
 
 .poi_page_hours_opennow,
 .poi_page_hours_closed,
@@ -12872,11 +13151,6 @@ input, button, textarea, select {
   gap: 11px;
 }
 
-.poi_page_hours {
-  display: block;
-  width: 100%;
-  padding-bottom: 20px;
-}
 
 
 .poi_page_hours_quick_show {
@@ -12903,41 +13177,42 @@ input, button, textarea, select {
 .btn_view_nearby {
   border: 2px solid $nn_purple1 !important;
   color: $nn_purple1 !important;
+  /* merged from duplicate at original line 13407 */
+  .poi_button_icon { fill: $nn_purple1; }
+
+  &:hover {
+    border-color: $nn_purple1;
+    background: $nn_gold;
+    color: $nn_purple1;
+
+    .poi_button_icon { fill: $nn_purple1; }
+  }
 }
 
-.btn_share {
-  border: 2px solid $blue !important;
-  color: $blue !important;
-}
+// .btn_share {
+//   border: 2px solid $blue !important;
+//   color: $blue !important;
+//   /* merged from duplicate at original line 13419 */
+//   .poi_button_icon { fill: $blue; }
+
+//   &:hover {
+//     border-color: $blue;
+//     background: $blue;
+//     color: white;
+
+//     .poi_button_icon { fill: white; }
+//   }
+// }
 
 .poi_button_title {}
 
-.poi_col2 {}
 
-.poi_verified_box {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-}
 
-.poi_verified_badge {
-  background-color: transparent !important;
-  color: $nn_dark !important;
-  padding: 15px 20px 15px 0 !important;
-  // border: 1px solid $green2 !important;
-}
 
-.poi_verified_badge_title {
-  font-weight: 600;
-  text-transform: none !important;
-  letter-spacing: 0;
-  font-size: 1.2em;
-}
 
 .poi_sponsor_box {
   display: flex;
-  flex-wrap: no-wrap;
+  flex-wrap: nowrap;
   justify-content: flex-start;
   align-items: center;
   gap: 15px;
@@ -12957,10 +13232,14 @@ input, button, textarea, select {
   line-height: 1.1;
 }
 
-.poi_last_updated {
-  padding: 20px 0;
-  font-size: 90%;
+.poi_type_info_box {
+  width: 100%;
+  font-family: $font_poppins;
+  font-size: 15px;
+  font-weight: 600;
+  color: $nn_slate;
 }
+
 
 // .btn_outline_teal {
 //   background: white !important;
@@ -12969,19 +13248,6 @@ input, button, textarea, select {
 //   font-weight: 600;
 // }
 
-#poi_quick_info_photos_box {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-gap: 40px;
-  justify-content: flex-start;
-  align-items: flex-start;
-  margin-bottom: 40px;
-
-  @media (min-width: 1200px) {
-    grid-template-columns: 1.3fr 1fr;
-    grid-gap: 75px;
-  }
-}
 
 .poi_quick_info {
   display: grid;
@@ -12991,37 +13257,8 @@ input, button, textarea, select {
   align-items: flex-start;
 }
 
-.poi_quick_info_single {
-  display: grid;
-  grid-template-columns: 100px auto;
-  grid-gap: 20px;
-  justify-content: flex-start;
-  align-items: flex-start;
-  padding: 5px 0;
-}
 
-.poi_quick_info_single_title {
-  font-weight: bold;
-}
 
-.poi_photos {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-gap: 15px;
-
-  @media (min-width: 500px) { grid-template-columns: repeat(3, 1fr); }
-  @media (min-width: 700px) { grid-template-columns: repeat(4, 1fr); }
-
-  img {
-    width: 100%;
-    height: auto;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: transform 0.2s;
-
-    &:hover { transform: scale(1.05); }
-  }
-}
 
 #poi_amenities_box {
   display: block;
@@ -13029,21 +13266,6 @@ input, button, textarea, select {
   margin-bottom: 40px;
 }
 
-.poi_amenities_list {
-  padding: 15px 0 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 20px;
-
-  a,
-  span {
-    color: var(--nn-teal1);
-    font-weight: 500;
-    text-decoration: none;
-  }
-}
 
 
 /* ── Component-specific styles ──────────────────────────────────────────── */
@@ -13055,7 +13277,7 @@ input, button, textarea, select {
 /* ── Page wrapper ────────────────────────────────────────────── */
 .poi_detail {
   min-height: 60vh;
-  background-color: var(--gray-7);
+  background-color: $gray7;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
@@ -13066,34 +13288,12 @@ input, button, textarea, select {
   font-size: 16px;
 }
 
-.btn_view_nearby {
-  .poi_button_icon { fill: var(--nn-purple1); }
 
-  &:hover {
-    border-color: var(--nn-purple1);
-    background: var(--nn-gold);
-    color: var(--nn-purple1);
-
-    .poi_button_icon { fill: var(--nn-purple1); }
-  }
-}
-
-.btn_share {
-  .poi_button_icon { fill: var(--nn-blue); }
-
-  &:hover {
-    border-color: var(--nn-blue);
-    background: var(--nn-blue);
-    color: white;
-
-    .poi_button_icon { fill: white; }
-  }
-}
 
 .poi_verified_badge_about {
   border: 0;
   background-color: transparent;
-  color: var(--nn-teal1);
+  color: $nn_teal1;
   padding: 15px 20px;
   cursor: pointer;
   font-size: 14px;
@@ -13119,17 +13319,17 @@ input, button, textarea, select {
   }
 
   .poi_verified_tooltip_inner {
-    padding: 25px;
-    font-size: 0.9em;
-    line-height: 1.2;
-    color: var(--nn-dark);
-    background-color: #ffd;
+    // padding: 25px;
+    // font-size: 0.9em;
+    line-height: 1.4;
+    // color: $nn_dark;
+    // background-color: #ffd;
   }
 }
 
 // .btn_outline_teal {
 //   &:hover {
-//     background: var(--nn-teal1);
+//     background: $nn_teal1;
 //     color: white;
 //   }
 // }
@@ -13145,23 +13345,14 @@ input, button, textarea, select {
   @media (max-width: 480px) { width: 95%; }
 }
 
-.poi_quick_info_title {
-  font-family: var(--font-poppins);
-  font-weight: bold;
-  font-size: 18px;
-  color: var(--nn-dark);
-}
 
-.poi_quick_info_single_info {
-  color: var(--nn-gray);
-}
 
 /* Photo overlay */
 .photo_overlay {
   aspect-ratio: 1;
   overflow: hidden;
   border-radius: 8px;
-  background: var(--gray-9, #f3f4f6);
+  background: $gray9;
   display: block;
   cursor: pointer;
 
@@ -13179,7 +13370,7 @@ input, button, textarea, select {
   margin-top: 6px;
   background: none;
   border: none;
-  color: var(--nn-teal2);
+  color: $nn_teal2;
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
@@ -13191,17 +13382,10 @@ input, button, textarea, select {
 .pd-addr__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 15px;
+  padding: 20px 0 30px 0;
 }
 
-.poi_button_group_1 {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 10px;
-}
 
 .btn_poi_button_1,
 .btn_poi_button_1:visited {
@@ -13272,7 +13456,7 @@ input, button, textarea, select {
 
 /* Links inside accordion */
 .pd-link {
-  color: var(--nn-teal2);
+  color: $nn_teal2;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -13287,7 +13471,7 @@ input, button, textarea, select {
 // /* ── Box Style ───────────────────────────────────────────────── */
 // .box_style_1 {
 //   background-color: #fff;
-//   border: 2px solid var(--nn-gold);
+//   border: 2px solid $nn_gold;
 //   padding: 30px;
 //   border-radius: 11px;
 //
@@ -13338,7 +13522,7 @@ input, button, textarea, select {
 
 .poi_detail__back-link {
   display: inline-block;
-  color: var(--nn-teal1);
+  color: $nn_teal1;
   text-decoration: none;
   font-weight: 600;
   margin-bottom: 24px;
@@ -13353,7 +13537,7 @@ input, button, textarea, select {
 
 /* Copied feedback toast */
 .poi_detail__copied-feedback {
-  background: var(--nn-teal2);
+  background: $nn_teal2;
   color: white;
   padding: 12px 20px;
   border-radius: 8px;
@@ -13379,25 +13563,25 @@ input, button, textarea, select {
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  background-color: var(--gray-7);
+  background-color: $gray7;
 }
 
 .poi_detail__loading {
   font-size: 18px;
-  color: var(--nn-gray);
+  color: $nn_gray;
 }
 
 .poi_detail__error {
   h2 {
-    font-family: var(--font-poppins);
+    font-family: $font_poppins;
     font-size: 24px;
-    color: var(--nn-dark);
+    color: $nn_dark;
     margin-bottom: 16px;
   }
 }
 
 .poi_detail__back-btn {
-  background: var(--nn-teal2);
+  background: $nn_teal2;
   color: white;
   border: none;
   padding: 12px 24px;
@@ -13406,25 +13590,20 @@ input, button, textarea, select {
   font-size: 16px;
   cursor: pointer;
 
-  &:hover { background: var(--nn-teal1); }
+  &:hover { background: $nn_teal1; }
 }
 
 /* ── Page wrapper ──────────────────────────────────────────────── */
 .poi_detail_page {
   min-height: 60vh;
-  background-color: var(--gray-7, #f7f7f7);
+  background-color: $gray7;
 }
 
-.poi_button_group_1 {
-  @media (max-width: 480px) {
-    gap: 8px;
-  }
-}
 
 .poi_detail_page,
 .poi_detail {
   @media (max-width: 1199px) {
-    padding-bottom: calc(20px + var(--mobile-nav-height));
+    padding-bottom: calc(20px + $mobile_nav_height);
   }
 }
 
@@ -13434,10 +13613,10 @@ input, button, textarea, select {
  * ===================================================================== */
 .services-page {
   min-height: 100vh;
-  background: var(--color-bg);
+  background: $color_bg;
   padding: 20px;
   @media (max-width: 1199px) {
-    padding-bottom: calc(20px + var(--mobile-nav-height));
+    padding-bottom: calc(20px + $mobile_nav_height);
   }
 }
 
@@ -13457,7 +13636,7 @@ input, button, textarea, select {
 
 .services-page__back-link {
   display: inline-block;
-  color: var(--nn-teal2);
+  color: $nn_teal2;
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 24px;
@@ -13469,7 +13648,7 @@ input, button, textarea, select {
 }
 
 .services-page__back-link:hover {
-  color: var(--nn-teal1);
+  color: $nn_teal1;
   text-decoration: underline;
 }
 
@@ -13478,10 +13657,10 @@ input, button, textarea, select {
 }
 
 .services-page__title {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 36px;
   font-weight: 800;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0 0 32px;
   line-height: 1.2;
   @media (max-width: 768px) {
@@ -13493,7 +13672,7 @@ input, button, textarea, select {
 .services-page__section {
   margin-bottom: 40px;
   padding-bottom: 32px;
-  border-bottom: 1px solid var(--gray-d);
+  border-bottom: 1px solid $grayD;
 }
 
 .services-page__section:last-child {
@@ -13503,10 +13682,10 @@ input, button, textarea, select {
 }
 
 .services-page__section h2 {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 22px;
   font-weight: 700;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0 0 16px;
   line-height: 1.3;
   @media (max-width: 768px) {
@@ -13517,7 +13696,7 @@ input, button, textarea, select {
 
 .services-page__section p {
   font-size: 15px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   line-height: 1.7;
   margin: 0 0 12px;
 }
@@ -13529,14 +13708,14 @@ input, button, textarea, select {
 
 .services-page__section li {
   font-size: 15px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   line-height: 1.7;
   margin-bottom: 8px;
 }
 
 .services-page__note {
   font-style: italic;
-  background: var(--light-yellow1);
+  background: $light_yellow1;
   padding: 12px 16px;
   border-radius: 8px;
   margin-top: 16px;
@@ -13548,38 +13727,38 @@ input, button, textarea, select {
 
 .services-page__download-link {
   display: inline-block;
-  background: var(--nn-teal2);
+  background: $nn_teal2;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
   font-size: 15px;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   text-decoration: none;
   transition: background-color 0.2s ease;
 }
 
 .services-page__download-link:hover {
-  background: var(--nn-teal1);
+  background: $nn_teal1;
 }
 
 .services-page__back-btn {
   display: block;
   width: 100%;
-  background: var(--nn-teal2);
+  background: $nn_teal2;
   color: white;
-  border: 2px solid var(--nn-teal1);
+  border: 2px solid $nn_teal1;
   border-radius: 10px;
   padding: 14px 24px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
 .services-page__back-btn:hover {
-  background: var(--nn-teal1);
+  background: $nn_teal1;
 }
 
 
@@ -13588,10 +13767,10 @@ input, button, textarea, select {
  * ===================================================================== */
 .terms-of-service {
   min-height: 100vh;
-  background: var(--color-bg);
+  background: $color_bg;
   padding: 20px;
   @media (max-width: 1199px) {
-    padding-bottom: calc(20px + var(--mobile-nav-height));
+    padding-bottom: calc(20px + $mobile_nav_height);
   }
 }
 
@@ -13611,7 +13790,7 @@ input, button, textarea, select {
 
 .terms-of-service__back-link {
   display: inline-block;
-  color: var(--nn-teal2);
+  color: $nn_teal2;
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 24px;
@@ -13623,7 +13802,7 @@ input, button, textarea, select {
 }
 
 .terms-of-service__back-link:hover {
-  color: var(--nn-teal1);
+  color: $nn_teal1;
   text-decoration: underline;
 }
 
@@ -13632,10 +13811,10 @@ input, button, textarea, select {
 }
 
 .terms-of-service__title {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 36px;
   font-weight: 800;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0 0 20px;
   line-height: 1.2;
   @media (max-width: 768px) {
@@ -13646,7 +13825,7 @@ input, button, textarea, select {
 
 .terms-of-service__intro {
   font-size: 16px;
-  color: var(--nn-dark);
+  color: $nn_dark;
   font-weight: 500;
   margin: 0 0 32px;
   line-height: 1.6;
@@ -13657,10 +13836,10 @@ input, button, textarea, select {
 }
 
 .terms-of-service__section h2 {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 20px;
   font-weight: 700;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0 0 12px;
   line-height: 1.3;
   @media (max-width: 768px) {
@@ -13671,7 +13850,7 @@ input, button, textarea, select {
 
 .terms-of-service__section p {
   font-size: 15px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   line-height: 1.7;
   margin: 0 0 12px;
 }
@@ -13683,40 +13862,40 @@ input, button, textarea, select {
 
 .terms-of-service__section li {
   font-size: 15px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   line-height: 1.7;
   margin-bottom: 8px;
 }
 
 .terms-of-service__link {
-  color: var(--nn-teal2);
+  color: $nn_teal2;
   font-weight: 600;
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .terms-of-service__link:hover {
-  color: var(--nn-teal1);
+  color: $nn_teal1;
   text-decoration: underline;
 }
 
 .terms-of-service__back-btn {
   display: block;
   width: 100%;
-  background: var(--nn-teal2);
+  background: $nn_teal2;
   color: white;
-  border: 2px solid var(--nn-teal1);
+  border: 2px solid $nn_teal1;
   border-radius: 10px;
   padding: 14px 24px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
 .terms-of-service__back-btn:hover {
-  background: var(--nn-teal1);
+  background: $nn_teal1;
 }
 
 
@@ -13749,18 +13928,18 @@ input, button, textarea, select {
 // The parent div uses .one_search_map_result_hours (styled in Explore.scss).
 // ---------------------------------------------------------------------------
 .nearby-card__hours--open {
-  // color: var(--nn-teal2);
-  color: var(--nn-green3);
+  // color: $nn_teal2;
+  color: $nn_green3;
   font-weight: 600;
 }
 
 .nearby-card__hours--closed {
-  color: var(--nn-red);
+  color: $red;
   font-weight: 600;
 }
 
 .nearby-card__hours--soon {
-  color: var(--nn-orange3);
+  color: $nn_orange3;
   font-weight: 600;
 }
 
@@ -13820,9 +13999,10 @@ input, button, textarea, select {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--nn-teal2);
-  font-size: 13px;
+  color: $nn_teal2;
+  font-size: 16px;
   font-weight: 600;
+  padding-bottom: 5px;
 
   svg {
     flex-shrink: 0;
@@ -13837,7 +14017,7 @@ input, button, textarea, select {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--nn-green);
+  color: $green;
   font-size: 13px;
   font-weight: 600;
 }
@@ -13853,35 +14033,66 @@ input, button, textarea, select {
 }
 
 .nearby-card__trail-length {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--nn-dark);
+  // font-size: 13px;
+  // font-weight: 600;
+  // color: $nn_dark;
 }
 
 .nearby-card__trail-difficulty {
+  display: flex;
+  gap: 5px;
+  justify-content: space-between;
+  align-items: center;
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 5px 9px;
+  border-radius: 99px;
   text-transform: uppercase;
+  border: 1px solid gold;
+}
+
+.nearby-card__trail-difficulty:before {
+  display: block;
+  content: "";
+  height: 9px;
+  width: 9px;
+  border-radius: 9px;
+  background-color: gold;
 }
 
 .nearby-card__trail-difficulty--easy {
-  background: #dcfce7;
-  color: #166534;
+  background: $trail_difficulty_easy_bg;
+  color: $trail_difficulty_easy_text;
+  border-color: $trail_difficulty_easy_border;
 }
 
 .nearby-card__trail-difficulty--moderate {
-  background: #fef3c7;
-  color: #92400e;
+  background: $trail_difficulty_moderate_bg;
+  color: $trail_difficulty_moderate_text;
+  border-color: $trail_difficulty_moderate_border;
 }
 
 .nearby-card__trail-difficulty--difficult,
-.nearby-card__trail-difficulty--hard {
-  background: #fee2e2;
-  color: #991b1b;
+.nearby-card__trail-difficulty--hard,
+.nearby-card__trail-difficulty--challenging {
+  background: $trail_difficulty_hard_bg;
+  color: $trail_difficulty_hard_text;
+  border-color: $trail_difficulty_hard_border;
 }
 
+.nearby-card__trail-difficulty--easy.nearby-card__trail-difficulty:before {
+  background-color: $trail_difficulty_easy_border;
+}
+
+.nearby-card__trail-difficulty--moderate.nearby-card__trail-difficulty:before {
+  background-color: $trail_difficulty_moderate_border;
+}
+
+.nearby-card__trail-difficulty--difficult.nearby-card__trail-difficulty:before,
+.nearby-card__trail-difficulty--hard.nearby-card__trail-difficulty:before,
+.nearby-card__trail-difficulty--challenging.nearby-card__trail-difficulty:before {
+  background-color: $trail_difficulty_hard_border;
+}
 
 // ---------------------------------------------------------------------------
 // Paid-tier quick-facts pad
@@ -13889,7 +14100,7 @@ input, button, textarea, select {
 .nearby-card__quick-facts {
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1.5px solid var(--nn-gold);
+  border: 1.5px solid $nn_gold;
   border-radius: 8px;
   background: #fff;
   display: flex;
@@ -13902,7 +14113,7 @@ input, button, textarea, select {
   grid-template-columns: 1fr;
   gap: 2px;
   padding: 6px 0;
-  border-bottom: 1px solid var(--gray-e, #eaeaea);
+  border-bottom: 1px solid $grayE;
   @media (min-width: 600px) {
     grid-template-columns: 0.9fr 1.4fr;
     gap: 10px;
@@ -13915,18 +14126,18 @@ input, button, textarea, select {
 }
 
 .nearby-card__quick-facts-label {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 600;
   font-size: 12px;
   letter-spacing: 0.2px;
-  color: var(--nn-dark);
+  color: $nn_dark;
   text-transform: uppercase;
 }
 
 .nearby-card__quick-facts-value {
   font-size: 13px;
   line-height: 1.35;
-  color: var(--nn-slate, #475569);
+  color: $nn_slate;
 }
 
 
@@ -13964,7 +14175,7 @@ input, button, textarea, select {
   background: white;
   border-radius: 11px;
   padding: 35px 25px 25px 25px;
-  border: 2px solid var(--nn-gold);
+  border: 2px solid $nn_gold;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -13982,7 +14193,7 @@ input, button, textarea, select {
 }
 
 .nearby-card--highlighted {
-  border-color: var(--nn-teal2);
+  border-color: $nn_teal2;
   box-shadow: 0 0 0 3px rgba(50, 129, 112, 0.2);
   animation: highlight-pulse 0.5s ease-out;
 }
@@ -13997,7 +14208,7 @@ input, button, textarea, select {
   top: -27px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--nn-purple1);
+  background: $nn_purple1;
   color: white;
   width: 55px;
   height: 55px;
@@ -14020,7 +14231,7 @@ input, button, textarea, select {
   box-shadow: 0 4px 10px rgba(86, 37, 86, 0.45);
 }
 .nearby-card__number:focus-visible {
-  outline: 3px solid var(--nn-gold);
+  outline: 3px solid $nn_gold;
   outline-offset: 2px;
 }
 
@@ -14037,23 +14248,23 @@ input, button, textarea, select {
   gap: 4px;
 }
 .nearby-card__distance-value {
-  color: var(--nn-purple1);
+  color: $nn_purple1;
   font-size: 87%;
   font-weight: 600;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
 }
 .nearby-card__distance-label {
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-size: 87%;
   font-weight: 500;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
 }
 
 .nearby-card__name {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 21px;
   font-weight: 700;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0;
   line-height: 1;
   padding: 5px 0;
@@ -14062,19 +14273,19 @@ input, button, textarea, select {
 
 .nearby-card__category {
   font-size: 90%;
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-weight: 500;
 }
 
 .nearby-card__city {
   font-size: 90%;
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-weight: 500;
 }
 
 .nearby-card--clickable { cursor: pointer; }
 .nearby-card--clickable:focus-visible {
-  outline: 3px solid var(--nn-gold);
+  outline: 3px solid $nn_gold;
   outline-offset: 2px;
 }
 .nearby-card--clickable:hover {
@@ -14136,7 +14347,7 @@ input, button, textarea, select {
   gap: 9px;
   padding: 15px 20px;
   border-radius: 55px;
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -14146,21 +14357,21 @@ input, button, textarea, select {
   cursor: pointer;
   transition: 0.3s all ease-out;
   background: white;
-  color: var(--nn-teal1);
-  border: 2px solid var(--nn-teal1);
+  color: $nn_teal1;
+  border: 2px solid $nn_teal1;
   @media (max-width: 768px) { padding: 8px 12px; font-size: 12px; }
 }
 .nearby-card__btn:hover {
-  background-color: var(--nn-teal1);
+  background-color: $nn_teal1;
   color: white;
 }
-.nearby-card__btn--directions .poi_button_icon { fill: var(--nn-teal1); }
+.nearby-card__btn--directions .poi_button_icon { fill: $nn_teal1; }
 .nearby-card__btn--directions:hover .poi_button_icon { fill: white; }
 
-.nearby-card--event  { border-color: var(--nn-teal2); }
-.nearby-card--park   { border-color: var(--nn-green); }
-.nearby-card--trail  { border-color: var(--nn-gold); }
-.nearby-card--business { border-color: var(--nn-gold); }
+.nearby-card--event  { border-color: $nn_teal2; }
+.nearby-card--park   { border-color: $green; }
+.nearby-card--trail  { border-color: $nn_gold; }
+.nearby-card--business { border-color: $nn_gold; }
 
 */
 
@@ -14215,7 +14426,7 @@ input, button, textarea, select {
   gap: 6px;
   background: #481f48;
   color: white;
-  border: 1px solid var(--nn-gold);
+  border: 1px solid $nn_gold;
   padding: 12px 20px;
   border-radius: 55px;
   font-weight: 600;
@@ -14245,51 +14456,173 @@ input, button, textarea, select {
 
 .nearby-filter:hover {
   background: #5a2d5a;
-  border-color: var(--nn-gold);
+  border-color: $nn_gold;
 }
 
 .nearby-filter:focus-visible {
-  outline: 2px solid var(--nn-gold);
+  outline: 2px solid $nn_gold;
   outline-offset: 2px;
 }
 
 .nearby-filter--active {
-  background: var(--nn-gold);
-  color: var(--nn-purple1);
-  border-color: var(--nn-gold);
+  background: $nn_gold;
+  color: $nn_purple1;
+  border-color: $nn_gold;
 }
 
 .nearby-filter--active:hover {
   background: #e5b73d;
   border-color: #e5b73d;
-  color: var(--nn-purple1);
+  color: $nn_purple1;
 }
 
 /* Light variant (for homepage Hero & Explore page) */
 .nearby-filters--light .nearby-filter {
   background: white;
-  color: var(--nn-dark);
-  border-color: var(--gray-d);
+  color: $nn_dark;
+  border-color: $grayD;
 }
 
 .nearby-filters--light .nearby-filter:hover {
-  background: var(--light-yellow1);
-  border-color: var(--nn-purple1);
+  background: $light_yellow1;
+  border-color: $nn_purple1;
 }
 
 .nearby-filters--light .nearby-filter--active {
-  background: var(--nn-purple1);
+  background: $nn_purple1;
   color: white;
-  border-color: var(--nn-purple1);
+  border-color: $nn_purple1;
 }
 
 .nearby-filters--light .nearby-filter--active:hover {
-  background: var(--nn-purple2);
-  border-color: var(--nn-purple2);
+  background: $nn_purple2;
+  border-color: $nn_purple2;
 }
 
 .nearby-filters--light .nearby-filter:focus-visible {
-  outline-color: var(--nn-purple1);
+  outline-color: $nn_purple1;
+}
+
+
+/* ── Amenity facet chips (Task 2.2) ─────────────────────────────────────── */
+/* A second chip row below the type pills. Inactive chips use an outline look
+   to read as secondary to the type pills; active chips match the gold accent. */
+.nearby-facets {
+  width: 100%;
+  overflow: hidden;
+  padding: 0 24px;
+  box-sizing: border-box;
+  @media (max-width: 768px) {
+    padding: 0 16px;
+    margin: 0 -16px;
+    width: calc(100% + 32px);
+  }
+  @media (max-width: 480px) {
+    padding: 0 12px;
+    margin: 0 -12px;
+    width: calc(100% + 24px);
+  }
+}
+
+.nearby-facets__scroll {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 8px;
+  @media (max-width: 480px) {
+    gap: 6px;
+  }
+}
+
+.nearby-facet {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: white;
+  border: 1px solid $nn_gold;
+  padding: 10px 16px;
+  border-radius: 55px;
+  font-weight: 600;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: 44px; /* Touch target */
+  @media (max-width: 768px) {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  @media (max-width: 480px) {
+    padding: 8px 10px;
+    font-size: 12px;
+    gap: 4px;
+  }
+}
+
+.nearby-facet:hover {
+  background: #5a2d5a;
+}
+
+.nearby-facet:focus-visible {
+  outline: 2px solid $nn_gold;
+  outline-offset: 2px;
+}
+
+.nearby-facet--active {
+  background: $nn_gold;
+  color: $nn_purple1;
+  border-color: $nn_gold;
+}
+
+.nearby-facet--active:hover {
+  background: #e5b73d;
+  border-color: #e5b73d;
+  color: $nn_purple1;
+}
+
+/* Payment single-select dropdown-chip */
+.nearby-facet-payment {
+  position: relative;
+  display: inline-block;
+}
+
+.nearby-facet-payment__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  z-index: 1000;
+  padding: 8px 0;
+}
+
+.nearby-facet-payment__option {
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  color: $nn_dark;
+  transition: background 0.2s ease;
+}
+
+.nearby-facet-payment__option:hover {
+  background: #f5f5f5;
+}
+
+.nearby-facet-payment__option--active {
+  background: #e8d4e8;
+  font-weight: 500;
 }
 
 
@@ -14328,6 +14661,8 @@ input, button, textarea, select {
 #one_search_map_results {
   padding: 55px 0;
   width: 100%;
+  /* merged from duplicate at original line 15108 */
+  background-color: $gray7;
 }
 
 
@@ -14370,34 +14705,7 @@ input, button, textarea, select {
 }
 
 /* ── Result card ────────────────────────────────────────────────────────── */
-.one_search_map_result_single {
-  padding: 35px 25px 25px 25px;
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-gap: 0;
-  position: relative;
-  cursor: pointer;
-}
 
-.one_search_map_result_number {
-  background-color: $nn_purple1;
-  color: white;
-  font-family: $font_poppins;
-  font-weight: bold;
-  font-size: 25px;
-  width: 55px;
-  height: 55px;
-  border-radius: 55px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  border: 2px solid white;
-  left: 50%;
-  top: -27px;
-  position: absolute;
-  transform: translateX(-50%);
-}
 
 .one_search_map_result_distance {
   font-size: 87%;
@@ -14409,21 +14717,15 @@ input, button, textarea, select {
   color: $nn_purple1;
 }
 
-.one_search_map_result_hours {
-  font-size: 90%;
-}
 
 .one_search_map_result_type_amenities_group {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
-  gap: 20px;
+  gap: 10px;
 }
 
-.one_search_map_result_type {
-  font-size: 90%;
-}
 
 .one_search_map_result_amenities {
   display: flex;
@@ -14475,55 +14777,10 @@ input, button, textarea, select {
   }
 }
 
-.map_result_single_style_1 {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-gap: 5px;
-  justify-content: flex-start;
-  align-items: center;
-  padding: 20px;
-  text-align: center;
 
-  @media(min-width: 1200px) {
-    text-align: left;
-  }
-}
 
-.map_result_single_style_1 .one_search_map_result_amenities {
-  justify-content: center;
 
-  @media(min-width: 1200px) {
-    justify-content: left;
-  }
-}
 
-.map_result_poi_distance {
-  display: flex;
-  flex-wrap: wrap;
-  grid-gap: 3px;
-  justify-content: center;
-  align-items: center;
-  color: $nn_teal1;
-  font-size: 90%;
-
-  @media(min-width: 1200px) {
-    justify-content: flex-start;
-  }
-}
-
-.map_result_single_title {
-  font-family: $font_poppins;
-  font-weight: 600;
-  font-size: 19px;
-  line-height: 1;
-
-  @media(min-width: 1600px) { font-size: 20px; }
-  @media(min-width: 2400px) { font-size: 21px; }
-}
-
-.map_result_single_category {
-  font-size: 90%;
-}
 
 /* ── Component-specific styles ──────────────────────────────────────────── */
 
@@ -14553,7 +14810,7 @@ input, button, textarea, select {
 .nearby-section {
   display: block;
   width: 100%;
-  background-color: var(--nn-purple1);
+  background-color: $nn_purple1;
   padding: 35px 0 0;
 
   @media(max-width: 768px) {
@@ -14569,7 +14826,7 @@ input, button, textarea, select {
 
 /* ── Title ─────────────────────────────────────────────────────────────── */
 .nearby-section__title {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 800;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -14588,10 +14845,10 @@ input, button, textarea, select {
 
 /* ── Listing count ─────────────────────────────────────────────────────── */
 .nearby-section__count {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-weight: 400;
   text-align: center;
-  color: var(--nn-purple3);
+  color: $nn_purple3;
   font-size: 1.1em;
   margin: 0;
 
@@ -14608,7 +14865,7 @@ input, button, textarea, select {
 
 .search_container .search-bar-input__icon {
   left: 20px;
-  color: $nn_purple1;
+  color: $nn_teal1;
 }
 
 .search_container .search-bar-input input {
@@ -14645,9 +14902,6 @@ input, button, textarea, select {
    ========================================================================== */
 
 /* Override parent .nearby-section purple — template uses $gray7 body background */
-#one_search_map_results {
-  background-color: $gray7;
-}
 
 /* .nearby-section .wrapper_wide { padding: 0 } cancels the grid's 75px top padding
    via higher specificity (2 classes > 1 class). Restore it with an ID + class rule. */
@@ -14660,7 +14914,7 @@ input, button, textarea, select {
   grid-column: 1 / -1;
   text-align: center;
   padding: 40px;
-  color: var(--nn-gray);
+  color: $nn_gray;
   font-size: 16px;
 }
 
@@ -14677,7 +14931,7 @@ input, button, textarea, select {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  background-color: var(--gray-7);
+  background-color: $gray7;
 
   @media(max-width: 768px) { padding: 0 16px 24px 16px; }
   @media(max-width: 480px) { padding: 0 12px 20px 12px; gap: 4px; }
@@ -14688,8 +14942,8 @@ input, button, textarea, select {
 .nearby_pagination__btn,
 .nearby_pagination__num {
   background: white;
-  border: 2px solid var(--nn-teal1);
-  color: var(--nn-dark);
+  border: 2px solid $nn_teal1;
+  color: $nn_dark;
   padding: 15px 24px;
   border-radius: 8px;
   font-size: 18px;
@@ -14710,15 +14964,15 @@ input, button, textarea, select {
 
 .nearby_pagination__btn:not(:disabled):hover,
 .nearby_pagination__num:hover {
-  background: var(--nn-purple1);
+  background: $nn_purple1;
   color: white;
-  border-color: var(--nn-purple1);
+  border-color: $nn_purple1;
 }
 
 .nearby_pagination__num.active {
-  background: var(--nn-purple1);
+  background: $nn_purple1;
   color: white;
-  border-color: var(--nn-purple1);
+  border-color: $nn_purple1;
 }
 
 /* ==========================================================================
@@ -14757,7 +15011,7 @@ input, button, textarea, select {
   right: 12px;
   background: none;
   border: none;
-  color: var(--nn-gray);
+  color: $red;
   cursor: pointer;
   padding: 8px;
   display: flex;
@@ -14770,30 +15024,47 @@ input, button, textarea, select {
 }
 
 .directions-modal__close-x:hover {
-  background: var(--gray-5);
-  color: var(--nn-dark);
+  background: $gray5;
+  color: $red;
 }
 
 .directions-modal__title {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 18px;
   font-weight: 700;
-  color: var(--nn-dark);
+  color: $nn_dark;
   margin: 0 0 4px 0;
+  padding: 30px 40px 7px 0;
+}
+
+.directions-modal__date {
+  font-size: 15px;
+  color: $nn_purple1;
+  margin: 0 0 3px 0;
   padding-right: 40px;
+  line-height: 1.4;
+}
+
+.directions-modal__category {
+  font-size: 15px;
+  color: $nn_purple1;
+  margin: 0 0 3px 0;
+  padding-right: 40px;
+  line-height: 1.4;
 }
 
 .directions-modal__address {
   font-size: 14px;
-  color: var(--nn-gray);
-  margin: 0 0 16px 0;
+  color: $nn_gray;
+  margin: 0 0 20px 0;
+  padding-top: 6px;
   line-height: 1.4;
 }
 
 .directions-modal__copy-section {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .directions-modal__copy-btn {
@@ -14802,30 +15073,32 @@ input, button, textarea, select {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: var(--gray-5);
-  border: 1px solid var(--gray-d);
+  background: $nn_teal4;
+  border: 1px solid $nn_teal1;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 99px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--nn-dark);
+  color: $nn_teal1;
   cursor: pointer;
   transition: all 0.2s;
   min-height: 44px;
 }
 
 .directions-modal__copy-btn:hover {
-  background: var(--gray-d);
+  background: $nn_teal1;
+  color: white;
 }
 
 .directions-modal__subtitle {
-  font-family: var(--font-poppins);
+  font-family: $font_poppins;
   font-size: 12px;
-  color: var(--nn-gray);
-  margin: 0 0 12px 0;
+  color: $nn_gray;
+  margin: 0 0 15px 0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
+  text-align: center;
 }
 
 .directions-modal__buttons {
@@ -14835,10 +15108,11 @@ input, button, textarea, select {
 }
 
 .directions-modal__btn {
+  background: $nn_teal1;
   color: white;
   border: none;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: 99px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -14852,19 +15126,33 @@ input, button, textarea, select {
   @media(max-width: 480px) { padding: 12px 14px; font-size: 14px; }
 }
 
-.directions-modal__btn--google { background: #4285f4; }
-.directions-modal__btn--google:hover { background: #3367d6; }
-.directions-modal__btn--apple { background: var(--nn-dark); }
-.directions-modal__btn--apple:hover { background: var(--nn-slate); }
-.directions-modal__btn--waze { background: #33ccff; }
-.directions-modal__btn--waze:hover { background: #00b8f0; }
+.directions-modal__btn:hover { background: #1f5046; }
 
 
 /* ===================================================================== *
  *  DRIFT CAPTURE — TrailDetail accordion containers (were only in .css)
  * ===================================================================== */
-.acc_content_group { display: flex; flex-direction: column; gap: 6px; }
-.acc_list_group_1 { display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px; }
+.acc_content_group { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 6px; 
+}
+
+.acc_list_group_1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  // font-size: 14px;
+}
+
+.poi_category_chip_link {
+  color: $nn_teal1;
+  text-decoration: underline;
+}
+
+.poi_category_chip_link:hover {
+  color: $nn_teal2;
+}
 
 
 /* ===================================================================== *
@@ -14897,4 +15185,109 @@ input, button, textarea, select {
   object-fit: cover;
   border-radius: 6px;
   display: block;
+}
+
+
+/* ===================================================================== *
+ *  ISSUE #142: Event POI page punch list (additive, app team)
+ *  Appended block: nothing above this line is modified or reordered.
+ * ===================================================================== */
+
+/* Item 6: the Share button was the only off-brand (blue) action button.
+   It now matches the teal outline / gold hover the rest of the row uses. */
+.btn_poi_button_1.btn_share {
+  border: 2px solid $nn_teal1 !important;
+  color: $nn_teal1 !important;
+}
+.btn_share .poi_button_icon {
+  fill: $nn_teal1 !important;
+}
+.btn_poi_button_1.btn_share:hover {
+  border: 2px solid $nn_teal1 !important;
+  background-color: $nn_gold !important;
+  color: $nn_teal1 !important;
+}
+.btn_poi_button_1.btn_share:hover .poi_button_icon {
+  fill: $nn_teal1 !important;
+}
+
+/* Item 6: keep the header action row on ONE line once there is room for it.
+   Below 980px the group still wraps (mobile needs it to). */
+@media (min-width: 980px) {
+  .poi_button_group_1 {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .poi_button_group_1 > * {
+    flex: 0 0 auto;
+  }
+}
+
+/* Item 3: "Ended" rides behind the date instead of the status block. */
+.ed-ended-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba($red, 0.1);
+  color: $red;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Item 4: replaces the removed "show all hours" toggle for recurring events. */
+.ed-recurring-note {
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: $nn_teal1;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ed-recurring-note:hover {
+  color: $nn_teal2;
+}
+
+/* Item 11: the next occurrences of a repeating series. */
+.ed-date-chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba($nn_teal1, 0.35);
+  background: rgba($nn_teal1, 0.08);
+  color: $nn_dark;
+  font-size: 14px;
+}
+
+/* Item 17: the bottom notice, restyled to the on-brand note card the other
+   three POI pages already use for the ADA Service Animal alert. */
+.ed-disclaimer {
+  margin: 35px 0 0;
+  padding: 30px 35px;
+  border: 1px solid rgba($nn_teal1, 0.35);
+  border-radius: 5px;
+  background: rgba($nn_teal1, 0.08);
+  color: $nn_dark;
+  text-align: left;
+
+  p {
+    margin: 0 0 8px;
+    font-weight: normal;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+}
+.ed-disclaimer__title {
+  margin: 0 0 8px;
+  padding-top: 0;
+  font-family: $font_poppins;
+  font-size: clamp(1.2rem, 3vw, 1.7rem);
+  color: $nn_teal1;
 }

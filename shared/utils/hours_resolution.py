@@ -94,6 +94,50 @@ HOLIDAY_CALCULATORS = {
 }
 
 
+# Canonical holiday list (#116) in admin-form order. The same 20 holidays, in
+# the same order, live in nearby-app/app/src/utils/hoursUtils.js (HOLIDAYS) and
+# nearby-admin/frontend/src/components/HoursSelector.jsx (COMMON_HOLIDAYS).
+HOLIDAYS = [
+    {"key": "new_year", "name": "New Year's Day"},
+    {"key": "mlk_day", "name": "MLK Jr. Day"},
+    {"key": "presidents_day", "name": "Presidents' Day"},
+    {"key": "memorial_day", "name": "Memorial Day"},
+    {"key": "juneteenth", "name": "Juneteenth"},
+    {"key": "independence_day", "name": "Independence Day"},
+    {"key": "labor_day", "name": "Labor Day"},
+    {"key": "columbus_day", "name": "Columbus Day"},
+    {"key": "veterans_day", "name": "Veterans Day"},
+    {"key": "thanksgiving", "name": "Thanksgiving"},
+    {"key": "black_friday", "name": "Black Friday"},
+    {"key": "christmas_eve", "name": "Christmas Eve"},
+    {"key": "christmas", "name": "Christmas Day"},
+    {"key": "new_year_eve", "name": "New Year's Eve"},
+    {"key": "easter", "name": "Easter Sunday"},
+    {"key": "good_friday", "name": "Good Friday"},
+    {"key": "mothers_day", "name": "Mother's Day"},
+    {"key": "fathers_day", "name": "Father's Day"},
+    {"key": "halloween", "name": "Halloween"},
+    {"key": "valentines_day", "name": "Valentine's Day"},
+]
+
+# Holidays where an unconfirmed entry is worth telling visitors about (#116, P1).
+# The other 11 fall through to the normal schedule silently.
+MAJOR_CLOSURE_HOLIDAYS = {
+    "new_year",
+    "memorial_day",
+    "independence_day",
+    "labor_day",
+    "thanksgiving",
+    "christmas_eve",
+    "christmas",
+    "new_year_eve",
+    "easter",
+}
+
+# Visitor-facing text for a major holiday the business has not answered for.
+HOLIDAY_UNCONFIRMED_TEXT = "Holiday hours not confirmed - please check with the business"
+
+
 # ── Internal resolution helpers ─────────────────────────────────────────────
 
 def _matches_recurring_exception(d: date, exception: dict) -> bool:
@@ -182,6 +226,15 @@ def _get_holiday_for_date(d: date, holidays: Optional[dict]) -> Optional[dict]:
     return None
 
 
+def _get_canonical_holiday_for_date(d: date) -> Optional[dict]:
+    """Return the canonical HOLIDAYS entry falling on *d*, or None."""
+    for holiday in HOLIDAYS:
+        calc = HOLIDAY_CALCULATORS.get(holiday["key"])
+        if calc and calc(d.year) == d:
+            return holiday
+    return None
+
+
 def _get_active_season(d: date, seasonal: Optional[dict]) -> Optional[str]:
     """Return the name of the active season, or None."""
     if not seasonal:
@@ -235,6 +288,76 @@ def _get_active_season(d: date, seasonal: Optional[dict]) -> Optional[str]:
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
+def get_holiday_mode(entry: Optional[dict]) -> str:
+    """
+    Resolve a holiday entry to one of the #116 modes.
+
+    ``mode`` wins when present. Otherwise the legacy ``status`` is mapped so
+    pre-#116 rows keep the meaning they have in production: ``open`` meant
+    "no special hours, use the normal schedule", NOT the new always-open mode.
+    A missing entry is ``unconfirmed`` (absence is the answer, we never write
+    stub rows).
+    """
+    if not entry or not isinstance(entry, dict):
+        return "unconfirmed"
+    mode = entry.get("mode")
+    if mode:
+        return mode
+    status = entry.get("status")
+    if status == "open":
+        return "follows_regular"
+    if status == "closed":
+        return "closed"
+    if status == "modified":
+        return "modified"
+    return "unconfirmed"
+
+
+def _resolve_base_hours_for_date(hours_data: dict, d: date, day_name: str) -> Dict[str, Any]:
+    """
+    Resolve the schedule that applies when no exception or holiday overrides
+    the date: the #118 no-regular-hours flag, then seasonal, then regular.
+    """
+    # #118 - this location keeps no weekly schedule at all. Wins over
+    # seasonal_only and regular (P4); exceptions and holidays still apply.
+    if hours_data.get("no_regular_hours") is True:
+        return {
+            "hours": {"status": "no_regular_hours"},
+            "source": "no_regular_hours",
+            "label": "No regular hours",
+        }
+
+    active_season = _get_active_season(d, hours_data.get("seasonal"))
+    if active_season and hours_data.get("seasonal", {}).get(active_season):
+        season_day_hours = hours_data["seasonal"][active_season].get(day_name)
+        if season_day_hours:
+            season_labels = {
+                "spring": "Spring Hours",
+                "summer": "Summer Hours",
+                "fall": "Fall Hours",
+                "winter": "Winter Hours",
+            }
+            return {
+                "hours": season_day_hours,
+                "source": "seasonal",
+                "label": season_labels.get(active_season, f"{active_season.title()} Hours"),
+            }
+
+    # Fall back to regular hours UNLESS this location is seasonal-only (#46).
+    # With seasonal_only and no active season, report closed-by-seasonal-schedule
+    # rather than leaking stale regular hours. Mirrors hoursUtils.js.
+    if hours_data.get("seasonal_only") is True:
+        return {
+            "hours": {"status": "closed"},
+            "source": "seasonal",
+            "label": "Closed — see seasonal schedule",
+        }
+
+    # Regular hours (fallback)
+    regular_hours = (hours_data.get("regular") or {}).get(day_name)
+    return {"hours": regular_hours, "source": "regular", "label": None}
+
+
 def get_effective_hours_for_date(
     hours_data: Optional[dict],
     d: date,
@@ -268,37 +391,77 @@ def get_effective_hours_for_date(
             regular_hours = (hours_data.get("regular") or {}).get(day_name)
             return {"hours": regular_hours, "source": "exception", "label": label}
 
-    # 2. Holiday hours
+    # 2. Holiday hours (#116) - mode driven, with legacy status mapping
     holiday = _get_holiday_for_date(d, hours_data.get("holidays"))
+    canonical = _get_canonical_holiday_for_date(d)
+    holiday_label = None
+    holiday_note = None
+
     if holiday:
-        h_status = holiday.get("status")
-        if h_status == "closed":
-            return {"hours": {"status": "closed"}, "source": "holiday", "label": holiday.get("name")}
-        if h_status == "modified" and holiday.get("periods"):
+        mode = get_holiday_mode(holiday)
+        holiday_label = holiday.get("name") or (canonical or {}).get("name")
+        holiday_note = holiday.get("note")
+        periods = holiday.get("periods")
+
+        if mode == "closed":
             return {
-                "hours": {"status": "open", "periods": holiday["periods"]},
+                "hours": {"status": "closed"},
                 "source": "holiday",
-                "label": holiday.get("name"),
+                "label": holiday_label,
+                "note": holiday_note,
             }
-        # status == "open" falls through to regular
-
-    # 3. Seasonal hours
-    active_season = _get_active_season(d, hours_data.get("seasonal"))
-    if active_season and hours_data.get("seasonal", {}).get(active_season):
-        season_day_hours = hours_data["seasonal"][active_season].get(day_name)
-        if season_day_hours:
-            season_labels = {
-                "spring": "Spring Hours",
-                "summer": "Summer Hours",
-                "fall": "Fall Hours",
-                "winter": "Winter Hours",
-            }
+        if mode == "modified" and periods:
             return {
-                "hours": season_day_hours,
-                "source": "seasonal",
-                "label": season_labels.get(active_season, f"{active_season.title()} Hours"),
+                "hours": {"status": "open", "periods": periods},
+                "source": "holiday",
+                "label": holiday_label,
+                "note": holiday_note,
             }
+        if mode == "open":
+            if periods:
+                return {
+                    "hours": {"status": "open", "periods": periods},
+                    "source": "holiday",
+                    "label": holiday_label,
+                    "note": holiday_note,
+                }
+            # No holiday-specific periods saved: reuse the day's normal schedule
+            # when there is one, otherwise say the hours are unknown (P3).
+            base = _resolve_base_hours_for_date(hours_data, d, day_name)
+            base_hours = base["hours"] or {}
+            if base_hours.get("status") == "open" and base_hours.get("periods"):
+                return {
+                    "hours": {"status": "open", "periods": base_hours["periods"]},
+                    "source": "holiday",
+                    "label": holiday_label,
+                    "note": holiday_note,
+                }
+            if base_hours.get("status") == "24hours":
+                return {
+                    "hours": {"status": "24hours"},
+                    "source": "holiday",
+                    "label": holiday_label,
+                    "note": holiday_note,
+                }
+            return {
+                "hours": {"status": "open", "hoursVary": True},
+                "source": "holiday",
+                "label": holiday_label,
+                "note": holiday_note,
+            }
+        # follows_regular (and a modified entry with no periods) falls through
+        # to the normal schedule, carrying the holiday name for the UI.
+    elif canonical and canonical["key"] in MAJOR_CLOSURE_HOLIDAYS:
+        # Nobody answered for a holiday people plan around (P1/P2).
+        return {
+            "hours": None,
+            "source": "holiday_unconfirmed",
+            "label": canonical["name"],
+            "unconfirmed": True,
+        }
 
-    # 4. Regular hours (fallback)
-    regular_hours = (hours_data.get("regular") or {}).get(day_name)
-    return {"hours": regular_hours, "source": "regular", "label": None}
+    # 3. no_regular_hours (#118) → 4. seasonal → 5. regular
+    base = _resolve_base_hours_for_date(hours_data, d, day_name)
+    if holiday_label:
+        base = {**base, "label": holiday_label, "note": holiday_note}
+    return base

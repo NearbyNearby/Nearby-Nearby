@@ -11,7 +11,7 @@ export default function MobileNavBar({ searchOverlay, navOverlay }) {
         id="btn_search_nav"
         className={`btn_reset btn_trigger btn_nav_icon_style_1${searchOverlay.isOpen ? ' is_active' : ''}`}
         type="button"
-        onClick={searchOverlay.toggle}
+        onClick={() => { navOverlay.close(); searchOverlay.toggle(); }}
         aria-expanded={searchOverlay.isOpen}
         aria-controls="search_overlay"
         ref={searchOverlay.triggerRef}
@@ -34,7 +34,7 @@ export default function MobileNavBar({ searchOverlay, navOverlay }) {
         id="btn_overlay_navigation"
         className={`btn_reset btn_trigger btn_nav_icon_style_1${navOverlay.isOpen ? ' is_active' : ''}`}
         type="button"
-        onClick={navOverlay.toggle}
+        onClick={() => { searchOverlay.close(); navOverlay.toggle(); }}
         aria-expanded={navOverlay.isOpen}
         aria-controls="nav_overlay"
         ref={navOverlay.triggerRef}

@@ -28,7 +28,11 @@ class EventStatus(enum.Enum):
     UNOFFICIAL_PROPOSED = "Unofficial Proposed Date"
 
 
-class ImageType(enum.Enum):
+class ImageType(str, enum.Enum):
+    # ``str`` mixin: the admin Pydantic layer aliases this as ``ImageTypeEnum``
+    # (schemas/image.py) for request/response validation, which relied on
+    # str-enum semantics. SQLAlchemy still maps ``Enum(ImageType)`` by member
+    # name, so the DB ``imagetype`` labels are unchanged.
     main = "main"
     gallery = "gallery"
     entry = "entry"
@@ -42,3 +46,4 @@ class ImageType(enum.Enum):
     access_point = "access_point"
     map = "map"
     downloadable_map = "downloadable_map"
+    sponsor_logo = "sponsor_logo"

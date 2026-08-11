@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MantineProvider, Accordion } from '@mantine/core';
 import { useForm } from '@mantine/form';
 
@@ -59,10 +59,14 @@ vi.mock('../../../HoursSelector', () => ({
 }));
 vi.mock('../../ImageIntegration', () => ({
   FeaturedImageUpload: () => <div data-testid="stub-featured" />,
+  DownloadableMapsUpload: () => <div data-testid="stub-downloadable-map" />,
   shouldUseImageUpload: () => true,
 }));
 vi.mock('../../components/ParkingLocationGroup', () => ({
   ParkingLocationGroup: () => <div data-testid="stub-parking-group" />,
+}));
+vi.mock('../../components/ParkingLotLinkGroup', () => ({
+  default: () => <div data-testid="stub-parking-lot-links" />,
 }));
 vi.mock('../../components/RestroomLocationGroup', () => ({
   RestroomLocationGroup: () => <div data-testid="stub-restroom-group" />,
@@ -196,5 +200,26 @@ describe('TrailLayout — #77 22-accordion reorg', () => {
     const restroomIdx = texts.findIndex((t) => t === 'Public Restrooms');
     expect(accIdx).toBeGreaterThan(-1);
     expect(accIdx).toBeLessThan(restroomIdx);
+  });
+  // #90/#161: the shared-lot link group lives in the SAME parking panel, below
+  // the listing's own parking.
+  it('renders the shared parking link group inside the Parking panel', () => {
+    const { container } = render(<Harness userRole="editor" />);
+    const control = Array.from(container.querySelectorAll('.mantine-Accordion-control'))
+      .find((c) => c.textContent.trim() === 'Parking');
+    fireEvent.click(control);
+    expect(screen.getByTestId('stub-parking-group')).toBeInTheDocument();
+    expect(screen.getByTestId('stub-parking-lot-links')).toBeInTheDocument();
+  });
+
+  // #147: the trail guide map must be an upload (PDF or image), not a raw URL
+  // text field, so visitors can actually download whatever file is there.
+  it('Trail Guide uses the downloadable-map file upload, not a URL text field', () => {
+    const { container } = render(<Harness userRole="editor" />);
+    const control = Array.from(container.querySelectorAll('.mantine-Accordion-control'))
+      .find((c) => c.textContent.trim() === 'Trail Guide');
+    fireEvent.click(control);
+    expect(screen.getByTestId('stub-downloadable-map')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/URL to trail map/i)).not.toBeInTheDocument();
   });
 });

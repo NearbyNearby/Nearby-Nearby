@@ -97,30 +97,55 @@ const HOLIDAY_CALCULATORS = {
   'valentines_day': (year) => new Date(year, 1, 14)
 };
 
-// Human-readable holiday names
-const HOLIDAY_NAMES = {
-  'new_year': "New Year's Day",
-  'new_years_day': "New Year's Day",
-  'mlk_day': 'MLK Jr. Day',
-  'presidents_day': "Presidents' Day",
-  'memorial_day': 'Memorial Day',
-  'juneteenth': 'Juneteenth',
-  'independence_day': 'Independence Day',
-  'labor_day': 'Labor Day',
-  'columbus_day': 'Columbus Day',
-  'veterans_day': "Veterans Day",
-  'thanksgiving': 'Thanksgiving',
-  'black_friday': 'Black Friday',
-  'christmas_eve': 'Christmas Eve',
-  'christmas': 'Christmas Day',
-  'new_year_eve': "New Year's Eve",
-  'easter': 'Easter Sunday',
-  'good_friday': 'Good Friday',
-  'mothers_day': "Mother's Day",
-  'fathers_day': "Father's Day",
-  'halloween': 'Halloween',
-  'valentines_day': "Valentine's Day"
-};
+/**
+ * Canonical holiday list (#116) in admin-form order.
+ *
+ * The same 20 holidays, in the same order, live in
+ * nearby-admin/frontend/src/components/HoursSelector.jsx (COMMON_HOLIDAYS) and
+ * shared/utils/hours_resolution.py (HOLIDAYS). Keep all three in lockstep.
+ */
+export const HOLIDAYS = [
+  { key: 'new_year', name: "New Year's Day" },
+  { key: 'mlk_day', name: 'MLK Jr. Day' },
+  { key: 'presidents_day', name: "Presidents' Day" },
+  { key: 'memorial_day', name: 'Memorial Day' },
+  { key: 'juneteenth', name: 'Juneteenth' },
+  { key: 'independence_day', name: 'Independence Day' },
+  { key: 'labor_day', name: 'Labor Day' },
+  { key: 'columbus_day', name: 'Columbus Day' },
+  { key: 'veterans_day', name: 'Veterans Day' },
+  { key: 'thanksgiving', name: 'Thanksgiving' },
+  { key: 'black_friday', name: 'Black Friday' },
+  { key: 'christmas_eve', name: 'Christmas Eve' },
+  { key: 'christmas', name: 'Christmas Day' },
+  { key: 'new_year_eve', name: "New Year's Eve" },
+  { key: 'easter', name: 'Easter Sunday' },
+  { key: 'good_friday', name: 'Good Friday' },
+  { key: 'mothers_day', name: "Mother's Day" },
+  { key: 'fathers_day', name: "Father's Day" },
+  { key: 'halloween', name: 'Halloween' },
+  { key: 'valentines_day', name: "Valentine's Day" }
+];
+
+/**
+ * Holidays where an unconfirmed entry is worth telling visitors about (#116, P1).
+ * The other 11 fall through to the normal schedule silently.
+ */
+export const MAJOR_CLOSURE_HOLIDAYS = new Set([
+  'new_year',
+  'memorial_day',
+  'independence_day',
+  'labor_day',
+  'thanksgiving',
+  'christmas_eve',
+  'christmas',
+  'new_year_eve',
+  'easter'
+]);
+
+// Visitor-facing text for a major holiday the business has not answered for.
+export const HOLIDAY_UNCONFIRMED_TEXT =
+  'Holiday hours not confirmed - please check with the business';
 
 // Format a holiday key to human-readable name
 function formatHolidayName(key) {
@@ -128,26 +153,69 @@ function formatHolidayName(key) {
 }
 
 /**
- * Get upcoming holidays from a holidays object.
+ * Resolve a holiday entry to one of the #116 modes:
+ * 'follows_regular' | 'open' | 'closed' | 'modified' | 'unconfirmed'.
  *
- * Issue #70: callers should pass `hours.holidays` (the canonical nested key).
- * The legacy top-level `holiday_hours` column has been deprecated; this util
- * intentionally never falls back to that legacy source.
+ * `mode` wins when present. Otherwise the legacy `status` is mapped so pre-#116
+ * rows keep the meaning they have in production: 'open' meant "no special
+ * hours, use the normal schedule", NOT the new always-open mode. A missing
+ * entry is 'unconfirmed' (absence is the answer, we never write stub rows).
  *
- * Returns array of { key, name, date, dateStr, hours } sorted by date.
+ * Python twin: shared/utils/hours_resolution.py get_holiday_mode().
  */
-export function getUpcomingHolidays(holidayHours, count = null) {
-  if (!holidayHours || typeof holidayHours !== 'object') return [];
+export function getHolidayMode(entry) {
+  if (!entry || typeof entry !== 'object') return 'unconfirmed';
+  if (entry.mode) return entry.mode;
+  if (entry.status === 'open') return 'follows_regular';
+  if (entry.status === 'closed') return 'closed';
+  if (entry.status === 'modified') return 'modified';
+  return 'unconfirmed';
+}
 
+function isSameLocalDay(a, b) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+/** Return the canonical HOLIDAYS entry falling on `date`, or null. */
+function getCanonicalHolidayForDate(date) {
+  for (const holiday of HOLIDAYS) {
+    const calculator = HOLIDAY_CALCULATORS[holiday.key];
+    if (calculator && isSameLocalDay(calculator(date.getFullYear()), date)) {
+      return holiday;
+    }
+  }
+  return null;
+}
+
+/**
+ * Get upcoming holidays for display (#116).
+ *
+ * Iterates the canonical HOLIDAYS list rather than only the configured keys, so
+ * a major holiday nobody answered for can still be surfaced as unconfirmed.
+ * Minor holidays with no entry are skipped: they just follow the normal
+ * schedule (P1).
+ *
+ * Issue #70: holidays are read from `hours.holidays` only; the legacy top-level
+ * `holiday_hours` column is deprecated and never consulted.
+ *
+ * @param {object} hoursData - the FULL hours blob (needs .holidays plus the
+ *                             regular/seasonal schedule to derive results)
+ * @param {number|null} count - cap the number of rows returned
+ * @returns {Array<{key,name,date,dateStr,hours,mode,note,statusText,unconfirmed}>}
+ */
+export function getUpcomingHolidays(hoursData, count = null) {
+  if (!hoursData || typeof hoursData !== 'object') return [];
+
+  const holidayEntries = hoursData.holidays || {};
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const currentYear = now.getFullYear();
   const upcoming = [];
 
-  for (const [key, hours] of Object.entries(holidayHours)) {
-    const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
-    const calculator = HOLIDAY_CALCULATORS[normalizedKey] || HOLIDAY_CALCULATORS[key];
-
+  for (const { key, name } of HOLIDAYS) {
+    const calculator = HOLIDAY_CALCULATORS[key];
     if (!calculator) continue;
 
     let holidayDate = calculator(currentYear);
@@ -156,18 +224,30 @@ export function getUpcomingHolidays(holidayHours, count = null) {
       holidayDate = calculator(currentYear + 1);
     }
 
-    const dateStr = holidayDate.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
+    const entry = holidayEntries[key];
+    const mode = getHolidayMode(entry);
+    if (mode === 'unconfirmed' && !MAJOR_CLOSURE_HOLIDAYS.has(key)) continue;
+
+    const effective = getEffectiveHoursForDate(hoursData, holidayDate);
+    const statusText = effective.source === 'holiday_unconfirmed'
+      ? HOLIDAY_UNCONFIRMED_TEXT
+      : formatDayHours(effective.hours);
+    if (!statusText) continue;
 
     upcoming.push({
       key,
-      name: HOLIDAY_NAMES[normalizedKey] || HOLIDAY_NAMES[key] || formatHolidayName(key),
+      name: entry?.name || name || formatHolidayName(key),
       date: holidayDate,
-      dateStr,
-      hours
+      dateStr: holidayDate.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      }),
+      hours: entry || null,
+      mode,
+      note: entry?.note || null,
+      statusText,
+      unconfirmed: mode === 'unconfirmed'
     });
   }
 
@@ -255,10 +335,15 @@ export function formatLegacyHours(hours) {
 }
 
 /**
- * Format holiday hours status for display
+ * Format holiday hours status for display.
+ *
+ * Preferred input is a row from getUpcomingHolidays(), which already carries
+ * the derived `statusText` for that year's date. The legacy path below still
+ * handles a raw `hours.holidays[key]` entry.
  */
 export function formatHolidayStatus(hours) {
   if (!hours) return 'Regular Hours';
+  if (hours.statusText) return hours.statusText;
   if (hours.status === 'closed' || hours === 'closed') return 'Closed';
   if (hours.status === '24hours') return 'Open 24 Hours';
   if (hours.status === 'modified' && hours.periods) {
@@ -331,13 +416,19 @@ export function formatTime(timeObj) {
   return '';
 }
 
-// Format a single day's hours
+// Format a single day's hours. Returns null when there is nothing to say.
 export function formatDayHours(hours) {
   if (!hours) return 'Closed';
+
+  // #118 - a location with no weekly schedule never renders a day line, and
+  // must never render "Closed".
+  if (hours.status === 'no_regular_hours') return null;
 
   if (hours.status === 'closed') return 'Closed';
   if (hours.status === '24hours') return 'Open 24 Hours';
   if (hours.status === 'appointment') return 'By Appointment';
+  // #116 P3 - open for the holiday but the hours were never filled in.
+  if (hours.status === 'open' && hours.hoursVary) return 'Open - hours vary, call ahead';
 
   if (hours.status === 'open' && hours.periods) {
     return hours.periods.map(period => {
@@ -576,7 +667,53 @@ function normalizeHoursData(hoursData) {
     holidays: hoursData.holidays,
     seasonal: hoursData.seasonal,
     seasonal_only: hoursData.seasonal_only,
+    no_regular_hours: hoursData.no_regular_hours,
   };
+}
+
+/**
+ * Resolve the schedule that applies when no exception or holiday overrides the
+ * date: the #118 no-regular-hours flag, then seasonal, then regular.
+ * Returns the same { hours, source, label } shape as getEffectiveHoursForDate.
+ */
+function resolveBaseHoursForDate(hoursData, date, dayName) {
+  // #118 - this location keeps no weekly schedule at all. Wins over
+  // seasonal_only and regular (P4); exceptions and holidays still apply.
+  if (hoursData.no_regular_hours === true) {
+    return {
+      hours: { status: 'no_regular_hours' },
+      source: 'no_regular_hours',
+      label: 'No regular hours',
+    };
+  }
+
+  const activeSeason = getActiveSeason(date, hoursData.seasonal);
+  if (activeSeason && hoursData.seasonal[activeSeason]) {
+    const seasonalDayHours = hoursData.seasonal[activeSeason][dayName];
+    if (seasonalDayHours) {
+      const seasonNames = {
+        'spring': 'Spring Hours',
+        'summer': 'Summer Hours',
+        'fall': 'Fall Hours',
+        'winter': 'Winter Hours'
+      };
+      return { hours: seasonalDayHours, source: 'seasonal', label: seasonNames[activeSeason] };
+    }
+  }
+
+  // Fall back to regular hours, UNLESS this location is seasonal-only (#46).
+  // When seasonal_only===true and no seasonal period is active for today, report
+  // closed-by-seasonal-schedule rather than leaking stale regular hours.
+  if (hoursData.seasonal_only === true) {
+    return {
+      hours: { status: 'closed' },
+      source: 'seasonal',
+      label: 'Closed — see seasonal schedule',
+    };
+  }
+
+  const regularHours = hoursData.regular?.[dayName];
+  return { hours: regularHours, source: 'regular', label: null };
 }
 
 export function getEffectiveHoursForDate(hoursData, date) {
@@ -605,46 +742,65 @@ export function getEffectiveHoursForDate(hoursData, date) {
     }
   }
 
-  // 2. Check holiday hours
+  // 2. Check holiday hours (#116) - mode driven, with legacy status mapping
   const holiday = getHolidayForDate(date, hoursData.holidays);
+  const canonical = getCanonicalHolidayForDate(date);
+  let holidayLabel = null;
+  let holidayNote = null;
+
   if (holiday) {
-    if (holiday.status === 'closed') {
-      return { hours: { status: 'closed' }, source: 'holiday', label: holiday.name };
-    }
-    if (holiday.status === 'modified' && holiday.periods) {
-      return { hours: { status: 'open', periods: holiday.periods }, source: 'holiday', label: holiday.name };
-    }
-    // If 'open', use regular hours but still note it's a holiday
-  }
+    const mode = getHolidayMode(holiday);
+    holidayLabel = holiday.name || canonical?.name || null;
+    holidayNote = holiday.note || null;
+    const periods = holiday.periods;
 
-  // 3. Check seasonal hours
-  const activeSeason = getActiveSeason(date, hoursData.seasonal);
-  if (activeSeason && hoursData.seasonal[activeSeason]) {
-    const seasonalDayHours = hoursData.seasonal[activeSeason][dayName];
-    if (seasonalDayHours) {
-      const seasonNames = {
-        'spring': 'Spring Hours',
-        'summer': 'Summer Hours',
-        'fall': 'Fall Hours',
-        'winter': 'Winter Hours'
+    if (mode === 'closed') {
+      return { hours: { status: 'closed' }, source: 'holiday', label: holidayLabel, note: holidayNote };
+    }
+    if (mode === 'modified' && periods?.length) {
+      return { hours: { status: 'open', periods }, source: 'holiday', label: holidayLabel, note: holidayNote };
+    }
+    if (mode === 'open') {
+      if (periods?.length) {
+        return { hours: { status: 'open', periods }, source: 'holiday', label: holidayLabel, note: holidayNote };
+      }
+      // No holiday-specific periods saved: reuse the day's normal schedule when
+      // there is one, otherwise say the hours are unknown (P3).
+      const base = resolveBaseHoursForDate(hoursData, date, dayName);
+      const baseHours = base.hours || {};
+      if (baseHours.status === 'open' && baseHours.periods?.length) {
+        return {
+          hours: { status: 'open', periods: baseHours.periods },
+          source: 'holiday',
+          label: holidayLabel,
+          note: holidayNote,
+        };
+      }
+      if (baseHours.status === '24hours') {
+        return { hours: { status: '24hours' }, source: 'holiday', label: holidayLabel, note: holidayNote };
+      }
+      return {
+        hours: { status: 'open', hoursVary: true },
+        source: 'holiday',
+        label: holidayLabel,
+        note: holidayNote,
       };
-      return { hours: seasonalDayHours, source: 'seasonal', label: seasonNames[activeSeason] };
     }
-  }
-
-  // 4. Fall back to regular hours — UNLESS this location is seasonal-only (#46).
-  // When seasonal_only===true and no seasonal period is active for today, report
-  // closed-by-seasonal-schedule rather than leaking stale regular hours.
-  if (hoursData.seasonal_only === true) {
+    // follows_regular (and a modified entry with no periods) falls through to
+    // the normal schedule, carrying the holiday name for the UI.
+  } else if (canonical && MAJOR_CLOSURE_HOLIDAYS.has(canonical.key)) {
+    // Nobody answered for a holiday people plan around (P1/P2).
     return {
-      hours: { status: 'closed' },
-      source: 'seasonal',
-      label: 'Closed — see seasonal schedule',
+      hours: null,
+      source: 'holiday_unconfirmed',
+      label: canonical.name,
+      unconfirmed: true,
     };
   }
 
-  const regularHours = hoursData.regular?.[dayName];
-  return { hours: regularHours, source: 'regular', label: null };
+  // 3. no_regular_hours (#118) → 4. seasonal → 5. regular
+  const base = resolveBaseHoursForDate(hoursData, date, dayName);
+  return holidayLabel ? { ...base, label: holidayLabel, note: holidayNote } : base;
 }
 
 /**
@@ -652,6 +808,9 @@ export function getEffectiveHoursForDate(hoursData, date) {
  * Returns array of { date, dayName, hours, source, label, isToday }
  */
 export function getWeekHours(hoursData, startDate = new Date()) {
+  // #118 - no weekly schedule means no day grid at all.
+  if (hoursData?.no_regular_hours === true) return [];
+
   const weekHours = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -672,9 +831,12 @@ export function getWeekHours(hoursData, startDate = new Date()) {
       dayLabel: DAYS_FULL[dayName],
       dayShort: DAYS_SHORT[dayName],
       hours: effective.hours,
-      formattedHours: formatDayHours(effective.hours),
+      formattedHours: effective.source === 'holiday_unconfirmed'
+        ? HOLIDAY_UNCONFIRMED_TEXT
+        : formatDayHours(effective.hours),
       source: effective.source,
       label: effective.label,
+      note: effective.note || null,
       isToday: date.getTime() === today.getTime(),
       isModified: effective.source !== 'regular'
     });
@@ -700,6 +862,11 @@ export function isCurrentlyOpen(hoursData, lat = null, lng = null) {
 
   if (!hours) {
     return { isOpen: false, status: 'Hours not set' };
+  }
+
+  // #118 - never report "Closed" for a location that keeps no schedule.
+  if (hours.status === 'no_regular_hours') {
+    return { isOpen: false, status: 'No regular hours', source, label };
   }
 
   if (hours.status === 'closed') {
@@ -884,7 +1051,12 @@ export function getOpenCloseStatusLabel(hoursData, now = new Date(), lat = null,
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const { hours, source, label: overrideLabel } = getEffectiveHoursForDate(hoursData, now);
 
+  // No hours to judge by: an unconfirmed major holiday (#116 P2) lands here too,
+  // which is exactly why the badge is suppressed rather than guessed.
   if (!hours) return { variant: null, label: null };
+
+  // #118 - no weekly schedule, so no open/closed claim anywhere.
+  if (hours.status === 'no_regular_hours') return { variant: null, label: null };
 
   // Special statuses
   if (hours.status === 'closed') {
@@ -903,6 +1075,11 @@ export function getOpenCloseStatusLabel(hoursData, now = new Date(), lat = null,
 
   if (hours.status === 'appointment') {
     return { variant: 'closed', label: 'By Appointment Only' };
+  }
+
+  // #116 P3 - open for the holiday, hours never filled in.
+  if (hours.status === 'open' && hours.hoursVary) {
+    return { variant: 'open', label: 'Open - hours vary, call ahead' };
   }
 
   if (hours.status === 'open' && Array.isArray(hours.periods)) {
@@ -1006,8 +1183,12 @@ export function formatGroupedHours(group) {
 }
 
 export default {
+  HOLIDAYS,
+  MAJOR_CLOSURE_HOLIDAYS,
+  HOLIDAY_UNCONFIRMED_TEXT,
   formatTime,
   formatDayHours,
+  getHolidayMode,
   getEffectiveHoursForDate,
   getWeekHours,
   isCurrentlyOpen,

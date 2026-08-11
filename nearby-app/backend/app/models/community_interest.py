@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy import Column, String, Text, TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
-from ..database import Base
+from ..database import FormsBase as Base
 
 
 class CommunityInterest(Base):

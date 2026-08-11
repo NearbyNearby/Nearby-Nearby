@@ -58,5 +58,17 @@ export const preparePOIPayload = (formValues) => {
   if (payload.poi_type !== 'TRAIL') delete payload.trail;
   if (payload.poi_type !== 'EVENT') delete payload.event;
 
+  // Issue #123: `_pendingLogoFile` is a raw File object held in form state so a
+  // sponsor logo can be picked before the POI (and its upload endpoint) exists.
+  // It is uploaded and swapped for a real logo_url/logo_image_id separately
+  // (see uploadPendingSponsorLogos in usePOIHandlers.jsx); never JSON-serialize
+  // it into the sponsors JSONB column.
+  if (payload.event?.sponsors) {
+    payload.event = {
+      ...payload.event,
+      sponsors: payload.event.sponsors.map(({ _pendingLogoFile, ...rest }) => rest),
+    };
+  }
+
   return payload;
 };

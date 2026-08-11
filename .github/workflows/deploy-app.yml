@@ -66,13 +66,13 @@ jobs:
         run: |
           pip install -r nearby-app/backend/requirements.txt
           pip install -r nearby-admin/backend/requirements.txt
-          pip install pytest pytest-httpx httpx
+          pip install pytest pytest-httpx httpx pytest-xdist
 
       - name: Run tests
         env:
           DATABASE_URL: postgresql://test:test@localhost:5434/test_nearby
           PYTHONPATH: .
-        run: pytest tests/ -v --tb=short -x
+        run: pytest tests/ -v --tb=short -x -n auto
 
   build-and-deploy:
     needs: test

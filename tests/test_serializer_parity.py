@@ -200,7 +200,7 @@ _COMMON_POI_FIELDS = dict(
     wifi_options=["free"],
     pet_options=["leashed"],
     pet_policy="Leashed only",
-    drone_usage="allowed",
+    drone_usage="No",
     drone_policy="Drone policy",
     available_for_rent=True,
     rental_info="Rental info",
@@ -341,7 +341,7 @@ def _build_full_poi(db_session, poi_type):
             price_range="$$$",
             price_range_per_person="$15 and under",
             pricing="Varies",
-            gift_cards="yes",
+            gift_cards="yes_this_only",
             youth_amenities=["kids_menu"],
             business_amenities=["meeting_room"],
             entertainment_options=["live_music"],
@@ -371,7 +371,7 @@ def _build_full_poi(db_session, poi_type):
             # "multiple values for keyword 'outdoor_types'".
             hunting_fishing_allowed="no",
             hunting_types=["deer"],
-            fishing_allowed="yes",
+            fishing_allowed="catch_release",
             fishing_types=["bass"],
             licenses_required=["state"],
             hunting_fishing_info="Info",
@@ -527,6 +527,33 @@ def test_serializer_parity(db_session, poi_type):
 
     diff = diff_serializers(norm_baseline, norm_registry)
 
+    # Task 2.1: the six POI-to-POI link fields are now sourced from the
+    # poi_relationships edge table ("edges:<type>"), no longer from their JSONB
+    # columns. This parity fixture sets the legacy JSONB attrs but creates NO
+    # edges, so the registry serializer correctly emits [] for them while the
+    # POIDetail baseline still reflects the raw JSONB. That is an EXPECTED,
+    # intentional source change (verified end-to-end in test_ghost_refs.py), not
+    # silent value drift — exclude these keys from the value-drift assertion.
+    _EDGE_LINK_KEYS = {
+        "service_locations", "locally_found_at", "associated_trails",
+        "membership_passes", "vendor_poi_links", "organization_memberships",
+    }
+    # Task 2.3: same story for the six point-geometry fields — now sourced from
+    # the poi_points table ("points:<kind>"), no longer from their retained JSONB
+    # columns. This fixture sets the legacy JSONB attrs but creates NO poi_points
+    # rows, so the registry serializer correctly emits None while the baseline
+    # still reflects the raw JSONB. Intentional source change (verified
+    # end-to-end in test_poi_points.py), not silent value drift.
+    _POINT_KEYS = {
+        "parking_locations", "toilet_locations", "playground_locations",
+        "payphone_locations", "access_points", "trailhead_location",
+    }
+    _INTENTIONAL_SOURCE_CHANGES = _EDGE_LINK_KEYS | _POINT_KEYS
+    value_mismatches = [
+        m for m in diff["value_mismatches"]
+        if m["key"] not in _INTENTIONAL_SOURCE_CHANGES
+    ]
+
     # --- 1. Previously-DROPPED-by-POIDetail public keys are RESTORED. ---
     # The pre-B3 baseline is the POIDetail allowlist (PII already removed by the
     # B0 hotfix), so the meaningful guarantee is "the registry RESTORES the public
@@ -542,8 +569,8 @@ def test_serializer_parity(db_session, poi_type):
     )
 
     # --- 2. No silent value change for any key present in BOTH payloads. ---
-    assert diff["value_mismatches"] == [], (
-        f"[{poi_type}] value drift on kept keys: {diff['value_mismatches']}"
+    assert value_mismatches == [], (
+        f"[{poi_type}] value drift on kept keys: {value_mismatches}"
     )
 
     # --- 3. Explicit (the real cutover guarantee): NONE of the PII keys nor

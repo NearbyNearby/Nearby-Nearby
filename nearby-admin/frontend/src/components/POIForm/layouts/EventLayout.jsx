@@ -26,6 +26,8 @@ import {
 import { CheckboxGroupSection } from '../components/CheckboxGroupSection';
 import { RestroomLocationGroup } from '../components/RestroomLocationGroup';
 import { ParkingLocationGroup } from '../components/ParkingLocationGroup';
+import ParkingLotLinkGroup from '../components/ParkingLotLinkGroup';
+import VenueSectionModeControl from '../components/VenueSectionModeControl';
 import { FeaturedImageUpload, shouldUseImageUpload } from '../ImageIntegration';
 
 import ServiceAnimalAlert from '../components/ServiceAnimalAlert';
@@ -91,7 +93,9 @@ export default function EventLayout({ form, userRole, poiId }) {
         <Accordion.Panel>
           <Stack>
             <CoreInformationSection form={form} isEvent id={poiId} />
-            <ContactSection form={form} isFreeListing={false} />
+            <VenueSectionModeControl section="contact" form={form}>
+              <ContactSection form={form} isFreeListing={false} />
+            </VenueSectionModeControl>
           </Stack>
         </Accordion.Panel>
       </Accordion.Item>
@@ -219,7 +223,7 @@ export default function EventLayout({ form, userRole, poiId }) {
       <Accordion.Item value="s6-sponsors">
         <Accordion.Control><Text fw={600}>Event Sponsors</Text></Accordion.Control>
         <Accordion.Panel>
-          <EventSponsorsSection form={form} />
+          <EventSponsorsSection form={form} id={poiId} />
         </Accordion.Panel>
       </Accordion.Item>
 
@@ -249,10 +253,12 @@ export default function EventLayout({ form, userRole, poiId }) {
       <Accordion.Item value="s8-address">
         <Accordion.Control><Text fw={600}>Address</Text></Accordion.Control>
         <Accordion.Panel>
-          <Stack>
-            <LocationSection form={form} isEvent id={poiId} />
-            <ArrivalMethodsGroup form={form} />
-          </Stack>
+          <VenueSectionModeControl section="address" form={form}>
+            <Stack>
+              <LocationSection form={form} isEvent id={poiId} />
+              <ArrivalMethodsGroup form={form} />
+            </Stack>
+          </VenueSectionModeControl>
         </Accordion.Panel>
       </Accordion.Item>
 
@@ -263,7 +269,12 @@ export default function EventLayout({ form, userRole, poiId }) {
       <Accordion.Item value="s9-parking">
         <Accordion.Control><Text fw={600}>Parking</Text></Accordion.Control>
         <Accordion.Panel>
-          <ParkingLocationGroup form={form} id={poiId} isEvent label="Parking Locations" />
+          {/* Parking lot LINKS are POI relationships, not venue-inherited data,
+              so they stay outside the venue mode control. */}
+          <VenueSectionModeControl section="parking" form={form}>
+            <ParkingLocationGroup form={form} id={poiId} isEvent label="Parking Locations" />
+          </VenueSectionModeControl>
+          <ParkingLotLinkGroup form={form} />
         </Accordion.Panel>
       </Accordion.Item>
 
@@ -272,6 +283,7 @@ export default function EventLayout({ form, userRole, poiId }) {
       <Accordion.Item value="s10-accessibility">
         <Accordion.Control><Text fw={600}>Accessibility + Mobility Access</Text></Accordion.Control>
         <Accordion.Panel>
+          <VenueSectionModeControl section="accessibility" form={form}>
           <Stack>
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
               <Select
@@ -305,6 +317,7 @@ export default function EventLayout({ form, userRole, poiId }) {
               onChange={(e) => form.setFieldValue('wheelchair_details', e.currentTarget.value)}
             />
           </Stack>
+          </VenueSectionModeControl>
         </Accordion.Panel>
       </Accordion.Item>
 
@@ -315,7 +328,9 @@ export default function EventLayout({ form, userRole, poiId }) {
       <Accordion.Item value="s11-restrooms">
         <Accordion.Control><Text fw={600}>Public Restrooms</Text></Accordion.Control>
         <Accordion.Panel>
-          <RestroomLocationGroup form={form} id={poiId} label="Restroom Locations" />
+          <VenueSectionModeControl section="restrooms" form={form}>
+            <RestroomLocationGroup form={form} id={poiId} label="Restroom Locations" />
+          </VenueSectionModeControl>
         </Accordion.Panel>
       </Accordion.Item>
 
@@ -324,7 +339,9 @@ export default function EventLayout({ form, userRole, poiId }) {
       <Accordion.Item value="s12-playground">
         <Accordion.Control><Text fw={600}>Playground</Text></Accordion.Control>
         <Accordion.Panel>
-          <PlaygroundsSection form={form} isPark id={poiId} />
+          <VenueSectionModeControl section="playground" form={form}>
+            <PlaygroundsSection form={form} isPark id={poiId} />
+          </VenueSectionModeControl>
         </Accordion.Panel>
       </Accordion.Item>
 
@@ -336,10 +353,12 @@ export default function EventLayout({ form, userRole, poiId }) {
       <Accordion.Item value="s13-onsite-facilities">
         <Accordion.Control><Text fw={600}>On Site Facilities + Amenities</Text></Accordion.Control>
         <Accordion.Panel>
-          <Stack>
-            <FacilitiesSection form={form} isEvent id={poiId} />
-            <FullAmenitiesBlock form={form} poiType="EVENT" />
-          </Stack>
+          <VenueSectionModeControl section="amenities" form={form}>
+            <Stack>
+              <FacilitiesSection form={form} isEvent id={poiId} />
+              <FullAmenitiesBlock form={form} poiType="EVENT" />
+            </Stack>
+          </VenueSectionModeControl>
         </Accordion.Panel>
       </Accordion.Item>
 
@@ -348,7 +367,9 @@ export default function EventLayout({ form, userRole, poiId }) {
         <Accordion.Control><Text fw={600}>Pet Policy</Text></Accordion.Control>
         <Accordion.Panel>
           <Stack>
-            <PetPolicySection form={form} />
+            <VenueSectionModeControl section="pet_policy" form={form}>
+              <PetPolicySection form={form} />
+            </VenueSectionModeControl>
             <ServiceAnimalAlert />
           </Stack>
         </Accordion.Panel>
@@ -360,6 +381,7 @@ export default function EventLayout({ form, userRole, poiId }) {
       <Accordion.Item value="s15-alcohol-smoking">
         <Accordion.Control><Text fw={600}>Alcohol + Smoking</Text></Accordion.Control>
         <Accordion.Panel>
+          <VenueSectionModeControl section="alcohol_smoking" form={form}>
           <Stack>
             <Select
               label="Alcohol Available"
@@ -419,6 +441,7 @@ export default function EventLayout({ form, userRole, poiId }) {
               onChange={(e) => form.setFieldValue('smoking_details', e.currentTarget.value)}
             />
           </Stack>
+          </VenueSectionModeControl>
         </Accordion.Panel>
       </Accordion.Item>
 

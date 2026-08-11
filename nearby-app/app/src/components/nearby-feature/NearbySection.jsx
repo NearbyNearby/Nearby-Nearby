@@ -5,9 +5,11 @@ import SearchBar from '../SearchBar';
 import Map from '../Map';
 import NearbyCard from './NearbyCard';
 import NearbyFilters from './NearbyFilters';
+import NearbyFacets from './NearbyFacets';
 import DirectionsModal from '../common/DirectionsModal';
 import { getApiUrl } from '../../config';
 import { getPOIUrl } from '../../utils/slugify';
+import { eventOccursOnDate } from '../../utils/eventSchedule';
 
 const RADIUS_OPTIONS = [1, 3, 5, 10, 15];
 
@@ -42,6 +44,8 @@ function NearbySection({ currentPOI }) {
   const [nearbyPOIs, setNearbyPOIs] = useState([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('All');
+  const [activeFacets, setActiveFacets] = useState([]);
+  const [activePayment, setActivePayment] = useState(null);
   const [radiusMiles, setRadiusMiles] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(8);
@@ -69,7 +73,7 @@ function NearbySection({ currentPOI }) {
     if (currentPOI) {
       fetchNearbyPOIs();
     }
-  }, [currentPOI, radiusMiles]);
+  }, [currentPOI, radiusMiles, activeFacets, activePayment]);
 
   // Close dropdowns on outside click or Escape
   useEffect(() => {
@@ -91,7 +95,10 @@ function NearbySection({ currentPOI }) {
   const fetchNearbyPOIs = async () => {
     setNearbyLoading(true);
     try {
-      const response = await fetch(getApiUrl(`api/pois/${currentPOI.id}/nearby?radius_miles=${radiusMiles}`));
+      const params = new URLSearchParams({ radius_miles: radiusMiles });
+      activeFacets.forEach(f => params.append('facet', f));
+      if (activePayment) params.append('payment', activePayment);
+      const response = await fetch(getApiUrl(`api/pois/${currentPOI.id}/nearby?${params.toString()}`));
       if (response.ok) {
         const data = await response.json();
         setNearbyPOIs(data);
@@ -108,8 +115,22 @@ function NearbySection({ currentPOI }) {
     setCurrentPage(1);
   };
 
+  const handleToggleFacet = (key) => {
+    setActiveFacets(prev =>
+      prev.includes(key) ? prev.filter(f => f !== key) : [...prev, key]
+    );
+    setCurrentPage(1);
+  };
+
+  const handlePaymentChange = (method) => {
+    setActivePayment(method);
+    setCurrentPage(1);
+  };
+
   const handleClear = () => {
     setSelectedFilter('All');
+    setActiveFacets([]);
+    setActivePayment(null);
     setRadiusMiles(5);
     setSelectedDate('');
     setSearchFilteredIds(null);
@@ -162,9 +183,11 @@ function NearbySection({ currentPOI }) {
       }
     }
 
-    if (selectedDate && nearbyPoi.poi_type?.toLowerCase() === 'event' && nearbyPoi.event?.start_datetime) {
-      const eventDate = new Date(nearbyPoi.event.start_datetime).toISOString().split('T')[0];
-      if (eventDate !== selectedDate) {
+    // Event cards carry their schedule as flat fields (start_datetime plus the
+    // recurrence block), not a nested `event` object, so a repeating event is
+    // resolved to whichever occurrence (if any) falls on the selected date.
+    if (selectedDate && nearbyPoi.poi_type?.toLowerCase() === 'event') {
+      if (!eventOccursOnDate(nearbyPoi, selectedDate)) {
         return false;
       }
     }
@@ -188,7 +211,6 @@ function NearbySection({ currentPOI }) {
   };
 
   const handleMarkerClick = (poiId, index) => {
-    setHighlightedCardId(poiId);
     const poiIndex = filteredNearbyPOIs.findIndex(p => p.id === poiId);
     if (poiIndex !== -1) {
       const targetPage = Math.floor(poiIndex / itemsPerPage) + 1;
@@ -202,7 +224,12 @@ function NearbySection({ currentPOI }) {
         }
       }, 100);
     }
-    setTimeout(() => setHighlightedCardId(null), 3000);
+    // Wait for the scroll-into-view to finish before highlighting, so the
+    // highlight animation isn't already underway (or done) while the card
+    // is still off-screen.
+    const HIGHLIGHT_DELAY = 1200;
+    setTimeout(() => setHighlightedCardId(poiId), HIGHLIGHT_DELAY);
+    setTimeout(() => setHighlightedCardId(null), HIGHLIGHT_DELAY + 3000);
   };
 
   const handleDetailsClick = (poi) => {
@@ -277,6 +304,16 @@ function NearbySection({ currentPOI }) {
             <NearbyFilters
               selectedFilter={selectedFilter}
               onFilterChange={handleFilterChange}
+            />
+          </div>
+
+          {/* Amenity facet chips — Task 2.2 */}
+          <div className="one_search_facets">
+            <NearbyFacets
+              activeFacets={activeFacets}
+              onToggleFacet={handleToggleFacet}
+              activePayment={activePayment}
+              onPaymentChange={handlePaymentChange}
             />
           </div>
 
@@ -359,13 +396,16 @@ function NearbySection({ currentPOI }) {
                       <div className="date_dropdown_custom">
                         <label className="date_dropdown_date_label">
                           <span>Pick a date</span>
-                          <input
-                            type="date"
-                            className="date_dropdown_date_input"
-                            value={selectedDate}
-                            min={getDatePresets().today}
-                            onChange={(e) => { setSelectedDate(e.target.value); setDateOpen(false); }}
-                          />
+                          <span className="date_dropdown_date_field">
+                            <input
+                              type="date"
+                              className={`date_dropdown_date_input${selectedDate ? '' : ' is-empty'}`}
+                              value={selectedDate}
+                              min={getDatePresets().today}
+                              onChange={(e) => { setSelectedDate(e.target.value); setDateOpen(false); }}
+                            />
+                            {!selectedDate && <span className="date_dropdown_date_ph" aria-hidden="true">mm/dd/yyyy</span>}
+                          </span>
                         </label>
                       </div>
                     </div>

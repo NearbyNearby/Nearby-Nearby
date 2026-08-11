@@ -19,6 +19,7 @@ class PointGeometry(BaseModel):
 class Category(BaseModel):
     id: uuid.UUID
     name: str
+    slug: str
     model_config = ConfigDict(from_attributes=True)
 
 # --- Sub-Type Schemas ---
@@ -32,6 +33,10 @@ class Park(BaseModel):
     
 class Trail(BaseModel):
     length_text: Optional[str] = None
+    # Task 2.4: derived from geom_line via ST_Length(geography), attached by
+    # enrich_trail_length on the detail path. None when the trail has no line;
+    # length_text remains the display fallback.
+    length_miles: Optional[float] = None
     difficulty: Optional[str] = None
     route_type: Optional[str] = None
     # Issue #63 / #64 — Trailhead + Access Points consolidation.
@@ -63,6 +68,11 @@ class Event(BaseModel):
     # Venue inheritance (Task 45)
     venue_poi_id: Optional[str] = None
     venue_inheritance: Optional[dict] = None
+    # Issue #124: the venue's display name/type, resolved at read time from the
+    # linked venue POI (see _apply_venue_inheritance). Not columns; a snapshot
+    # column would go stale whenever the venue is renamed.
+    venue_name: Optional[str] = None
+    venue_type: Optional[str] = None
     # Recurring events expansion (Task 50)
     series_id: Optional[str] = None
     parent_event_id: Optional[str] = None
@@ -125,6 +135,9 @@ class POISearchResult(BaseModel):
     address_street: Optional[str] = None
     description_short: Optional[str] = None
     location: Optional[Any] = None
+    # #130: service-based POIs opt out of being pinned on a map. Every surface
+    # that draws a marker from a search result needs the flag.
+    dont_display_location: Optional[bool] = None
     main_category: Optional[Category] = None  # Primary display category
     model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 

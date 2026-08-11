@@ -14,6 +14,7 @@ import {
 } from '../sections/MiscellaneousSections';
 import HoursSelector from '../../HoursSelector';
 import { RestroomLocationGroup } from '../components/RestroomLocationGroup';
+import ParkingLotLinkGroup from '../components/ParkingLotLinkGroup';
 import { FeaturedImageUpload, shouldUseImageUpload } from '../ImageIntegration';
 
 import ServiceAnimalAlert from '../components/ServiceAnimalAlert';
@@ -162,6 +163,10 @@ export default function BusinessFreeLayout({ form, userRole, poiId }) {
                 )}
               </Stack>
             )}
+
+            {/* Business Free still gets no own-lot repeat, but it may LINK
+                shared lots (product decision 7). */}
+            <ParkingLotLinkGroup form={form} />
           </Stack>
         </Accordion.Panel>
       </Accordion.Item>

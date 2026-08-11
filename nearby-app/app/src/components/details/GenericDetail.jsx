@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import {
   AccSection, ContentGroup, ChipList, QuickInfoRow,
-  POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox,
+  POIDetailLayout, QuickInfoPhotosBox, AmenitiesBox, SocialLinksGroup, hasSocialLinks,
   hasVal, getImages,
 } from './shared';
 import HoursDisplay from '../common/HoursDisplay';
@@ -40,14 +40,20 @@ export default function GenericDetail({ poi }) {
   const seoUrl = `${window.location.origin}${getPOIUrl(poi)}`;
 
   const contactAny =
-    hasVal(poi.phone_number) || hasVal(poi.email) || hasVal(poi.website_url);
+    hasVal(poi.phone_number) || hasVal(poi.email) || hasVal(poi.website_url) || hasSocialLinks(poi);
 
   const addressAny =
     hasVal(poi.address_street) || hasVal(poi.address_city) ||
-    hasVal(poi.parking_types) || hasVal(poi.parking_notes);
+    hasVal(poi.parking_types) || hasVal(poi.parking_notes) ||
+    hasVal(poi.arrival_methods) || poi.expect_to_pay_parking === true;
 
   /* ── Accordion sections ── */
   const aboutCol1 = [
+    hasVal(poi.teaser_paragraph) && (
+      <ContentGroup key="teaser">
+        <div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.teaser_paragraph) }} />
+      </ContentGroup>
+    ),
     hasVal(poi.description_long) && (
       <ContentGroup key="desc" title="About">
         <div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_long) }} />
@@ -62,7 +68,7 @@ export default function GenericDetail({ poi }) {
           <HoursDisplay hours={poi.hours}
             appointmentBookingUrl={poi.appointment_booking_url}
             appointmentRequired={poi.hours_but_appointment_required}
-            hoursNotes={poi.hours_notes} />
+            hoursNotes={poi.hours?.notes} />
         </div>
       </ContentGroup>
     ),
@@ -83,6 +89,8 @@ export default function GenericDetail({ poi }) {
   ].filter(Boolean);
   const addrCol2 = [
     hasVal(poi.parking_types) && <ContentGroup key="parking" title="Parking"><ChipList items={poi.parking_types} /></ContentGroup>,
+    hasVal(poi.arrival_methods) && <ContentGroup key="arrival" title="Arrival"><ChipList items={poi.arrival_methods} /></ContentGroup>,
+    poi.expect_to_pay_parking === true && <ContentGroup key="paypark"><div className="acc_content_text"><p>Expect to pay for parking.</p></div></ContentGroup>,
     hasVal(poi.parking_notes) && <ContentGroup key="pnotes"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.parking_notes) }} /></ContentGroup>,
   ].filter(Boolean);
 
@@ -98,6 +106,7 @@ export default function GenericDetail({ poi }) {
   ].filter(Boolean);
   const contactCol2 = [
     hasVal(poi.email) && <ContentGroup key="em" title="Email"><div className="acc_list_group_1"><a href={`mailto:${poi.email}`}>{poi.email}</a></div></ContentGroup>,
+    hasSocialLinks(poi) && <SocialLinksGroup key="soc" poi={poi} />,
   ].filter(Boolean);
 
   const sections = [
@@ -133,17 +142,17 @@ export default function GenericDetail({ poi }) {
 
             <AmenitiesBox poi={poi} title="Amenities" />
 
-            {sections.length > 0 && (
-              <div id="accordion_1_box" className="poi_accordion_box">
-                <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
-                  {sections.map((s) => (
-                    <AccSection key={s.key} title={s.title} defaultOpen={s.open}
-                      col1={s.col1.length > 0 ? s.col1 : null}
-                      col2={s.col2.length > 0 ? s.col2 : null} />
-                  ))}
-                </div>
+            {/* ONE accordion stack per page (Barry's single-poi layout): the
+                registry-driven auto sections render inside the same parent. */}
+            <div id="accordion_1_box" className="poi_accordion_box">
+              <div id="accordion_1_parent" className="poi_accordion_parent accordionjs">
+                {sections.map((s) => (
+                  <AccSection key={s.key} title={s.title} defaultOpen={s.open}
+                    col1={s.col1.length > 0 ? s.col1 : null}
+                    col2={s.col2.length > 0 ? s.col2 : null} />
+                ))}
               </div>
-            )}
+            </div>
           </>
         )}
       </POIDetailLayout>

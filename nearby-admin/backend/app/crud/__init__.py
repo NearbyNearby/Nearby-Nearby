@@ -8,7 +8,7 @@ from .crud_poi import (
     create_poi, update_poi, delete_poi, create_poi_relationship, get_poi_relationships
 )
 from .crud_category import (
-    get_category, create_category, delete_category, get_all_categories_as_tree,
+    get_category, create_category, update_category, delete_category, get_all_categories_as_tree,
     get_category_tree_by_poi_type,
     get_categories_by_poi_type
 )

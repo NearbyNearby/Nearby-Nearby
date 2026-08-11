@@ -97,6 +97,65 @@ class TestUpdateCategories:
         assert "Sec Cat 3" in cat_names or "Sec Cat 3" in sec_names
 
 
+class TestUpdateCategoryItself:
+    """PUT /api/categories/{id}: issue #96 (updating a category errors out)."""
+
+    def test_rename_category(self, admin_client):
+        cat = create_category(admin_client, name="Original Name")
+        resp = admin_client.put(
+            f"/api/categories/{cat['id']}",
+            json={"name": "Renamed Category"},
+        )
+        assert resp.status_code == 200, resp.text
+        updated = resp.json()
+        assert updated["name"] == "Renamed Category"
+
+    def test_change_parent(self, admin_client):
+        parent = create_category(admin_client, name="New Parent")
+        cat = create_category(admin_client, name="Child Cat")
+        resp = admin_client.put(
+            f"/api/categories/{cat['id']}",
+            json={"parent_id": parent["id"]},
+        )
+        assert resp.status_code == 200, resp.text
+        updated = resp.json()
+        assert updated["parent_id"] == parent["id"]
+
+    def test_change_applicable_to(self, admin_client):
+        cat = create_category(admin_client, name="Type Change Cat", applicable_to=["BUSINESS"])
+        resp = admin_client.put(
+            f"/api/categories/{cat['id']}",
+            json={"applicable_to": ["PARK", "TRAIL"]},
+        )
+        assert resp.status_code == 200, resp.text
+        updated = resp.json()
+        assert set(updated["applicable_to"]) == {"PARK", "TRAIL"}
+
+    def test_full_update_like_frontend_payload(self, admin_client):
+        """Mirrors the exact payload CategoryForm.jsx sends on save (poi_types
+        already mapped to applicable_to client-side)."""
+        parent = create_category(admin_client, name="Parent For Full Update")
+        cat = create_category(admin_client, name="Full Update Cat", applicable_to=["BUSINESS"])
+        payload = {
+            "name": "Full Update Cat Renamed",
+            "parent_id": parent["id"],
+            "applicable_to": ["EVENT"],
+        }
+        resp = admin_client.put(f"/api/categories/{cat['id']}", json=payload)
+        assert resp.status_code == 200, resp.text
+        updated = resp.json()
+        assert updated["name"] == "Full Update Cat Renamed"
+        assert updated["parent_id"] == parent["id"]
+        assert updated["applicable_to"] == ["EVENT"]
+
+        # Confirm it round-trips on GET too.
+        get_resp = admin_client.get(f"/api/categories/{cat['id']}")
+        assert get_resp.status_code == 200
+        fetched = get_resp.json()
+        assert fetched["name"] == "Full Update Cat Renamed"
+        assert fetched["applicable_to"] == ["EVENT"]
+
+
 class TestCategoryTree:
     def test_category_tree(self, admin_client):
         """GET /api/categories/tree."""

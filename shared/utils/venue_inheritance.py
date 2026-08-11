@@ -2,25 +2,22 @@
 
 When an event has a venue_poi_id, certain data sections can be inherited from
 the venue POI. The venue_inheritance JSONB config specifies per-section behavior:
-  - "as_is": use venue data directly
-  - "use_and_add": merge venue base + event additions
-  - "do_not_use": skip venue data, keep event's own data
+  - "as_is": venue data wins, live, on every read. The event's own columns for
+    that section are dormant, never cleared, and never shown.
+  - "use_and_add": a ONE-TIME copy performed by the admin form when the mode is
+    selected. At read time this is a NO-OP: the event's own columns are used
+    verbatim so later venue edits cannot overwrite the editor's changes.
+  - "do_not_use": skip venue data, keep event's own data.
+
+Issue #124: use_and_add used to merge venue lists/dicts into the event on every
+read, which is exactly the overwrite the mode promises not to do. Sections and
+their fields now come from shared/constants/venue_sections.py; hours is no
+longer inheritable, and stale {"hours": ...} config keys are simply ignored.
 """
 
 from typing import Optional
 
-# Map section names to the fields they control
-_SECTION_FIELDS = {
-    # public_transit_info removed from parking inheritance — renamed _deprecated_public_transit_info (Migration A #33)
-    "parking": ["parking_types", "parking_locations", "parking_notes", "expect_to_pay_parking"],
-    "restrooms": ["public_toilets", "toilet_locations", "toilet_description"],
-    # wheelchair_accessible removed (Issue #45 PR2 Migration B — column dropped)
-    "accessibility": ["wheelchair_details"],
-    "hours": ["hours"],
-    "amenities": ["amenities"],
-    "pet_policy": ["pet_options", "pet_policy"],
-    "drone_policy": ["drone_usage", "drone_policy"],
-}
+from shared.constants.venue_sections import SECTION_FIELDS as _SECTION_FIELDS
 
 
 def resolve_venue_inheritance(
@@ -53,39 +50,16 @@ def resolve_venue_inheritance(
         fields = _SECTION_FIELDS[section]
         venue_source[section] = mode
 
-        if mode == "do_not_use":
+        # do_not_use: nothing to do. use_and_add: also nothing to do; the copy
+        # already happened at write time, so the event's own values stand and a
+        # later venue edit must not reach back in and overwrite them.
+        if mode != "as_is":
             continue
 
-        if mode == "as_is":
-            for field in fields:
-                venue_val = venue_data.get(field)
-                if venue_val is not None:
-                    result[field] = venue_val
-
-        elif mode == "use_and_add":
-            for field in fields:
-                venue_val = venue_data.get(field)
-                event_val = result.get(field)
-
-                if venue_val is None:
-                    continue
-
-                if isinstance(venue_val, list) and isinstance(event_val, list):
-                    # Merge lists, preserving order: venue first, then event additions
-                    merged = list(venue_val)
-                    for item in event_val:
-                        if item not in merged:
-                            merged.append(item)
-                    result[field] = merged
-                elif isinstance(venue_val, dict) and isinstance(event_val, dict):
-                    # Merge dicts: venue base, event overrides
-                    merged = dict(venue_val)
-                    merged.update(event_val)
-                    result[field] = merged
-                elif event_val is None:
-                    # Event has no data, use venue
-                    result[field] = venue_val
-                # else: event has non-list/dict data, keep event's own value
+        for field in fields:
+            venue_val = venue_data.get(field)
+            if venue_val is not None:
+                result[field] = venue_val
 
     result["_venue_source"] = venue_source
     return result

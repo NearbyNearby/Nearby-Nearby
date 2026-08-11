@@ -21,6 +21,44 @@ RELATIVE_SCORE_THRESHOLD = 0.20
 # pg_trgm similarity threshold for name matching
 TRIGRAM_SIMILARITY_THRESHOLD = 0.15
 
+# Minimum raw cosine similarity for a pgvector neighbour to count as a match
+# at all (Issue #140). Without it the nearest-neighbour query returns its LIMIT
+# worth of rows no matter how bad they are, so a type-filtered search behaved
+# like a full type listing. EmbeddingGemma (with the query/document prompt
+# prefixes the shared client applies) puts unrelated pairs in roughly the
+# 0.20-0.45 band and topically related pairs above ~0.55, so 0.45 sits in the
+# trough. This is THE knob to turn if semantic recall ever feels too tight:
+# lower it toward 0.35 for more recall, raise it toward 0.55 for more precision.
+SEMANTIC_SIMILARITY_THRESHOLD = 0.45
+
+# --- Amenity phrases that are really filters, not text (Issue #137) ---
+# A query that IS one of these phrases (case-, hyphen- and punctuation-
+# insensitive, see amenity_flag_column()) filters on the matching computed
+# boolean instead of hoping text similarity lands on pet-friendly places.
+# The icon_* columns are computed on every admin write from the underlying
+# option lists (compute_icon_booleans), and are the same source the /pois/counts
+# facets and the Nearby facet filters use.
+AMENITY_FLAG_PHRASES = {
+    "pet friendly": "icon_pet_friendly",
+    "pets allowed": "icon_pet_friendly",
+    "dog friendly": "icon_pet_friendly",
+    "dogs allowed": "icon_pet_friendly",
+    "wheelchair": "icon_wheelchair_accessible",
+    "wheelchair accessible": "icon_wheelchair_accessible",
+    "wheelchair access": "icon_wheelchair_accessible",
+    "wifi": "icon_free_wifi",
+    "wi fi": "icon_free_wifi",
+    "free wifi": "icon_free_wifi",
+    "free wi fi": "icon_free_wifi",
+    "public wifi": "icon_free_wifi",
+    "restroom": "icon_public_restroom",
+    "restrooms": "icon_public_restroom",
+    "public restroom": "icon_public_restroom",
+    "public restrooms": "icon_public_restroom",
+    "bathroom": "icon_public_restroom",
+    "bathrooms": "icon_public_restroom",
+}
+
 # --- POI type synonyms ---
 # Maps query words to POIType enum values
 POI_TYPE_SYNONYMS = {

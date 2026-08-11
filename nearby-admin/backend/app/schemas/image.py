@@ -2,24 +2,11 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from uuid import UUID
-from enum import Enum
 
-
-class ImageTypeEnum(str, Enum):
-    """Types of images that can be uploaded"""
-    MAIN = "main"
-    GALLERY = "gallery"
-    ENTRY = "entry"
-    PARKING = "parking"
-    RESTROOM = "restroom"
-    RENTAL = "rental"
-    PLAYGROUND = "playground"
-    MENU = "menu"
-    TRAIL_HEAD = "trail_head"
-    TRAIL_EXIT = "trail_exit"
-    ACCESS_POINT = "access_point"
-    MAP = "map"
-    DOWNLOADABLE_MAP = "downloadable_map"
+# One image-type enum for the whole platform (Task 1.2). This was a second,
+# hand-maintained copy (the `sponsor_logo` drift that caused public 500s traced
+# to it); it now aliases the single shared enum instead of redefining values.
+from shared.models.enums import ImageType as ImageTypeEnum
 
 
 class ImageBase(BaseModel):

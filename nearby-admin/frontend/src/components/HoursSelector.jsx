@@ -61,6 +61,102 @@ const COMMON_HOLIDAYS = [
   { value: 'valentines_day', label: "Valentine's Day", date: '02-14' }
 ];
 
+// Holiday date calculators (#116). Same 20 holidays, same order, as HOLIDAYS in
+// nearby-app/app/src/utils/hoursUtils.js and shared/utils/hours_resolution.py.
+function getNthWeekdayOfMonth(year, month, weekday, n) {
+  const firstWeekday = new Date(year, month, 1).getDay();
+  let dayOffset = weekday - firstWeekday;
+  if (dayOffset < 0) dayOffset += 7;
+  return new Date(year, month, 1 + dayOffset + (n - 1) * 7);
+}
+
+function getLastWeekdayOfMonth(year, month, weekday) {
+  const lastDay = new Date(year, month + 1, 0);
+  let dayOffset = lastDay.getDay() - weekday;
+  if (dayOffset < 0) dayOffset += 7;
+  return new Date(year, month + 1, -dayOffset);
+}
+
+// Anonymous Gregorian algorithm
+function calculateEaster(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month, day);
+}
+
+const HOLIDAY_CALCULATORS = {
+  new_year: (y) => new Date(y, 0, 1),
+  mlk_day: (y) => getNthWeekdayOfMonth(y, 0, 1, 3),
+  presidents_day: (y) => getNthWeekdayOfMonth(y, 1, 1, 3),
+  memorial_day: (y) => getLastWeekdayOfMonth(y, 4, 1),
+  juneteenth: (y) => new Date(y, 5, 19),
+  independence_day: (y) => new Date(y, 6, 4),
+  labor_day: (y) => getNthWeekdayOfMonth(y, 8, 1, 1),
+  columbus_day: (y) => getNthWeekdayOfMonth(y, 9, 1, 2),
+  veterans_day: (y) => new Date(y, 10, 11),
+  thanksgiving: (y) => getNthWeekdayOfMonth(y, 10, 4, 4),
+  black_friday: (y) => new Date(getNthWeekdayOfMonth(y, 10, 4, 4).getTime() + 24 * 60 * 60 * 1000),
+  christmas_eve: (y) => new Date(y, 11, 24),
+  christmas: (y) => new Date(y, 11, 25),
+  new_year_eve: (y) => new Date(y, 11, 31),
+  easter: (y) => calculateEaster(y),
+  good_friday: (y) => new Date(calculateEaster(y).getTime() - 2 * 24 * 60 * 60 * 1000),
+  mothers_day: (y) => getNthWeekdayOfMonth(y, 4, 0, 2),
+  fathers_day: (y) => getNthWeekdayOfMonth(y, 5, 0, 3),
+  halloween: (y) => new Date(y, 9, 31),
+  valentines_day: (y) => new Date(y, 1, 14)
+};
+
+// #116 - what the business is telling visitors about this holiday.
+const HOLIDAY_MODE_OPTIONS = [
+  { label: 'Not confirmed', value: 'unconfirmed' },
+  { label: 'Follows regular hours', value: 'follows_regular' },
+  { label: 'Open', value: 'open' },
+  { label: 'Closed', value: 'closed' },
+  { label: 'Modified', value: 'modified' }
+];
+
+// Legacy `status` mirror, written alongside `mode` for one release so older
+// readers keep working. 'follows_regular' maps to the legacy 'open', which has
+// always meant "no special hours, use the normal schedule".
+const LEGACY_STATUS_FOR_MODE = {
+  follows_regular: 'open',
+  open: 'open',
+  closed: 'closed',
+  modified: 'modified'
+};
+
+// Mirrors getHolidayMode() in nearby-app/app/src/utils/hoursUtils.js.
+function getHolidayMode(entry) {
+  if (!entry || typeof entry !== 'object') return 'unconfirmed';
+  if (entry.mode) return entry.mode;
+  if (entry.status === 'open') return 'follows_regular';
+  if (entry.status === 'closed') return 'closed';
+  if (entry.status === 'modified') return 'modified';
+  return 'unconfirmed';
+}
+
+// Next occurrence of a holiday, this year or next.
+function nextHolidayDate(holidayId, from = new Date()) {
+  const calculator = HOLIDAY_CALCULATORS[holidayId];
+  if (!calculator) return null;
+  const today = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const thisYear = calculator(today.getFullYear());
+  return thisYear < today ? calculator(today.getFullYear() + 1) : thisYear;
+}
+
 const SEASON_DEFINITIONS = [
   { value: 'spring', label: 'Spring', icon: IconFlower, months: [3, 4, 5], color: 'green' },
   { value: 'summer', label: 'Summer', icon: IconSunHigh, months: [6, 7, 8], color: 'yellow' },
@@ -377,37 +473,21 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
     timezone: value.timezone || 'America/New_York',
     notes: value.notes || '',
     seasonal_only: !!value.seasonal_only,
+    no_regular_hours: !!value.no_regular_hours,
   };
 
   const seasonalOnly = !!hours.seasonal_only;
+  // #118 - locations with nothing to put on a weekly grid.
+  const noRegularHours = !!hours.no_regular_hours;
 
   const updateHours = (updates) => {
     onChange({ ...hours, ...updates });
   };
 
-  // Count regular days currently set to 'appointment' status for #54 auto-flip-off
-  const countAppointmentDays = (regular) => {
-    if (!regular || typeof regular !== 'object') return 0;
-    return DAYS_OF_WEEK.reduce((acc, day) => {
-      const d = regular[day.value];
-      return acc + (d && d.status === 'appointment' ? 1 : 0);
-    }, 0);
-  };
-
-  // Recompute the hours_but_appointment_required boolean after a regular-hours change.
-  // - Auto-flip ON if any day has status==='appointment' and the flag is currently false.
-  // - Auto-flip OFF if zero days have status==='appointment' and the flag is currently true.
-  // Never clears appointment_booking_url — that's preserved for re-enable.
-  const recomputeAppointmentFlag = (newRegular) => {
-    if (!form) return;
-    const count = countAppointmentDays(newRegular);
-    const current = !!form.values?.hours_but_appointment_required;
-    if (count > 0 && !current) {
-      form.setFieldValue('hours_but_appointment_required', true);
-    } else if (count === 0 && current) {
-      form.setFieldValue('hours_but_appointment_required', false);
-    }
-  };
+  // #118 - hours_but_appointment_required is never auto-cleared by a regular-hours
+  // edit. A business can keep posted hours AND require appointments (a law firm
+  // open Mon-Fri that only sees clients by appointment). The flag is set by the
+  // "By Appointment Only" preset or the Switch, and cleared only by the Switch.
 
   // Copy hours from one day to others
   const handleCopyHours = (sourceDay) => {
@@ -452,20 +532,90 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
     updateHours({ seasonal: newSeasonal });
   };
 
-  // Add holiday hours
-  const addHolidayHours = (holidayId) => {
-    const holiday = COMMON_HOLIDAYS.find(h => h.value === holidayId);
-    if (!holiday) return;
-    
-    const newHolidays = {
-      ...hours.holidays,
-      [holidayId]: {
+  // ── Holidays (#116) ───────────────────────────────────────────────────────
+
+  // All 20 holidays, soonest first. Dates are computed, never typed.
+  const holidayRows = useMemo(() => {
+    const today = new Date();
+    return COMMON_HOLIDAYS
+      .map(holiday => ({ ...holiday, nextDate: nextHolidayDate(holiday.value, today) }))
+      .sort((a, b) => a.nextDate - b.nextDate);
+  }, []);
+
+  const defaultHolidayPeriod = () => ({
+    open: { type: 'fixed', time: '10:00' },
+    close: { type: 'fixed', time: '16:00' }
+  });
+
+  // The regular-hours entry for the weekday a holiday lands on this time round.
+  const regularHoursForDate = (d) => {
+    if (!d) return null;
+    const dayKey = DAYS_OF_WEEK[(d.getDay() + 6) % 7].value;
+    return hours.regular?.[dayKey] || null;
+  };
+
+  const formatTimeEnd = (t) => {
+    if (!t) return '';
+    if (t.type === 'fixed') return t.time || '';
+    if (t.type === 'dawn') return 'dawn';
+    if (t.type === 'dusk') return 'dusk';
+    if (t.type === 'appointment') return 'by appointment';
+    if (t.type === 'call') return 'call for hours';
+    return '';
+  };
+
+  const describeRegularDay = (dayHours) => {
+    if (!dayHours || dayHours.status === 'closed') return 'Closed';
+    if (dayHours.status === '24hours') return 'Open 24 hours';
+    if (dayHours.status === 'appointment') return 'By appointment';
+    const periods = (dayHours.periods || [])
+      .map(p => `${formatTimeEnd(p.open)} to ${formatTimeEnd(p.close)}`)
+      .filter(p => p !== ' to ');
+    return periods.length ? periods.join(', ') : 'Hours not set';
+  };
+
+  const updateHolidayEntry = (holidayId, updates) => {
+    const existing = hours.holidays[holidayId];
+    if (!existing) return;
+    updateHours({
+      holidays: { ...hours.holidays, [holidayId]: { ...existing, ...updates } }
+    });
+  };
+
+  // Writes BOTH the new mode and the closest legacy status. 'Not confirmed'
+  // deletes the key: absence is how we record "nobody answered".
+  const setHolidayMode = (holiday, mode, withPeriods = false) => {
+    const newHolidays = { ...hours.holidays };
+    if (mode === 'unconfirmed') {
+      delete newHolidays[holiday.value];
+    } else {
+      const existing = newHolidays[holiday.value] || {};
+      const entry = {
+        ...existing,
         name: holiday.label,
         date: holiday.date,
-        status: 'closed',
-        periods: []
+        mode,
+        status: LEGACY_STATUS_FOR_MODE[mode]
+      };
+      if (withPeriods && !existing.periods?.length) {
+        entry.periods = [defaultHolidayPeriod()];
       }
-    };
+      newHolidays[holiday.value] = entry;
+    }
+    updateHours({ holidays: newHolidays });
+  };
+
+  const setAllHolidaysFollowRegular = () => {
+    const newHolidays = { ...hours.holidays };
+    COMMON_HOLIDAYS.forEach(holiday => {
+      newHolidays[holiday.value] = {
+        ...(newHolidays[holiday.value] || {}),
+        name: holiday.label,
+        date: holiday.date,
+        mode: 'follows_regular',
+        status: LEGACY_STATUS_FOR_MODE.follows_regular
+      };
+    });
     updateHours({ holidays: newHolidays });
   };
 
@@ -570,8 +720,7 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
                     newRegular[day] = defaultHours;
                   });
                   // Clear seasonal_only when applying any other preset (#46 exit path)
-                  updateHours({ regular: newRegular, seasonal_only: false });
-                  recomputeAppointmentFlag(newRegular);
+                  updateHours({ regular: newRegular, seasonal_only: false, no_regular_hours: false });
                 }}
               >
                 Set Mon-Fri: 9am-5pm
@@ -585,8 +734,7 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
                   DAYS_OF_WEEK.forEach(day => {
                     newRegular[day.value] = { status: '24hours' };
                   });
-                  updateHours({ regular: newRegular, seasonal_only: false });
-                  recomputeAppointmentFlag(newRegular);
+                  updateHours({ regular: newRegular, seasonal_only: false, no_regular_hours: false });
                 }}
               >
                 Set 24/7
@@ -607,7 +755,7 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
                   DAYS_OF_WEEK.forEach(day => {
                     newRegular[day.value] = appointmentHours;
                   });
-                  updateHours({ regular: newRegular, seasonal_only: false });
+                  updateHours({ regular: newRegular, seasonal_only: false, no_regular_hours: false });
                   // #54 — "By Appointment Only" button flips the boolean flag on
                   if (form) {
                     form.setFieldValue('hours_but_appointment_required', true);
@@ -629,11 +777,21 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
                 variant={seasonalOnly ? 'filled' : 'light'}
                 color="indigo"
                 onClick={() => {
-                  updateHours({ seasonal_only: true });
+                  updateHours({ seasonal_only: true, no_regular_hours: false });
                   setActiveTab('seasonal');
                 }}
               >
                 Set to Seasonal Hours Only
+              </Button>
+
+              {/* #118 - 5th quick-set button: No Regular Hours */}
+              <Button
+                size="sm"
+                variant={noRegularHours ? 'filled' : 'light'}
+                color="grape"
+                onClick={() => updateHours({ no_regular_hours: true, seasonal_only: false })}
+              >
+                No Regular Hours
               </Button>
             </Group>
 
@@ -654,20 +812,38 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
               </Alert>
             )}
 
+            {noRegularHours && (
+              <Alert color="grape" variant="light">
+                <Group justify="space-between" wrap="nowrap">
+                  <Text size="sm">
+                    This location has no regular hours. Visitors see a single "No regular hours"
+                    line instead of a weekly grid. Use General Hours Notes at the bottom of this
+                    section to tell them how to find out (call ahead, by request, watch our page).
+                  </Text>
+                  <Button
+                    size="compact-xs"
+                    variant="subtle"
+                    onClick={() => updateHours({ no_regular_hours: false })}
+                  >
+                    Clear No-Regular-Hours Mode
+                  </Button>
+                </Group>
+              </Alert>
+            )}
+
             {DAYS_OF_WEEK.map(day => (
               <DayHours
                 key={day.value}
                 day={day}
                 hours={hours.regular[day.value]}
-                disabled={seasonalOnly}
+                disabled={seasonalOnly || noRegularHours}
                 onChange={(dayHours) => {
                   const newRegular = { ...hours.regular, [day.value]: dayHours };
                   updateHours({ regular: newRegular });
-                  recomputeAppointmentFlag(newRegular);
                 }}
                 onStatusChange={(status) => {
-                  // #54 — When a day becomes 'appointment', auto-flip the flag ON
-                  // (don't auto-flip OFF on a single day leaving — only when ALL leave)
+                  // #54 - When a day becomes 'appointment', auto-flip the flag ON.
+                  // #118 - nothing ever auto-flips it OFF.
                   if (status === 'appointment' && form && !form.values?.hours_but_appointment_required) {
                     form.setFieldValue('hours_but_appointment_required', true);
                   }
@@ -683,6 +859,7 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
                   <Text fw={600} size="sm">Appointments</Text>
                   <Switch
                     label="Appointments required"
+                    description="Can be combined with regular hours. Editing the days above never changes this."
                     checked={!!form.values?.hours_but_appointment_required}
                     onChange={(e) => form.setFieldValue('hours_but_appointment_required', e.currentTarget.checked)}
                   />
@@ -856,119 +1033,119 @@ const HoursSelector = memo(({ value = {}, onChange, poiType, form }) => {
         <Tabs.Panel value="holidays" pt="md">
           <Stack>
             <Alert color="blue" variant="light">
-              Set special hours for holidays. These override both regular and seasonal hours.
+              Answer for every holiday. Anything left "Not confirmed" tells visitors the holiday
+              hours have not been confirmed, so they know to check before driving out. Holiday
+              settings override both regular and seasonal hours.
             </Alert>
-            
-            <MultiSelect
-              label="Add holiday hours"
-              placeholder="Select holidays"
-              data={COMMON_HOLIDAYS.filter(h => !hours.holidays[h.value])}
-              onChange={(values) => {
-                values.forEach(value => {
-                  if (!hours.holidays[value]) {
-                    addHolidayHours(value);
-                  }
-                });
-              }}
-            />
-            
+
+            <Group>
+              <Button size="xs" variant="light" onClick={setAllHolidaysFollowRegular}>
+                Set all to Follows regular hours
+              </Button>
+              <Button
+                size="xs"
+                variant="subtle"
+                color="red"
+                onClick={() => updateHours({ holidays: {} })}
+              >
+                Clear all
+              </Button>
+            </Group>
+
             <Stack>
-              {Object.entries(hours.holidays).map(([holidayId, holiday]) => (
-                <Card key={holidayId} withBorder p="sm">
-                  <Group justify="space-between" mb="xs">
-                    <Group>
-                      <Text fw={500}>{holiday.name}</Text>
-                      <Badge size="sm" variant="light">
-                        {holiday.date}
-                      </Badge>
-                    </Group>
-                    <Group>
+              {holidayRows.map(holiday => {
+                const entry = hours.holidays[holiday.value];
+                const mode = getHolidayMode(entry);
+                const regularDay = regularHoursForDate(holiday.nextDate);
+                const normallyOpen = !!regularDay
+                  && (regularDay.status === 'open' || regularDay.status === '24hours');
+                const showPeriods = mode === 'modified' || (mode === 'open' && !normallyOpen);
+                const periods = entry?.periods?.length ? entry.periods : [defaultHolidayPeriod()];
+                const weekday = holiday.nextDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+                return (
+                  <Card key={holiday.value} withBorder p="sm">
+                    <Group justify="space-between" mb="xs" wrap="wrap">
+                      <Group gap="xs">
+                        <Text fw={500}>{holiday.label}</Text>
+                        <Badge size="sm" variant="light">
+                          {holiday.nextDate.toLocaleDateString('en-US', {
+                            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+                          })}
+                        </Badge>
+                      </Group>
                       <SegmentedControl
                         size="xs"
-                        value={holiday.status}
-                        onChange={(status) => updateHours({
-                          holidays: {
-                            ...hours.holidays,
-                            [holidayId]: { ...holiday, status }
-                          }
-                        })}
-                        data={[
-                          { label: 'Open', value: 'open' },
-                          { label: 'Closed', value: 'closed' },
-                          { label: 'Modified', value: 'modified' }
-                        ]}
+                        value={mode}
+                        onChange={(nextMode) => setHolidayMode(
+                          holiday,
+                          nextMode,
+                          nextMode === 'modified' || (nextMode === 'open' && !normallyOpen)
+                        )}
+                        data={HOLIDAY_MODE_OPTIONS}
                       />
-                      <ActionIcon
-                        color="red"
-                        size="sm"
-                        onClick={() => {
-                          const newHolidays = { ...hours.holidays };
-                          delete newHolidays[holidayId];
-                          updateHours({ holidays: newHolidays });
-                        }}
-                      >
-                        <IconTrash size={14} />
-                      </ActionIcon>
                     </Group>
-                  </Group>
-                  
-                  {holiday.status === 'modified' && (
-                    <Stack gap="xs">
-                      {(holiday.periods || [{ 
-                        open: { type: 'fixed', time: '10:00' }, 
-                        close: { type: 'fixed', time: '16:00' } 
-                      }]).map((period, index) => (
-                        <TimePeriod
-                          key={index}
-                          period={period}
-                          onChange={(p) => {
-                            const newPeriods = [...(holiday.periods || [])];
-                            newPeriods[index] = p;
-                            updateHours({
-                              holidays: {
-                                ...hours.holidays,
-                                [holidayId]: { ...holiday, periods: newPeriods }
-                              }
-                            });
-                          }}
-                          onRemove={() => {
-                            const newPeriods = holiday.periods.filter((_, i) => i !== index);
-                            updateHours({
-                              holidays: {
-                                ...hours.holidays,
-                                [holidayId]: { ...holiday, periods: newPeriods }
-                              }
-                            });
-                          }}
-                          showRemove={holiday.periods?.length > 1}
-                        />
-                      ))}
-                      <Button
+
+                    {mode === 'follows_regular' && (
+                      <Text size="xs" c="dimmed">
+                        {holiday.nextDate.toLocaleDateString('en-US', {
+                          month: 'long', day: 'numeric', year: 'numeric'
+                        })} falls on a {weekday}: {describeRegularDay(regularDay)}
+                      </Text>
+                    )}
+
+                    {mode === 'open' && !normallyOpen && (
+                      <Alert color="yellow" variant="light" mb="xs">
+                        You are normally closed on {weekday}s. Add the hours you will be open,
+                        otherwise visitors see "Open - hours vary, call ahead".
+                      </Alert>
+                    )}
+
+                    {showPeriods && (
+                      <Stack gap="xs">
+                        {periods.map((period, index) => (
+                          <TimePeriod
+                            key={index}
+                            period={period}
+                            onChange={(p) => {
+                              const newPeriods = [...periods];
+                              newPeriods[index] = p;
+                              updateHolidayEntry(holiday.value, { periods: newPeriods });
+                            }}
+                            onRemove={() => {
+                              updateHolidayEntry(holiday.value, {
+                                periods: periods.filter((_, i) => i !== index)
+                              });
+                            }}
+                            showRemove={periods.length > 1}
+                          />
+                        ))}
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<IconPlus size={14} />}
+                          onClick={() => updateHolidayEntry(holiday.value, {
+                            periods: [...periods, defaultHolidayPeriod()]
+                          })}
+                        >
+                          Add time period
+                        </Button>
+                      </Stack>
+                    )}
+
+                    {mode !== 'unconfirmed' && (
+                      <TextInput
                         size="xs"
-                        variant="light"
-                        leftSection={<IconPlus size={14} />}
-                        onClick={() => {
-                          const newPeriods = [
-                            ...(holiday.periods || []),
-                            { 
-                              open: { type: 'fixed', time: '10:00' }, 
-                              close: { type: 'fixed', time: '16:00' } 
-                            }
-                          ];
-                          updateHours({
-                            holidays: {
-                              ...hours.holidays,
-                              [holidayId]: { ...holiday, periods: newPeriods }
-                            }
-                          });
-                        }}
-                      >
-                        Add time period
-                      </Button>
-                    </Stack>
-                  )}
-                </Card>
-              ))}
+                        mt="xs"
+                        label="Note shown to visitors"
+                        placeholder="e.g., 'Closing at 2pm, reopening December 26'"
+                        value={entry?.note || ''}
+                        onChange={(e) => updateHolidayEntry(holiday.value, { note: e.target.value })}
+                      />
+                    )}
+                  </Card>
+                );
+              })}
             </Stack>
           </Stack>
         </Tabs.Panel>

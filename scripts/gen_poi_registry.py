@@ -38,7 +38,9 @@ from pathlib import Path
 # Paths
 # --------------------------------------------------------------------------- #
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MODEL_FILE = REPO_ROOT / "nearby-admin" / "backend" / "app" / "models" / "poi.py"
+# The POI ORM is now defined once in shared/models/poi.py (Task 1.2); reflect
+# over it. The admin/app model modules are thin re-export shims.
+MODEL_FILE = REPO_ROOT / "shared" / "models" / "poi.py"
 ENUMS_FILE = REPO_ROOT / "shared" / "models" / "enums.py"
 OUTPUT_FILE = REPO_ROOT / "shared" / "poi_fields.json"
 # The Vite frontend build context only includes nearby-app/app/, so it cannot
@@ -133,8 +135,9 @@ def reflect_static() -> list[tuple[str, str, str]]:
 
 
 def reflect_orm() -> list[tuple[str, str, str]] | None:
-    """Try to import the admin models and read __table__.columns. Returns None
-    if the import environment is unavailable."""
+    """Try to import the models and read __table__.columns. Returns None if the
+    import environment is unavailable (falls back to static parse). The admin
+    ``app.models.poi`` path is a thin re-export of the shared ORM (Task 1.2)."""
     try:
         sys.path.insert(0, str(REPO_ROOT))
         sys.path.insert(0, str(REPO_ROOT / "nearby-admin" / "backend"))
@@ -185,7 +188,7 @@ def map_type(token: str, col_name: str) -> str:
 DICT_FIELDS = {
     "other_socials", "mobility_access", "repeat_pattern", "venue_inheritance",
     "organizer_social_media", "amenities", "contact_info", "compliance",
-    "custom_fields", "photos", "hours", "trailhead_location", "payphone_location",
+    "custom_fields", "photos", "hours", "trailhead_location",
 }
 
 # --------------------------------------------------------------------------- #
@@ -207,11 +210,13 @@ GROUP_ORDER = {
     "Parking": 90,
     "Accessibility": 100,
     "Restrooms": 110,
-    "Alcohol & Smoking": 120,
+    # NOTE: rendered accordion titles — keep Barry's "X + Y" title style
+    # (nn-templates/single-poi-page-01.html) rather than "&".
+    "Alcohol + Smoking": 120,
     "Pets": 130,
     "Playground": 140,
     "Outdoor Features": 150,
-    "Hunting & Fishing": 160,
+    "Hunting + Fishing": 160,
     "Trail Details": 170,
     "Trailhead & Access": 180,
     "Event Details": 190,
@@ -221,6 +226,7 @@ GROUP_ORDER = {
     "Memberships": 230,
     "Community": 240,
     "Images & Media": 250,
+    "Maps + Guides": 255,
     "Disaster Response": 260,
     "Admin Only": 270,
     "Metadata": 280,
@@ -231,7 +237,7 @@ _GROUPS_RAW = {
     "Core Information": [
         "poi_type", "name", "slug", "teaser_paragraph", "description_short",
         "description_long", "history_paragraph", "status", "status_message",
-        "is_verified", "is_disaster_hub", "lat_long_most_accurate",
+        "is_verified", "lat_long_most_accurate",
         "listing_type", "is_sponsor", "sponsor_level", "primary_type_id",
         "publication_status", "has_been_published",
     ],
@@ -239,7 +245,7 @@ _GROUPS_RAW = {
         "dont_display_location", "address_full", "address_street",
         "address_city", "address_state", "address_zip", "address_county",
         "front_door_latitude", "front_door_longitude", "arrival_methods",
-        "what3words_address", "location",
+        "what3words_address", "location", "geom_line", "geom_area",
     ],
     "Contact": [
         "website_url", "phone_number", "email", "instagram_username",
@@ -256,7 +262,7 @@ _GROUPS_RAW = {
     ],
     "Pricing": [
         "cost", "pricing_details", "discounts", "payment_methods",
-        "cost_type",
+        "cost_type", "price_range",
     ],
     "Menu & Ordering": [
         "menu_photos", "menu_link", "delivery_links", "reservation_links",
@@ -273,10 +279,10 @@ _GROUPS_RAW = {
     "Restrooms": [
         "icon_public_restroom", "public_toilets", "toilet_locations",
         "toilet_description", "accessible_restroom",
-        "accessible_restroom_details", "payphone_location",
+        "accessible_restroom_details",
         "payphone_locations",
     ],
-    "Alcohol & Smoking": [
+    "Alcohol + Smoking": [
         "alcohol_options", "alcohol_policy_details", "alcohol_available",
         "alcohol_availability", "byob_allowed", "alcohol_notes",
         "smoking_options", "smoking_details",
@@ -294,7 +300,7 @@ _GROUPS_RAW = {
         "outdoor_types", "things_to_do", "birding_wildlife", "drone_usage",
         "drone_policy", "drone_usage_policy",
     ],
-    "Hunting & Fishing": [
+    "Hunting + Fishing": [
         "hunting_fishing_allowed", "hunting_types", "fishing_allowed",
         "fishing_types", "licenses_required", "hunting_fishing_info",
     ],
@@ -337,11 +343,17 @@ _GROUPS_RAW = {
     ],
     "Community": [
         "service_locations", "locally_found_at", "article_links",
-        "community_impact", "organization_memberships", "price_range",
+        "community_impact", "organization_memberships",
+        # a disaster-hub designation is community info, not a "Core
+        # Information" row (kills the junk Core Information accordion)
+        "is_disaster_hub",
     ],
     "Images & Media": [
-        "featured_image", "gallery_photos", "photos", "downloadable_maps",
+        "featured_image", "gallery_photos", "photos",
         "business_entry_notes", "park_entry_notes",
+    ],
+    "Maps + Guides": [
+        "downloadable_maps",
     ],
     "Disaster Response": [
         "compliance",
@@ -386,7 +398,7 @@ def applies_to_for(table_key: str, name: str) -> list[str]:
         "hunting_fishing_allowed", "hunting_types", "fishing_allowed",
         "fishing_types", "licenses_required", "hunting_fishing_info",
         "membership_passes", "membership_details", "associated_trails",
-        "camping_lodging", "park_entry_notes", "payphone_location",
+        "camping_lodging", "park_entry_notes",
         "payphone_locations", "drone_usage", "drone_policy",
     }
     if name in business_only:
@@ -395,6 +407,11 @@ def applies_to_for(table_key: str, name: str) -> list[str]:
         return list(OUTDOOR)
     if name == "wifi_options":  # Events only per model comment
         return ["EVENT"]
+    # Task 2.4: trails carry lines, parks carry areas.
+    if name == "geom_line":
+        return ["TRAIL"]
+    if name == "geom_area":
+        return ["PARK"]
     return list(ALL_TYPES)
 
 
@@ -479,6 +496,12 @@ ADMIN_FIELDS = {
     # Both must never reach the public API (the registry-driven serializer emits
     # every audience==public field regardless of render).
     "contact_info", "compliance",
+    # Task 2.4: raw line/area geometries. Kept admin-audience so no public endpoint
+    # dumps a WKB/GeoJSON geometry blob — the public app has no line/polygon
+    # renderer yet (the draw UI + public map rendering is Task 4.3). The only
+    # public geometry derivation is the trail's computed length_miles. Flip to
+    # audience=public with a structural GeoJSON handler when Task 4.3 lands.
+    "geom_line", "geom_area",
 }
 # (2) computed icon booleans (server-derived from underlying data) + the two
 #     accessibility roll-ups. These stay audience=public but are computed.
@@ -492,10 +515,9 @@ COMPUTED_FIELDS = {
 }
 # (3) deprecated -> replaced_by. None means "no successor" (note documents it).
 DEPRECATED = {
-    "payphone_location": "payphone_locations",
     # The following legacy names may or may not still be ORM-mapped; if present
     # they are flagged. Their data has migrated elsewhere.
-    "holiday_hours": "hours",          # data moved under hours.holidays
+    # payphone_location + holiday_hours dropped in migration p_drop_deprecated_001.
     "key_facilities": "facilities_options",
     "public_transit_info": "arrival_methods",
     "wheelchair_accessible": "icon_wheelchair_accessible",
@@ -563,6 +585,7 @@ LABEL_OVERRIDES = {
     "poi_type": "POI Type",
     "slug": "URL Slug",
     "wifi_options": "WiFi Options",
+    "length_miles": "Length (miles)",
 }
 # (8) bespoke renderers (fields too complex for the auto serializer/UI).
 BESPOKE_FIELDS = {
@@ -601,8 +624,27 @@ RENDER_BESPOKE = {
     # location sublists rendered bespoke (lat/long aware)
     "parking_locations", "toilet_locations", "playground_locations",
     "payphone_locations", "access_points",
-    # hero / gallery imagery
-    "featured_image",
+    # hero / gallery imagery; photos / gallery_photos / menu_photos are flat
+    # projections of the poi.images gallery already painted by
+    # QuickInfoPhotosBox + PhotoLightbox on every detail page
+    "featured_image", "photos", "gallery_photos", "menu_photos",
+    # operational status painted in the PoiHeader poi_status slot (Barry's
+    # single-poi template); status_message renders directly under it
+    "status", "status_message",
+    # teaser painted as the intro line of every About accordion
+    "teaser_paragraph",
+    # "Last updated <date>" line painted by PoiHeader
+    "last_updated",
+    # server-computed amenity icon booleans + playground flag painted by the
+    # AmenitiesBox/AmenityPillStrip pill row on every detail page
+    "icon_public_restroom", "icon_free_wifi", "icon_wheelchair_accessible",
+    "icon_pet_friendly", "playground_available",
+    # social handles painted by SocialLinksGroup inside every Contact accordion
+    "instagram_username", "facebook_username", "x_username",
+    "tiktok_username", "linkedin_username", "other_socials",
+    # arrival / entry / parking-fee facts painted inside every Address +
+    # Parking accordion (business_entry_notes is BUSINESS-only)
+    "arrival_methods", "expect_to_pay_parking", "business_entry_notes",
     # appointment / booking surfaced inside the bespoke HoursDisplay panel on
     # every detail page (Business/Trail/Park/Generic/Event) — not a standalone row.
     "appointment_booking_url", "hours_but_appointment_required",
@@ -612,17 +654,9 @@ RENDER_BESPOKE = {
 # DOWNGRADED_TO_AUTO: keys the render audit proposed as "bespoke" but which no
 # detail component actually paints (verified against bespoke_covered + a source
 # grep). Auto-rendering is safer than letting them silently disappear.
-#   teaser_paragraph     - no component reads it (QuickInfoPhotosBox uses
-#                          description_short as its title)
-#   status, status_message - PoiHeader derives open/closed from `hours`, not
-#                          from these business-status columns
-#   menu_photos          - not read anywhere in the detail components
-#   gallery_photos, photos - not read anywhere (gallery_images image[] is the
-#                          real gallery source)
 #   recurrence_end_date  - feeds recurrence logic but is not rendered as a row
 DOWNGRADED_TO_AUTO = {
-    "teaser_paragraph", "status", "status_message", "menu_photos",
-    "gallery_photos", "photos", "recurrence_end_date",
+    "recurrence_end_date",
 }
 # RENDER_HIDDEN: public-audience fields that must never be a display row —
 # internal routing/moderation/workflow flags, raw coordinates that only feed the
@@ -637,12 +671,49 @@ RENDER_HIDDEN = {
     # internal display-control toggle (hides exact location on the map); it is a
     # moderation flag, not a user-facing attribute row.
     "dont_display_location",
+    # system timestamp — workflow metadata, never a display row (last_updated
+    # IS displayed, by PoiHeader — see RENDER_BESPOKE).
+    "created_at",
+    # what3words is backend-only per spec (#41) — never rendered publicly.
+    "what3words_address",
+    # Task 2.1: event vendors are rendered by the dedicated EventVendors component
+    # (via /pois/{id}/vendors), not the generic auto field-row — hide the flat
+    # vendor_poi_links row to avoid a double render.
+    "vendor_poi_links",
 }
 # (9) relation-typed multi/JSONB columns that hold POI-id links.
 RELATION_LINK_FIELDS = {
     "service_locations", "locally_found_at", "associated_trails",
     "membership_passes", "organization_memberships", "vendor_poi_links",
     "venue_poi_id", "organizer_poi_id",
+}
+# (9b) Task 2.1: the six POI-to-POI link fields are now served from the
+# poi_relationships edge table, not their (retained) JSONB columns. Their
+# registry ``source`` is "edges:<relationship_type>" so the serializer resolves
+# linked POIs from edges. Keep in sync with shared/relationship_links.py
+# (LINK_FIELDS). ``vendor_poi_links`` is additionally render-hidden (see
+# RENDER_HIDDEN) because the app renders event vendors via the dedicated
+# ``/pois/{id}/vendors`` endpoint, not the generic auto field-row.
+SOURCE_OVERRIDE = {
+    "service_locations":        "edges:service_location",
+    "locally_found_at":         "edges:locally_found_at",
+    "associated_trails":        "edges:associated_trail",
+    "membership_passes":        "edges:membership_pass",
+    "organization_memberships": "edges:organization_membership",
+    "vendor_poi_links":         "edges:vendor",
+    # (9c) Task 2.3: the six point-geometry fields are now served from the
+    # GIST-indexed poi_points table, not their (retained) JSONB columns. Their
+    # source is "points:<kind>" so the serializer reconstructs the original
+    # JSONB shape from poi_points rows. Keep in sync with shared/poi_points.py
+    # (POINT_FIELDS). The two trail-owned fields (access_points,
+    # trailhead_location) remain STRUCTURAL on the wire — surfaced via the
+    # nested trail object, which the detail path enriches from poi_points.
+    "parking_locations":    "points:parking",
+    "toilet_locations":     "points:restroom",
+    "playground_locations": "points:playground",
+    "payphone_locations":   "points:payphone",
+    "access_points":        "points:access_point",
+    "trailhead_location":   "points:trailhead",
 }
 # (10b) explicit registry-type overrides (column SQL type doesn't imply the widget).
 TYPE_OVERRIDE = {
@@ -727,7 +798,10 @@ def build_entry(table_key: str, name: str, sql_token: str, decl_index: int) -> d
         tier = "paid"
 
     computed = name in COMPUTED_FIELDS
-    source = COMPUTED_FIELDS.get(name, f"{table_key}.{name}")
+    # Task 2.1 edge-sourced link fields and Task 2.3 points-sourced geometry
+    # fields take precedence over the default "<table>.<column>" source (they are
+    # read from poi_relationships / poi_points, not JSONB).
+    source = SOURCE_OVERRIDE.get(name) or COMPUTED_FIELDS.get(name, f"{table_key}.{name}")
 
     # Render taxonomy (B4): admin fields are always hidden. Otherwise apply the
     # curated RENDER_HIDDEN / RENDER_BESPOKE overrides; default is "auto".
@@ -790,6 +864,81 @@ def build_image_entry(key: str, label: str, image_type: str,
 
 
 # --------------------------------------------------------------------------- #
+# Synthetic (non-column) fields
+# --------------------------------------------------------------------------- #
+# Fields with NO backing ORM column, so they are injected rather than reflected.
+# Task 2.4: ``length_miles`` is DERIVED from geom_line via ST_Length(geography)
+# and attached to the trail object by shared.poi_geometry.enrich_trail_length.
+# Sourced from the trail subtype so the serializer/contract surface it under the
+# nested ``trail`` object (like length_text), NOT as a flat top-level key.
+SYNTHETIC_FIELDS = [
+    {
+        "key": "length_miles",
+        "type": "number",
+        "group": "Trail Details",
+        "applies_to": ["TRAIL"],
+        "tier": "any",
+        "audience": "public",
+        "render": "bespoke",
+        "icon": "ruler",
+        "value_source": None,
+        "schema_org": None,
+        "source": "trail.length_miles",
+        "computed": True,
+        "card": False,
+    },
+    {
+        # Issues #90/#161. The unified parking read: the POI's own pins
+        # (poi_points kind='parking') followed by the SHAREABLE lots it links,
+        # every entry the same shape with an "origin" discriminator. Not a
+        # column, so it has to be synthetic. The write-side input
+        # (parking_lot_links) is admin-only and deliberately NOT a registry
+        # field. Carries no PII by construction.
+        "key": "parking_lots",
+        "type": "list",
+        "group": "Parking",
+        "applies_to": ["BUSINESS", "SERVICES", "PARK", "TRAIL", "EVENT",
+                       "YOUTH_ACTIVITIES", "JOBS", "VOLUNTEER_OPPORTUNITIES",
+                       "DISASTER_HUBS"],
+        "tier": "any",
+        "audience": "public",
+        "render": "bespoke",
+        "icon": "parking",
+        "value_source": None,
+        "schema_org": None,
+        "source": "lots:parking",
+        "computed": True,
+        "card": False,
+    },
+]
+
+
+def build_synthetic_entry(spec: dict, order_base: int) -> dict:
+    group = spec["group"]
+    return {
+        "key": spec["key"],
+        "label": humanize(spec["key"]),
+        "type": spec["type"],
+        "group": group,
+        # Sort AFTER every reflected field in the group (real decl indices are the
+        # global column index, < ~300); 900+ keeps synthetics last, deterministically.
+        "order": GROUP_ORDER[group] * 100 + 900 + order_base,
+        "applies_to": list(spec["applies_to"]),
+        "tier": spec["tier"],
+        "audience": spec["audience"],
+        "render": spec["render"],
+        "icon": spec["icon"],
+        "value_source": spec["value_source"],
+        "schema_org": spec["schema_org"],
+        "source": spec["source"],
+        "computed": spec["computed"],
+        "card": spec["card"],
+        "deprecated": False,
+        "replaced_by": None,
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Assemble registry
 # --------------------------------------------------------------------------- #
 def build_registry() -> list[dict]:
@@ -817,6 +966,13 @@ def build_registry() -> list[dict]:
             continue
         seen.add(key)
         entries.append(build_image_entry(key, label, image_type, applies, i))
+
+    # Append synthetic (non-column) fields (Task 2.4: length_miles).
+    for i, spec in enumerate(SYNTHETIC_FIELDS):
+        if spec["key"] in seen:
+            continue
+        seen.add(spec["key"])
+        entries.append(build_synthetic_entry(spec, i))
 
     # Deterministic ordering: by (order, key).
     entries.sort(key=lambda e: (e["order"], e["key"]))

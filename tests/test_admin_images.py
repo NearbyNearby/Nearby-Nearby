@@ -9,7 +9,7 @@ import struct
 import uuid
 import zlib
 import pytest
-from conftest import create_business, MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+from conftest import create_business, create_park, create_trail, create_event, MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
 
 
 def _create_test_png(width=10, height=10):
@@ -36,6 +36,17 @@ def _create_test_png(width=10, height=10):
     iend = struct.pack('>I', 0) + b'IEND' + struct.pack('>I', iend_crc)
 
     return signature + ihdr + idat + iend
+
+
+def _create_test_heic():
+    """Create a small HEIC image for upload testing."""
+    from PIL import Image as PILImage
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    buf = io.BytesIO()
+    img = PILImage.new('RGB', (12, 12), color='green')
+    img.save(buf, format='HEIF')
+    return buf.getvalue()
 
 
 def _create_test_jpeg():
@@ -135,6 +146,94 @@ class TestUploadImage:
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["url"] is not None
+
+
+class TestUploadParkingLotImage:
+    """Lot photos exercise the nullable ``images.poi_id`` widened by #90/#161."""
+
+    def _create_lot(self, admin_client, **overrides):
+        payload = {"name": "Photo Lot", "publication_status": "published"}
+        payload.update(overrides)
+        resp = admin_client.post("/api/parking-lots/", json=payload)
+        assert resp.status_code == 201, resp.text
+        return resp.json()
+
+    def test_standalone_lot_photo_has_no_poi_owner(self, admin_client, ensure_minio_bucket):
+        """A standalone lot's photo stores poi_id NULL and its own S3 prefix.
+
+        Uses a 300x300 source so size VARIANTS are actually generated: those rows
+        also have poi_id NULL, so they prove the variants carry parking_lot_id
+        and therefore satisfy ck_images_owner_present.
+        """
+        lot = self._create_lot(admin_client)
+
+        png_bytes = _create_test_png(width=300, height=300)
+        resp = admin_client.post(
+            f"/api/images/upload/parking-lot/{lot['id']}",
+            files={"file": ("lot.png", io.BytesIO(png_bytes), "image/png")},
+            data={"caption": "Look for the blue awning"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["url"] is not None
+
+        fetched = admin_client.get(f"/api/parking-lots/{lot['id']}").json()
+        assert len(fetched["images"]) == 1
+        assert fetched["images"][0]["caption"] == "Look for the blue awning"
+        assert fetched["images"][0]["type"] == "parking"
+        assert fetched["images"][0]["thumbnail_url"] is not None
+
+        objects = ensure_minio_bucket.list_objects_v2(
+            Bucket=MINIO_BUCKET, Prefix=f"images/parking-lots/{lot['id']}/parking/"
+        )
+        assert objects.get("KeyCount", 0) >= 1
+
+    def test_owned_lot_photo_also_belongs_to_the_owner_poi(
+        self, admin_client, ensure_minio_bucket
+    ):
+        """An owned lot's photo carries BOTH ids, so the owner still sees it."""
+        biz = create_business(admin_client, name="Lot Owner Biz")
+        lot = self._create_lot(admin_client, name="Owned Lot", owner_poi_id=biz["id"])
+
+        png_bytes = _create_test_png()
+        resp = admin_client.post(
+            f"/api/images/upload/parking-lot/{lot['id']}",
+            files={"file": ("owned_lot.png", io.BytesIO(png_bytes), "image/png")},
+        )
+        assert resp.status_code == 200, resp.text
+
+        poi_images = admin_client.get(f"/api/images/poi/{biz['id']}").json()
+        parking = [i for i in poi_images if i["image_type"] == "parking"]
+        assert len(parking) == 1
+
+    def test_upload_to_unknown_lot_is_404(self, admin_client, ensure_minio_bucket):
+        png_bytes = _create_test_png()
+        resp = admin_client.post(
+            f"/api/images/upload/parking-lot/{uuid.uuid4()}",
+            files={"file": ("nope.png", io.BytesIO(png_bytes), "image/png")},
+        )
+        assert resp.status_code == 404
+
+
+class TestUploadHeic:
+    def test_upload_heic_happy_path(self, admin_client, ensure_minio_bucket):
+        """HEIC upload is accepted and stored as JPEG in MinIO."""
+        biz = create_business(admin_client, name="Heic Upload Biz")
+        poi_id = biz["id"]
+
+        heic_bytes = _create_test_heic()
+        resp = admin_client.post(
+            f"/api/images/upload/{poi_id}",
+            files={"file": ("photo.heic", io.BytesIO(heic_bytes), "image/heic")},
+            data={"image_type": "main"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["url"] is not None
+
+        # The stored original must be transcoded to JPEG.
+        images = admin_client.get(f"/api/images/poi/{poi_id}").json()
+        originals = [img for img in images if img.get("parent_image_id") is None]
+        assert originals, "no original image record found"
+        assert originals[0]["mime_type"] == "image/jpeg"
 
 
 class TestGetImages:
@@ -360,3 +459,66 @@ class TestImageStorageVerification:
         before_count = objects_before.get("KeyCount", 0)
         after_count = objects_after.get("KeyCount", 0)
         assert after_count < before_count, f"Expected fewer objects after delete: before={before_count}, after={after_count}"
+
+
+class TestCopyImagesFromVenue:
+    """Issue #124: 'Photos - nothing copies over' when a venue is linked."""
+
+    def _upload(self, admin_client, poi_id, image_type):
+        resp = admin_client.post(
+            f"/api/images/upload/{poi_id}",
+            files={"file": (f"{image_type}_src.png", io.BytesIO(_create_test_png()), "image/png")},
+            data={"image_type": image_type},
+        )
+        assert resp.status_code == 200, resp.text
+        return resp.json()
+
+    def test_copy_from_business_venue(self, admin_client, ensure_minio_bucket):
+        """Baseline: entry/parking/restroom photos copy from a BUSINESS venue."""
+        venue = create_business(admin_client, name="Copy Source Biz")
+        event = create_event(admin_client, name="Copy Target Event")
+        for image_type in ("entry", "parking", "restroom"):
+            self._upload(admin_client, venue["id"], image_type)
+
+        resp = admin_client.post(
+            f"/api/images/copy/{venue['id']}/to/{event['id']}"
+            "?image_types=entry&image_types=parking&image_types=restroom"
+        )
+        assert resp.status_code == 200, resp.text
+        assert len(resp.json()["uploaded"]) == 3
+
+    def test_copy_playground_image_type(self, admin_client, ensure_minio_bucket):
+        """#124 added playground to what a venue hands an event."""
+        venue = create_park(admin_client, name="Playground Source Park")
+        event = create_event(admin_client, name="Playground Target Event")
+        self._upload(admin_client, venue["id"], "playground")
+
+        resp = admin_client.post(
+            f"/api/images/copy/{venue['id']}/to/{event['id']}?image_types=playground"
+        )
+        assert resp.status_code == 200, resp.text
+        assert len(resp.json()["uploaded"]) == 1
+
+        images = admin_client.get(f"/api/images/poi/{event['id']}").json()
+        assert any(img["image_type"] == "playground" for img in images)
+
+    def test_copy_from_trail_venue_allowed(self, admin_client, ensure_minio_bucket):
+        """TRAIL is a valid venue everywhere else, so its photos must copy too (#124)."""
+        venue = create_trail(admin_client, name="Copy Source Trail")
+        event = create_event(admin_client, name="Trail Copy Target Event")
+        self._upload(admin_client, venue["id"], "entry")
+
+        resp = admin_client.post(
+            f"/api/images/copy/{venue['id']}/to/{event['id']}?image_types=entry"
+        )
+        assert resp.status_code == 200, resp.text
+        assert len(resp.json()["uploaded"]) == 1
+
+    def test_copy_rejects_non_venue_source(self, admin_client, ensure_minio_bucket):
+        """An EVENT is still not a valid copy source."""
+        source = create_event(admin_client, name="Not A Venue Source")
+        target = create_event(admin_client, name="Not A Venue Target")
+        resp = admin_client.post(
+            f"/api/images/copy/{source['id']}/to/{target['id']}?image_types=entry"
+        )
+        assert resp.status_code == 400

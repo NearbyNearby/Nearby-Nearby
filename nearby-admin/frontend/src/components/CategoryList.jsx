@@ -1,52 +1,57 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../utils/api';
 import {
   Button,
   Group,
   Title,
   Paper,
-  ActionIcon,
-  Tooltip,
   Text,
   Stack,
   TextInput,
   Modal,
-  Badge,
-  Select,
-  UnstyledButton,
-  Center,
-  Table,
-  Anchor,
+  Chip,
+  Drawer,
   Box,
   ScrollArea,
 } from '@mantine/core';
-import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
-import { handleSort, clearAllFilters } from '../utils/filterUtils';
 import {
-  IconPencil,
-  IconTrash,
   IconPlus,
   IconSearch,
   IconAlertTriangle,
-  IconChevronUp,
-  IconChevronDown,
-  IconSelector,
-  IconX
+  IconTrash,
+  IconX,
+  IconFoldDown,
+  IconFoldUp,
 } from '@tabler/icons-react';
+import CategoryForm from './CategoryForm';
+import CategoryTreeNode from './categories/CategoryTreeNode';
+import {
+  collectCategoryIds,
+  countByPoiType,
+  countCategories,
+  filterCategoryTree,
+} from './categories/categoryTree';
+import { POI_TYPE_OPTIONS } from './categories/poiTypes';
 
-
+/**
+ * Category management screen.
+ *
+ * The hierarchy is shown as a real tree instead of a flattened sortable table:
+ * a category's place in the hierarchy is the thing being managed, so any sort
+ * that reorders parents away from their children makes the screen harder to
+ * read, not easier. Creating and editing happen in a side drawer so the tree
+ * (and your place in it) stays on screen.
+ */
 function CategoryList() {
   const [categories, setCategories] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState(null);
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState('asc');
+  const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [mainCategoryFilter, setMainCategoryFilter] = useState('');
-  const navigate = useNavigate();
+  const [expandedIds, setExpandedIds] = useState(new Set());
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  // { mode: 'edit' | 'create', categoryId, parentId, parentName, key }
+  const [editor, setEditor] = useState(null);
 
   const fetchCategories = async () => {
     try {
@@ -69,284 +74,215 @@ function CategoryList() {
     fetchCategories();
   }, []);
 
-  const handleDelete = async (categoryId, categoryName) => {
-    setCategoryToDelete({ id: categoryId, name: categoryName });
-    setDeleteModalOpen(true);
+  const filterActive = Boolean(searchTerm.trim() || typeFilter);
+
+  const visibleCategories = useMemo(
+    () => filterCategoryTree(categories, { search: searchTerm, poiType: typeFilter || null }),
+    [categories, searchTerm, typeFilter],
+  );
+
+  const totalCount = useMemo(() => countCategories(categories), [categories]);
+  const visibleCount = useMemo(() => countCategories(visibleCategories), [visibleCategories]);
+  const typeCounts = useMemo(() => countByPoiType(categories), [categories]);
+
+  const toggleNode = (id) => {
+    setExpandedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => setExpandedIds(new Set(collectCategoryIds(categories)));
+  const collapseAll = () => setExpandedIds(new Set());
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setTypeFilter('');
+  };
+
+  const openEditor = (config) => setEditor({ ...config, key: `${config.mode}-${Date.now()}` });
+
+  const handleEdit = (category) =>
+    openEditor({ mode: 'edit', categoryId: category.id, parentId: null, parentName: null });
+
+  const handleAddChild = (parent) =>
+    openEditor({ mode: 'create', categoryId: null, parentId: parent.id, parentName: parent.name });
+
+  const handleAddRoot = () =>
+    openEditor({ mode: 'create', categoryId: null, parentId: null, parentName: null });
+
+  const handleSaved = () => {
+    const parentId = editor?.parentId;
+    setEditor(null);
+    if (parentId) {
+      // Reveal the subcategory that was just added.
+      setExpandedIds((previous) => new Set(previous).add(parentId));
+    }
+    fetchCategories();
   };
 
   const confirmDelete = async () => {
-    if (!categoryToDelete) return;
-    
+    if (!deleteTarget) return;
     try {
-      const response = await api.delete(`/categories/${categoryToDelete.id}`);
+      const response = await api.delete(`/categories/${deleteTarget.id}`);
       if (response.ok) {
         notifications.show({
           title: 'Success!',
-          message: `Category "${categoryToDelete.name}" was deleted.`,
+          message: `Category "${deleteTarget.name}" was deleted.`,
           color: 'green',
         });
-        fetchCategories(); // Refresh the list
+        fetchCategories();
       } else {
-        throw new Error('Failed to delete category');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to delete category');
       }
     } catch (error) {
       notifications.show({
         title: 'Deletion Error',
-        message: 'Failed to delete category.',
+        message: error.message || 'Failed to delete category.',
         color: 'red',
       });
     } finally {
-      setDeleteModalOpen(false);
-      setCategoryToDelete(null);
+      setDeleteTarget(null);
     }
   };
 
-  const handleEdit = (categoryId) => {
-    navigate(`/category/${categoryId}/edit`);
+  const editorTitle = () => {
+    if (!editor) return '';
+    if (editor.mode === 'edit') return 'Edit category';
+    if (editor.parentName) return `New subcategory under "${editor.parentName}"`;
+    return 'New top-level category';
   };
 
-  const handleSortClick = (field) => {
-    handleSort(field, sortBy, sortOrder, setSortBy, setSortOrder);
-  };
-
-  const getSortIcon = (field) => {
-    if (sortBy !== field) {
-      return <IconSelector size={14} />;
-    }
-    return sortOrder === 'asc' ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />;
-  };
-
-  const getUniquePOITypes = () => {
-    const allTypes = new Set();
-    const addTypes = (categoryList) => {
-      categoryList.forEach(category => {
-        if (category.poi_types) {
-          category.poi_types.forEach(type => allTypes.add(type));
-        }
-        if (category.children) {
-          addTypes(category.children);
-        }
-      });
-    };
-    addTypes(categories);
-    return Array.from(allTypes).map(type => ({ value: type, label: type }));
-  };
-
-  const clearFilters = () => {
-    clearAllFilters(setSearchTerm, setTypeFilter, setMainCategoryFilter);
-  };
-
-  const flattenCategories = (categoryList, parentName = '') => {
-    let flattened = [];
-    categoryList.forEach(category => {
-      const fullName = parentName ? `${parentName} > ${category.name}` : category.name;
-      flattened.push({ ...category, fullName });
-      if (category.children && category.children.length > 0) {
-        flattened = flattened.concat(flattenCategories(category.children, fullName));
-      }
-    });
-    return flattened;
-  };
-
-  const filteredAndSortedCategories = () => {
-    let flatCategories = flattenCategories(categories);
-
-    // Apply filters
-    if (typeFilter) {
-      flatCategories = flatCategories.filter(category =>
-        category.poi_types && category.poi_types.includes(typeFilter)
-      );
-    }
-
-    if (searchTerm) {
-      flatCategories = flatCategories.filter(category =>
-        category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        category.fullName.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Apply sorting
-    flatCategories.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-
-      if (sortBy === 'name' || sortBy === 'fullName') {
-        aValue = aValue?.toLowerCase() || '';
-        bValue = bValue?.toLowerCase() || '';
-      } else if (sortBy === 'is_main_category') {
-        aValue = aValue ? 1 : 0;
-        bValue = bValue ? 1 : 0;
-      } else if (sortBy === 'poi_types') {
-        aValue = aValue ? aValue.join(', ') : '';
-        bValue = bValue ? bValue.join(', ') : '';
-      }
-
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return flatCategories;
-  };
-
-  const displayCategories = filteredAndSortedCategories();
-
-  // Calculate category depth from full name
-  const getCategoryDepth = (fullName) => {
-    if (!fullName) return 0;
-    return (fullName.match(/>/g) || []).length;
-  };
-
-  const rows = displayCategories.map((category) => {
-    const depth = getCategoryDepth(category.fullName);
-    const indentation = depth * 20; // 20px per level
-
-    return (
-      <Table.Tr key={category.id} style={{ transition: 'background-color 0.2s' }}>
-        <Table.Td>
-          <Group gap="xs" style={{ paddingLeft: `${indentation}px` }}>
-            {depth > 0 && <Text c="dimmed" size="sm">└─</Text>}
-            <Anchor onClick={() => handleEdit(category.id)} fw={500} style={{ cursor: 'pointer' }}>
-              {category.name}
-            </Anchor>
-          </Group>
-        </Table.Td>
-        <Table.Td>
-          <Badge size="sm" variant="light" color={depth === 0 ? "grape" : depth === 1 ? "blue" : depth === 2 ? "teal" : "gray"}>
-            Level {depth}
-          </Badge>
-        </Table.Td>
-        <Table.Td>
-          <Text size="sm" c="dimmed">{category.fullName || category.name}</Text>
-        </Table.Td>
-        <Table.Td>
-          <Group gap="xs">
-            {category.poi_types && category.poi_types.length > 0 ? (
-              category.poi_types.map(type => (
-                <Badge key={type} size="xs" variant="dot" color="blue">
-                  {type}
-                </Badge>
-              ))
-            ) : (
-              <Text size="sm" c="dimmed">None</Text>
-            )}
-          </Group>
-        </Table.Td>
-        <Table.Td>
-          <Group gap="xs" justify="flex-end">
-            <Tooltip label="Edit Category">
-              <ActionIcon variant="subtle" color="gray" onClick={() => handleEdit(category.id)}>
-                <IconPencil size={18} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Delete Category">
-              <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(category.id, category.name)}>
-                <IconTrash size={18} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        </Table.Td>
-      </Table.Tr>
-    );
-  });
+  const availableTypes = POI_TYPE_OPTIONS.filter((option) => typeCounts[option.value]);
 
   return (
     <Paper>
-      <Group justify="space-between" mb="lg">
-        <Title order={2} c="deep-purple.7">Manage Categories</Title>
-        <Button
-          onClick={() => navigate('/category/new')}
-          leftSection={<IconPlus size={18} />}
-        >
-          Create New Category
+      <Group justify="space-between" align="flex-start" mb="md">
+        <Box>
+          <Title order={2} c="deep-purple.7">Manage Categories</Title>
+          <Text size="sm" c="dimmed">
+            {filterActive
+              ? `Showing ${visibleCount} of ${totalCount} categories`
+              : `${totalCount} categories, ${categories.length} at the top level`}
+          </Text>
+        </Box>
+        <Button onClick={handleAddRoot} leftSection={<IconPlus size={18} />}>
+          Add Top-Level Category
         </Button>
       </Group>
 
-      {/* Filters */}
-      <Stack gap="md" mb="lg">
-        <Group align="flex-end">
+      <Stack gap="sm" mb="md">
+        <Group align="center" gap="sm">
           <TextInput
             placeholder="Search categories..."
+            aria-label="Search categories"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.currentTarget.value)}
             leftSection={<IconSearch size={16} />}
-            style={{ flex: 1, minWidth: 300 }}
+            style={{ flex: 1, minWidth: 240 }}
           />
-          <Select
-            placeholder="Filter by POI Type"
-            value={typeFilter}
-            onChange={setTypeFilter}
-            data={getUniquePOITypes()}
-            clearable
-            style={{ minWidth: 150 }}
-          />
-          {(searchTerm || typeFilter) && (
-            <Button variant="light" color="gray" onClick={clearFilters} leftSection={<IconX size={16} />}>
-              Clear Filters
-            </Button>
-          )}
+          <Button
+            variant="light"
+            color="gray"
+            onClick={expandAll}
+            leftSection={<IconFoldDown size={16} />}
+          >
+            Expand all
+          </Button>
+          <Button
+            variant="light"
+            color="gray"
+            onClick={collapseAll}
+            leftSection={<IconFoldUp size={16} />}
+          >
+            Collapse all
+          </Button>
         </Group>
 
-
-        {(searchTerm || typeFilter || sortBy !== 'name') && (
-          <Text size="sm" c="dimmed">
-            {(() => {
-              const filteredCategories = filteredAndSortedCategories();
-              const totalCategories = flattenCategories(categories).length;
-              return `Showing ${filteredCategories.length} of ${totalCategories} categories`;
-            })()}
-          </Text>
+        {availableTypes.length > 0 && (
+          <Group gap="xs" align="center">
+            <Text size="sm" c="dimmed">POI type:</Text>
+            <Chip.Group multiple={false} value={typeFilter} onChange={(value) => setTypeFilter(value || '')}>
+              <Group gap="xs">
+                {availableTypes.map((option) => (
+                  <Chip key={option.value} value={option.value} size="xs" color={option.color}>
+                    {`${option.label} (${typeCounts[option.value]})`}
+                  </Chip>
+                ))}
+              </Group>
+            </Chip.Group>
+            {filterActive && (
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                color="gray"
+                onClick={clearFilters}
+                leftSection={<IconX size={14} />}
+              >
+                Clear filters
+              </Button>
+            )}
+          </Group>
         )}
       </Stack>
 
       {loading ? (
-        <Text c="dimmed" ta="center" py="xl">
-          Loading categories...
-        </Text>
-      ) : displayCategories.length > 0 ? (
-        <ScrollArea type="auto"><Table striped highlightOnHover withTableBorder miw={700}>
-          <Table.Thead style={{ backgroundColor: 'var(--mantine-color-deep-purple-0)' }}>
-            <Table.Tr>
-              <Table.Th>
-                <UnstyledButton onClick={() => handleSortClick('name')} style={{ width: '100%' }}>
-                  <Group justify="space-between">
-                    <Text fw={500}>Name</Text>
-                    <Center>{getSortIcon('name')}</Center>
-                  </Group>
-                </UnstyledButton>
-              </Table.Th>
-              <Table.Th>
-                <Text fw={500}>Level</Text>
-              </Table.Th>
-              <Table.Th>
-                <Text fw={500}>Full Path</Text>
-              </Table.Th>
-              <Table.Th>
-                <UnstyledButton onClick={() => handleSortClick('poi_types')} style={{ width: '100%' }}>
-                  <Group justify="space-between">
-                    <Text fw={500}>POI Types</Text>
-                    <Center>{getSortIcon('poi_types')}</Center>
-                  </Group>
-                </UnstyledButton>
-              </Table.Th>
-              <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>{rows}</Table.Tbody>
-        </Table></ScrollArea>
+        <Text c="dimmed" ta="center" py="xl">Loading categories...</Text>
+      ) : visibleCategories.length > 0 ? (
+        <ScrollArea type="auto">
+          <Box miw={520} style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}>
+            {visibleCategories.map((category) => (
+              <CategoryTreeNode
+                key={category.id}
+                node={category}
+                expandedIds={expandedIds}
+                forceExpanded={filterActive}
+                onToggle={toggleNode}
+                onEdit={handleEdit}
+                onAddChild={handleAddChild}
+                onDelete={setDeleteTarget}
+              />
+            ))}
+          </Box>
+        </ScrollArea>
       ) : (
         <Text c="dimmed" ta="center" py="xl">
           {categories.length === 0
-            ? "No categories found. Create your first category to get started!"
-            : "No categories match your current filters. Try adjusting your search criteria."
-          }
+            ? 'No categories yet. Add your first top-level category to get started.'
+            : 'No categories match your search. Try a different term or clear the filters.'}
         </Text>
       )}
 
-      {/* Delete Confirmation Modal */}
+      <Drawer
+        opened={Boolean(editor)}
+        onClose={() => setEditor(null)}
+        position="right"
+        size="md"
+        padding="lg"
+        title={<Text fw={600}>{editorTitle()}</Text>}
+      >
+        {editor && (
+          <CategoryForm
+            key={editor.key}
+            embedded
+            categoryId={editor.categoryId}
+            initialParentId={editor.parentId}
+            tree={categories}
+            onSaved={handleSaved}
+            onCancel={() => setEditor(null)}
+          />
+        )}
+      </Drawer>
+
       <Modal
-        opened={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
+        opened={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
         title={
           <Group gap="xs">
             <IconAlertTriangle size={20} color="var(--mantine-color-red-6)" />
@@ -355,31 +291,23 @@ function CategoryList() {
         }
         centered
         size="md"
-        styles={{
-          title: {
-            color: 'var(--mantine-color-red-7)',
-          }
-        }}
+        styles={{ title: { color: 'var(--mantine-color-red-7)' } }}
       >
         <Stack gap="lg">
           <Text>
             Are you sure you want to delete the category{' '}
             <Text component="span" fw={600} c="red.7">
-              "{categoryToDelete?.name}"
+              "{deleteTarget?.name}"
             </Text>
             ?
           </Text>
-          
-          <Text size="sm" c="dimmed">
-            This action will:
-          </Text>
-          
+
           <Box pl="md">
             <Text size="sm" c="dimmed" mb="xs">
-              • Remove this category from all associated POIs
+              • It is removed from every POI that uses it
             </Text>
             <Text size="sm" c="dimmed" mb="xs">
-              • Delete all child categories under this category
+              • Categories with subcategories cannot be deleted, move or delete those first
             </Text>
             <Text size="sm" c="dimmed">
               • This action cannot be undone
@@ -387,17 +315,8 @@ function CategoryList() {
           </Box>
 
           <Group justify="flex-end" gap="md" mt="lg">
-            <Button 
-              variant="subtle" 
-              onClick={() => setDeleteModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              color="red" 
-              onClick={confirmDelete}
-              leftSection={<IconTrash size={16} />}
-            >
+            <Button variant="subtle" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button color="red" onClick={confirmDelete} leftSection={<IconTrash size={16} />}>
               Delete Category
             </Button>
           </Group>

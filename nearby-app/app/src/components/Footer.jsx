@@ -165,7 +165,8 @@ export default function Footer() {
             <ul className="list_footer">
               <li><Link to="/">Home</Link></li>
               <li><Link to="/explore">Explore</Link></li>
-              <li><Link to="/help">Help / FAQ's</Link></li>
+              {/* Hidden until the Help / FAQ page has real content (#129). Restore this line to bring it back. */}
+              {/* <li><Link to="/help">Help / FAQ's</Link></li> */}
               <li><Link to="/suggest-event">Suggest an Event</Link></li>
               <li><Link to="/disaster-network">Disaster Network</Link></li>
             </ul>
@@ -176,7 +177,7 @@ export default function Footer() {
           <div className="end_item copyright_date">&copy; {new Date().getFullYear()} Nearby Nearby. Patent Pending.</div>
           <div className="end_item"><Link to="/privacy-policy">Privacy Policy</Link></div>
           <div className="end_item"><Link to="/terms-of-service">Terms &amp; Conditions</Link></div>
-          <div className="end_item"><a href="/sitemap.xml" target="_blank" rel="noopener noreferrer">Sitemap</a></div>
+          <div className="end_item"><Link to="/sitemap">Sitemap</Link></div>
         </div>
       </footer>
     </>

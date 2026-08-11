@@ -44,8 +44,14 @@ export const RestroomLocationGroup = React.memo(function RestroomLocationGroup({
       addButtonLabel="Add Another Bathroom Location"
       defaultRow={{
         restroom_name: '',
-        lat: null,
-        lng: null,
+        // Seed with the POI's own coordinates rather than null. A restroom row
+        // with no parseable lat/lng is silently dropped in its entirety (name,
+        // description, features included, not just the pin) by the poi_points
+        // sync layer — geom is NOT NULL there. Most editors never touch the
+        // coordinate fields for an indoor restroom, so defaulting to "here"
+        // keeps the row (and everything else they typed) from vanishing.
+        lat: typeof form.values?.latitude === 'number' ? form.values.latitude : null,
+        lng: typeof form.values?.longitude === 'number' ? form.values.longitude : null,
         w3w: '',
         description: '',
         photos: '',
@@ -88,9 +94,17 @@ export const RestroomLocationGroup = React.memo(function RestroomLocationGroup({
               onChange={(value) => form.setFieldValue(`${fieldName}.${index}.toilet_types`, value)}
             >
               <SimpleGrid cols={{ base: 2, sm: 3 }}>
-                {PUBLIC_TOILET_OPTIONS.filter(option => !['Yes', 'No'].includes(option)).map(option => (
-                  <Checkbox key={option} value={option} label={option} />
-                ))}
+                {/* "Wheelchair + ADA Accessible" is excluded here on purpose: this
+                    group has its own standalone ADA checkbox below (with an inline
+                    ADA sub-checklist), so surfacing the plain option too would
+                    duplicate it. Kept in the shared PUBLIC_TOILET_OPTIONS constant
+                    because the legacy PublicAmenitiesSection + backend search still
+                    key off that exact string. */}
+                {PUBLIC_TOILET_OPTIONS
+                  .filter(option => !['Yes', 'No', 'Wheelchair + ADA Accessible'].includes(option))
+                  .map(option => (
+                    <Checkbox key={option} value={option} label={option} />
+                  ))}
               </SimpleGrid>
             </Checkbox.Group>
 

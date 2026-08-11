@@ -12,7 +12,7 @@ import {
   Badge,
   Divider,
 } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
+import { DatePickerInput, TimeInput } from '@mantine/dates';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { REPEAT_FREQUENCY_OPTIONS } from '../../../utils/constants';
 
@@ -23,6 +23,58 @@ const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // Frequencies that expose the day-of-week chip selector
 const WEEKLY_FREQUENCIES = ['weekly', 'biweekly'];
+
+// ---------------------------------------------------------------------------
+// Time helpers.
+//
+// Per-occurrence times are stored as "HH:MM" strings (24h). The base times are
+// derived from the event's top-level start/end DateTimePickers so every
+// generated occurrence and manual date defaults to the event's base time and
+// can be overridden individually.
+// ---------------------------------------------------------------------------
+function toDate(value) {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
+}
+
+function dateToLocalYMD(date) {
+  const d = toDate(date);
+  if (!d || isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function dateToHM(date) {
+  const d = toDate(date);
+  if (!d || isNaN(d.getTime())) return '';
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${min}`;
+}
+
+// Format a "YYYY-MM-DD" + "HH:MM" pair as a local Date for display.
+function ymdHmToDate(ymd, hm) {
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split('-').map(Number);
+  let hh = 0;
+  let mm = 0;
+  if (hm && /^\d{1,2}:\d{2}/.test(hm)) {
+    const parts = hm.split(':');
+    hh = Number(parts[0]);
+    mm = Number(parts[1]);
+  }
+  return new Date(y, (m || 1) - 1, d || 1, hh, mm);
+}
+
+// Human-readable "12:30 PM" (or empty string when no time available).
+function formatTimeLabel(hm) {
+  if (!hm || !/^\d{1,2}:\d{2}/.test(hm)) return '';
+  const [h, m] = hm.split(':').map(Number);
+  const date = new Date(2000, 0, 1, h, m);
+  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
 
 // ---------------------------------------------------------------------------
 // Preview calculation helper — returns up to `limit` future occurrence Dates
@@ -114,6 +166,23 @@ function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit 
 }
 
 // ---------------------------------------------------------------------------
+// Manual-date normalisation. Manual dates are stored as objects
+// { date, start_time, end_time } so each one-off date can carry its own time.
+// Legacy rows stored a bare "YYYY-MM-DD" string; treat those as { date } with
+// no explicit time override (falls back to the event base time on display).
+// ---------------------------------------------------------------------------
+function normalizeManualDate(entry, baseStart, baseEnd) {
+  if (typeof entry === 'string') {
+    return { date: entry, start_time: baseStart || '', end_time: baseEnd || '' };
+  }
+  return {
+    date: entry?.date || '',
+    start_time: entry?.start_time || baseStart || '',
+    end_time: entry?.end_time || baseEnd || '',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // RecurringEventSection
 // ---------------------------------------------------------------------------
 
@@ -122,16 +191,27 @@ export default function RecurringEventSection({ form }) {
   const [showManualPicker, setShowManualPicker] = useState(false);
   const [pendingExcludedDate, setPendingExcludedDate] = useState(null);
   const [pendingManualDate, setPendingManualDate] = useState(null);
+  const [pendingManualStart, setPendingManualStart] = useState('');
+  const [pendingManualEnd, setPendingManualEnd] = useState('');
 
   const isRepeating = form.values.event?.is_repeating || false;
   const pattern = form.values.event?.repeat_pattern || {};
   const frequency = pattern.frequency || '';
   const interval = pattern.interval || 1;
   const daysOfWeek = pattern.days_of_week || [];
+  // Per-occurrence time overrides for the regular recurrence, keyed by the
+  // occurrence date ("YYYY-MM-DD"). Stored inside repeat_pattern (already JSONB)
+  // so no schema/migration change is required.
+  const occurrenceTimes = pattern.occurrence_times || {};
   const excludedDates = form.values.event?.excluded_dates || [];
   const manualDates = form.values.event?.manual_dates || [];
   const recurrenceEndDate = form.values.event?.recurrence_end_date || null;
   const startDatetime = form.values.event?.start_datetime || null;
+  const endDatetime = form.values.event?.end_datetime || null;
+
+  // Base times default every occurrence and manual date to the event's time.
+  const baseStartTime = dateToHM(startDatetime);
+  const baseEndTime = dateToHM(endDatetime);
 
   // When toggling repeating ON, initialise the pattern with sensible defaults
   function handleToggleRepeating(checked) {
@@ -165,14 +245,30 @@ export default function RecurringEventSection({ form }) {
     form.setFieldValue('event.repeat_pattern', { ...current, days_of_week: selected });
   }
 
+  // Write a per-occurrence time override into repeat_pattern.occurrence_times.
+  function handleOccurrenceTimeChange(ymd, which, value) {
+    const current = form.values.event?.repeat_pattern || {};
+    const times = { ...(current.occurrence_times || {}) };
+    const entry = { ...(times[ymd] || {}) };
+    entry[which] = value;
+    // Prune empty override entries so the pattern stays clean.
+    if (!entry.start_time && !entry.end_time) {
+      delete times[ymd];
+    } else {
+      times[ymd] = entry;
+    }
+    form.setFieldValue('event.repeat_pattern', { ...current, occurrence_times: times });
+  }
+
+  // ---- Excluded dates: repeatable, picker stays open ----
   function handleAddExcludedDate() {
     if (!pendingExcludedDate) return;
-    const dateStr = pendingExcludedDate.toISOString().split('T')[0];
-    if (!excludedDates.includes(dateStr)) {
+    const dateStr = dateToLocalYMD(pendingExcludedDate);
+    if (dateStr && !excludedDates.includes(dateStr)) {
       form.setFieldValue('event.excluded_dates', [...excludedDates, dateStr]);
     }
+    // Keep the picker open so multiple dates can be added in a row.
     setPendingExcludedDate(null);
-    setShowExcludedPicker(false);
   }
 
   function handleRemoveExcludedDate(dateStr) {
@@ -182,20 +278,44 @@ export default function RecurringEventSection({ form }) {
     );
   }
 
+  // ---- Manual dates: repeatable objects with per-date times ----
   function handleAddManualDate() {
     if (!pendingManualDate) return;
-    const dateStr = pendingManualDate.toISOString().split('T')[0];
-    if (!manualDates.includes(dateStr)) {
-      form.setFieldValue('event.manual_dates', [...manualDates, dateStr]);
+    const dateStr = dateToLocalYMD(pendingManualDate);
+    if (!dateStr) return;
+    const alreadyAdded = manualDates.some((m) =>
+      (typeof m === 'string' ? m : m?.date) === dateStr
+    );
+    if (!alreadyAdded) {
+      const entry = {
+        date: dateStr,
+        start_time: pendingManualStart || baseStartTime || '',
+        end_time: pendingManualEnd || baseEndTime || '',
+      };
+      form.setFieldValue('event.manual_dates', [...manualDates, entry]);
     }
+    // Keep the picker open so multiple manual dates can be added in a row.
     setPendingManualDate(null);
-    setShowManualPicker(false);
+    setPendingManualStart('');
+    setPendingManualEnd('');
   }
 
   function handleRemoveManualDate(dateStr) {
     form.setFieldValue(
       'event.manual_dates',
-      manualDates.filter((d) => d !== dateStr)
+      manualDates.filter((m) => (typeof m === 'string' ? m : m?.date) !== dateStr)
+    );
+  }
+
+  // Edit the time on an already-added manual date.
+  function handleManualDateTimeChange(dateStr, which, value) {
+    form.setFieldValue(
+      'event.manual_dates',
+      manualDates.map((m) => {
+        const norm = normalizeManualDate(m, baseStartTime, baseEndTime);
+        if (norm.date !== dateStr) return norm;
+        return { ...norm, [which]: value };
+      })
     );
   }
 
@@ -326,6 +446,7 @@ export default function RecurringEventSection({ form }) {
                   onChange={setPendingExcludedDate}
                 />
                 <Group gap="xs">
+                  {/* Add keeps the picker open so multiple dates can be added. */}
                   <Button size="xs" onClick={handleAddExcludedDate} disabled={!pendingExcludedDate}>
                     Add
                   </Button>
@@ -337,7 +458,7 @@ export default function RecurringEventSection({ form }) {
                       setShowExcludedPicker(false);
                     }}
                   >
-                    Cancel
+                    Done
                   </Button>
                 </Group>
               </Stack>
@@ -359,36 +480,52 @@ export default function RecurringEventSection({ form }) {
           <Divider my="xs" label="Manual Dates" />
           <Text size="sm" c="dimmed">
             Additional one-off dates when this event occurs outside its regular schedule.
+            Each may carry its own start / end time (defaults to the event time).
           </Text>
 
           {manualDates.length > 0 && (
-            <Group gap="xs" wrap="wrap">
-              {manualDates.map((dateStr) => (
-                <Badge
-                  key={dateStr}
-                  color="blue"
-                  variant="light"
-                  rightSection={
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveManualDate(dateStr)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '0 2px',
-                        lineHeight: 1,
-                      }}
-                      aria-label={`Remove manual date ${dateStr}`}
-                    >
-                      ×
-                    </button>
-                  }
-                >
-                  {dateStr}
-                </Badge>
-              ))}
-            </Group>
+            <Stack gap="xs">
+              {manualDates.map((entry) => {
+                const norm = normalizeManualDate(entry, baseStartTime, baseEndTime);
+                return (
+                  <Card key={norm.date} withBorder p="xs">
+                    <Group justify="space-between" wrap="wrap" gap="xs">
+                      <Badge color="blue" variant="light">
+                        {norm.date}
+                      </Badge>
+                      <Group gap="xs" align="flex-end" wrap="wrap">
+                        <TimeInput
+                          size="xs"
+                          label="Start"
+                          value={norm.start_time || ''}
+                          onChange={(e) =>
+                            handleManualDateTimeChange(norm.date, 'start_time', e.target.value)
+                          }
+                        />
+                        <TimeInput
+                          size="xs"
+                          label="End"
+                          value={norm.end_time || ''}
+                          onChange={(e) =>
+                            handleManualDateTimeChange(norm.date, 'end_time', e.target.value)
+                          }
+                        />
+                        <Button
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          leftSection={<IconTrash size={14} />}
+                          onClick={() => handleRemoveManualDate(norm.date)}
+                          aria-label={`Remove manual date ${norm.date}`}
+                        >
+                          Remove
+                        </Button>
+                      </Group>
+                    </Group>
+                  </Card>
+                );
+              })}
+            </Stack>
           )}
 
           {showManualPicker ? (
@@ -400,7 +537,20 @@ export default function RecurringEventSection({ form }) {
                   value={pendingManualDate}
                   onChange={setPendingManualDate}
                 />
+                <Group gap="xs" align="flex-end" grow>
+                  <TimeInput
+                    label="Start time"
+                    value={pendingManualStart || baseStartTime || ''}
+                    onChange={(e) => setPendingManualStart(e.target.value)}
+                  />
+                  <TimeInput
+                    label="End time"
+                    value={pendingManualEnd || baseEndTime || ''}
+                    onChange={(e) => setPendingManualEnd(e.target.value)}
+                  />
+                </Group>
                 <Group gap="xs">
+                  {/* Add keeps the picker open so multiple manual dates can be added. */}
                   <Button size="xs" onClick={handleAddManualDate} disabled={!pendingManualDate}>
                     Add
                   </Button>
@@ -409,10 +559,12 @@ export default function RecurringEventSection({ form }) {
                     variant="subtle"
                     onClick={() => {
                       setPendingManualDate(null);
+                      setPendingManualStart('');
+                      setPendingManualEnd('');
                       setShowManualPicker(false);
                     }}
                   >
-                    Cancel
+                    Done
                   </Button>
                 </Group>
               </Stack>
@@ -444,16 +596,45 @@ export default function RecurringEventSection({ form }) {
                     : 'Select a frequency to preview upcoming occurrences.'}
                 </Text>
               ) : (
-                previewOccurrences.map((date, i) => (
-                  <Text key={i} size="sm">
-                    {date.toLocaleDateString(undefined, {
-                      weekday: 'short',
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </Text>
-                ))
+                previewOccurrences.map((date, i) => {
+                  const ymd = dateToLocalYMD(date);
+                  const override = occurrenceTimes[ymd] || {};
+                  // Per-occurrence time defaults to the event's base start time.
+                  const timeStr = override.start_time || baseStartTime || '';
+                  const displayDate = ymdHmToDate(ymd, timeStr) || date;
+                  const timeLabel = formatTimeLabel(timeStr);
+                  return (
+                    <Group key={i} justify="space-between" wrap="wrap" gap="xs">
+                      <Text size="sm">
+                        {displayDate.toLocaleDateString(undefined, {
+                          weekday: 'short',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                        {timeLabel ? ` · ${timeLabel}` : ''}
+                      </Text>
+                      <Group gap="xs" align="flex-end" wrap="wrap">
+                        <TimeInput
+                          size="xs"
+                          aria-label={`Start time for ${ymd}`}
+                          value={override.start_time || baseStartTime || ''}
+                          onChange={(e) =>
+                            handleOccurrenceTimeChange(ymd, 'start_time', e.target.value)
+                          }
+                        />
+                        <TimeInput
+                          size="xs"
+                          aria-label={`End time for ${ymd}`}
+                          value={override.end_time || baseEndTime || ''}
+                          onChange={(e) =>
+                            handleOccurrenceTimeChange(ymd, 'end_time', e.target.value)
+                          }
+                        />
+                      </Group>
+                    </Group>
+                  );
+                })
               )}
             </Stack>
           </Card>

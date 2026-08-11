@@ -192,7 +192,26 @@ SIGNAL_WEIGHTS = {
 MIN_ABSOLUTE_SCORE = 0.02
 RELATIVE_SCORE_THRESHOLD = 0.20
 TRIGRAM_SIMILARITY_THRESHOLD = 0.15
+SEMANTIC_SIMILARITY_THRESHOLD = 0.45  # issue #140
 ```
+
+`SEMANTIC_SIMILARITY_THRESHOLD` (issue #140) is the cosine floor for the
+semantic signal: rows below it are excluded in SQL, and surviving scores are
+rescaled `(sim - T) / (1 - T)` instead of being normalized by the batch
+maximum (which used to promote the best of a bad batch to ~1.0 and surface
+every POI of the filtered type). It is the main relevance knob: lower it
+(~0.35) for more recall, raise it (~0.55) for more precision.
+
+**Amenity-flag short circuit** (issue #137): a query that IS a known amenity
+phrase (after normalizing case/hyphens/underscores), e.g. "pet friendly",
+"free wifi", "wheelchair accessible", skips ranking entirely and filters on
+the corresponding computed boolean (`icon_pet_friendly`, `icon_free_wifi`,
+`icon_wheelchair_accessible`, `icon_public_restroom`), still applying the
+published filter and any type filter. See `AMENITY_FLAG_PHRASES` /
+`amenity_flag_column()` in `constants.py`. This is distinct from the older
+`AMENITY_PATTERNS_STATIC` mechanism, which extracts amenity terms out of
+LONGER queries as one weighted signal among six; the short circuit only fires
+when the whole query is essentially the phrase itself.
 
 `multi_signal_search(db, query, limit, poi_type, client)` runs all 6 signals, weight-combines them per POI, applies the dynamic threshold, and returns ranked ORM objects. The semantic `client` is threaded through from `app.state.embedding_client`; when it is `None`/disabled the blend is purely the 5 keyword signals.
 

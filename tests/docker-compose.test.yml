@@ -9,6 +9,10 @@ services:
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test
       POSTGRES_DB: test_nearby
+    # Every test drops/recreates the whole schema (40+ tables). With pytest-xdist
+    # running many workers concurrently, the default max_locks_per_transaction=64
+    # overflows Postgres's shared lock table and errors the run.
+    command: postgres -c max_locks_per_transaction=256
     ports:
       - "5434:5432"
     healthcheck:

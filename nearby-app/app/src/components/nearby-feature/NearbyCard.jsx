@@ -1,18 +1,24 @@
 import { forwardRef } from 'react';
 import { Navigation, Toilet, Wifi, PawPrint, Accessibility } from 'lucide-react';
 import { getDisplayableLocation } from '../../utils/getDisplayableLocation';
-import { isPaidTier } from '../../utils/poiTier';
+import { getNextOccurrence } from '../../utils/eventSchedule';
 import { getOpenCloseStatusLabel, getEffectiveHoursForDate, formatDayHours } from '../../utils/hoursUtils';
-import AmenityPillStrip from '../details/AmenityPillStrip';
 
-// Helper to convert meters to miles
-function formatDistance(meters) {
-  if (!meters || meters === 0) return '0 mi';
-  const miles = meters / 1609.34;
+// Card distance formatting: feet under a tenth of a mile, miles above it.
+// Exported so Explore's result cards read identically (#134) instead of always
+// printing miles.
+export function formatDistanceMiles(miles) {
+  if (!miles || miles <= 0) return '0 mi';
   if (miles < 0.1) {
     return `${Math.round(miles * 5280)} ft`;
   }
   return `${miles.toFixed(1)} mi`;
+}
+
+// Helper to convert meters to miles
+function formatDistance(meters) {
+  if (!meters || meters === 0) return '0 mi';
+  return formatDistanceMiles(meters / 1609.34);
 }
 
 // Amenity icon components — Lucide icons (swapped from custom SVGs 2026-05-29)
@@ -34,12 +40,15 @@ function hasAmenity(values) {
   });
 }
 
-function getAmenities(poi) {
+export function getAmenities(poi) {
   const amenities = [];
-  if (hasAmenity(poi.public_toilets))  amenities.push({ icon: <RestroomIcon />, title: 'Public Restrooms', key: 'restroom' });
-  // wheelchair amenity icon removed — wheelchair_accessible column dropped (Issue #45 PR2 Migration B)
-  if (hasAmenity(poi.wifi_options))    amenities.push({ icon: <WifiIcon />,     title: 'WiFi Available',   key: 'wifi' });
-  if (hasAmenity(poi.pet_options))     amenities.push({ icon: <PetIcon />,      title: 'Pet Friendly',     key: 'pet' });
+  // Prefer the registry computed icon_* booleans (card fields); fall back to the
+  // loose array heuristic so we never drop an amenity that already showed.
+  const has = (iconBool, values) => iconBool === true || hasAmenity(values);
+  if (has(poi.icon_public_restroom, poi.public_toilets))  amenities.push({ icon: <RestroomIcon />,   title: 'Public Restrooms',    key: 'restroom' });
+  if (poi.icon_wheelchair_accessible === true)            amenities.push({ icon: <WheelchairIcon />, title: 'Wheelchair Accessible', key: 'wheelchair' });
+  if (has(poi.icon_free_wifi, poi.wifi_options))          amenities.push({ icon: <WifiIcon />,       title: 'WiFi Available',      key: 'wifi' });
+  if (has(poi.icon_pet_friendly, poi.pet_options))        amenities.push({ icon: <PetIcon />,        title: 'Pet Friendly',        key: 'pet' });
   return amenities;
 }
 
@@ -94,6 +103,27 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
 
   const distance = formatDistance(poi.distance_meters);
 
+  // Event start comes from the flat card field (registry card:true); fall back to
+  // the nested event object for callers that pass a full detail payload.
+  // #141: for a repeating series that stored date is the FIRST occurrence, so the
+  // card resolves the occurrence that is current today. `null` means the
+  // recurrence has finished; the card then falls back to the stored date and the
+  // "Past" badge below is correct.
+  const eventSchedule = poi.event?.start_datetime ? poi.event : poi;
+  const nextOccurrence = isEvent ? getNextOccurrence(eventSchedule) : null;
+  const eventStart = nextOccurrence?.start || poi.start_datetime || poi.event?.start_datetime;
+  // Past is measured from the start of today in UTC, the same cutoff the API's
+  // browse filter uses (_event_is_past), so the badge can never contradict a
+  // card the server just delivered as current.
+  const _badgeNow = new Date();
+  const _todayStartUtc = new Date(Date.UTC(
+    _badgeNow.getUTCFullYear(), _badgeNow.getUTCMonth(), _badgeNow.getUTCDate()
+  ));
+  const occurrenceEnd = nextOccurrence
+    ? (nextOccurrence.end ?? nextOccurrence.start)
+    : (eventStart ? new Date(eventStart) : null);
+  const eventIsPast = Boolean(occurrenceEnd) && occurrenceEnd < _todayStartUtc;
+
   // Coordinates for dawn/dusk-aware status (GeoJSON order: [lng, lat])
   const _poiCoords = poi?.location?.coordinates;
   const _poiLat = Array.isArray(_poiCoords) ? _poiCoords[1] : null;
@@ -133,48 +163,6 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
 
   // Location display gating - hide exact location for POIs that opt out
   const displayLoc = getDisplayableLocation(poi);
-
-  // Paid-tier listing cards get the yellow quick-facts pad + amenity pills
-  const paid = isPaidTier(poi);
-
-  const buildQuickFacts = () => {
-    const fmtList = (v) => (Array.isArray(v) && v.length > 0 ? v.join(', ') : (v || null));
-    if (isBusiness) {
-      return [
-        { label: 'Price Range', value: poi.business?.price_range || poi.price_range || null },
-        { label: 'Good For',    value: fmtList(poi.ideal_for?.age_group || poi.ideal_for) },
-        { label: 'Pets',        value: fmtList(poi.pet_options) },
-      ];
-    }
-    if (isEvent) {
-      return [
-        { label: 'Cost',        value: poi.event?.cost || poi.cost || null },
-        { label: 'At-A-Glance', value: poi.description_short || null },
-        { label: 'Pets',        value: fmtList(poi.pet_options) },
-      ];
-    }
-    if (isTrail) {
-      const rows = [
-        { label: 'Cost',        value: poi.trail?.cost || poi.cost || null },
-        { label: 'At-A-Glance', value: poi.description_short || null },
-        { label: 'Pets',        value: fmtList(poi.pet_options) },
-      ];
-      if (poi.trail?.payphone) rows.push({ label: 'PayPhone', value: poi.trail.payphone });
-      return rows;
-    }
-    if (isPark) {
-      return [
-        { label: 'Cost',        value: poi.park?.cost || poi.cost || null },
-        { label: 'At-A-Glance', value: poi.description_short || null },
-        { label: 'Pets',        value: fmtList(poi.pet_options) },
-      ];
-    }
-    return [];
-  };
-
-  const quickFacts = paid
-    ? buildQuickFacts().filter((r) => r.value != null && r.value !== '')
-    : [];
 
   // Stop card-level navigation when interacting with inner controls
   const stop = (e) => e.stopPropagation();
@@ -222,7 +210,7 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
       )}
 
       {/* Past event badge for Scheduled events whose date has passed */}
-      {isEvent && poi.event?.start_datetime && new Date(poi.event.start_datetime) < new Date() && poi.event?.event_status === 'Scheduled' && (
+      {isEvent && eventIsPast && poi.event?.event_status === 'Scheduled' && (
         <span className="nearby-card__status-badge nearby-card__status-badge--past">Past</span>
       )}
 
@@ -234,15 +222,15 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
       )}
 
       {/* Event-specific: Date */}
-      {isEvent && poi.event?.start_datetime && (
+      {isEvent && eventStart && (
         <div className="nearby-card__event-date">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
             <line x1="16" y1="2" x2="16" y2="6"/>
             <line x1="8" y1="2" x2="8" y2="6"/>
             <line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
-          <span>{formatEventDate(poi.event.start_datetime)}</span>
+          <span>{formatEventDate(eventStart)}</span>
         </div>
       )}
 
@@ -263,15 +251,15 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
           </div>
         )}
 
-        {/* Trail-specific: Length and difficulty */}
+        {/* Trail-specific: Length and difficulty (flat card fields, nested fallback) */}
         {isTrail && (
           <div className="nearby-card__trail-info">
-            {poi.trail?.length_miles && (
-              <span className="nearby-card__trail-length">{poi.trail.length_miles} mi</span>
+            {(poi.length_text || poi.trail?.length_miles) && (
+              <span className="nearby-card__trail-length">{poi.length_text || `${poi.trail.length_miles} mi`}</span>
             )}
-            {poi.trail?.difficulty && (
-              <span className={`nearby-card__trail-difficulty nearby-card__trail-difficulty--${poi.trail.difficulty.toLowerCase()}`}>
-                {poi.trail.difficulty}
+            {(poi.difficulty || poi.trail?.difficulty) && (
+              <span className={`nearby-card__trail-difficulty nearby-card__trail-difficulty--${(poi.difficulty || poi.trail?.difficulty).toLowerCase()}`}>
+                {poi.difficulty || poi.trail?.difficulty}
               </span>
             )}
           </div>
@@ -293,25 +281,6 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
           </div>
         )}
       </div>
-
-      {/* Paid-tier quick facts */}
-      {paid && quickFacts.length > 0 && (
-        <div className="nearby-card__quick-facts">
-          {quickFacts.map(({ label, value }) => (
-            <div className="nearby-card__quick-facts-row" key={label}>
-              <div className="nearby-card__quick-facts-label">{label}</div>
-              <div className="nearby-card__quick-facts-value">{value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Paid-tier amenity pill strip */}
-      {paid && (
-        <div className="nearby-card__amenity-strip-wrap">
-          <AmenityPillStrip poi={poi} />
-        </div>
-      )}
 
       {/* Action Buttons */}
       <div className="one_search_map_result_single_buttons" onClick={stop}>

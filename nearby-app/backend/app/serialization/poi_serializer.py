@@ -154,6 +154,37 @@ def _read_source(db, poi, entry: Dict[str, Any], images: List[Any]) -> Any:
             if _image_type_of(img) == image_type
         ]
 
+    # edges:<relationship_type> — Task 2.1 POI-to-POI links resolved from the
+    # poi_relationships edge table (published targets only), as RelationLink-shaped
+    # summaries. Needs ``db``; the card path (db=None) never carries these fields.
+    if source.startswith("edges:"):
+        if db is None:
+            return []
+        from shared.relationship_links import read_edges_public
+        rel_type = source.split(":", 1)[1]
+        return read_edges_public(db, poi.id, rel_type)
+
+    # points:<kind> — Task 2.3 point geometry resolved from the poi_points table,
+    # reconstructed in the field's original JSONB shape (the JSONB columns are
+    # retained but no longer written). Needs ``db``; every points field is
+    # card:false so the card path (db=None) never carries them.
+    if source.startswith("points:"):
+        if db is None:
+            return None
+        from shared.poi_points import read_points_by_kind
+        kind = source.split(":", 1)[1]
+        return read_points_by_kind(db, poi.id, kind)
+
+    # lots:<kind> (issues #90/#161). The unified parking read: the POI's own pins
+    # (poi_points kind='parking') followed by the SHAREABLE lots it links, each
+    # entry tagged with an ``origin``. Needs ``db``; the field is card:false so
+    # the card path (db=None) never carries it.
+    if source.startswith("lots:"):
+        if db is None:
+            return []
+        from shared.parking_lots import read_parking_lots
+        return read_parking_lots(db, poi.id, audience="public")
+
     # computed.<fn> — read the stored column by entry key (icon_*,
     # accessible_restroom, inclusive_playground are real boolean columns).
     if source.startswith("computed."):
@@ -255,6 +286,17 @@ def structural_registry_keys_for(poi_type: str) -> frozenset:
         if source.startswith("images:"):
             keys.add(entry["key"])
             continue
+        # points:<kind> (Task 2.3): a point field OWNED by a subtype table
+        # (access_points / trailhead_location live on trails) is still surfaced
+        # via the nested subtype object — the detail path enriches the ORM trail
+        # from poi_points — so its flat key is structural. The four POI-owned
+        # point fields stay flat, exactly as before.
+        if source.startswith("points:"):
+            from shared.poi_points import KIND_TO_FIELD, POINT_FIELDS
+            field = KIND_TO_FIELD.get(source.split(":", 1)[1])
+            if field is not None and POINT_FIELDS[field]["owner"] in _SUBTYPES:
+                keys.add(entry["key"])
+            continue
         prefix = source.split(".", 1)[0].split(":", 1)[0]
         if prefix in _SUBTYPES:
             keys.add(entry["key"])
@@ -284,8 +326,9 @@ def _build_location(poi):
 
 # The card/list response (``POINearbyResult``) is a small, fixed contract. The
 # registry drives WHICH fields are eligible (card == true, public, applies_to),
-# but the schema only declares a subset; we emit the intersection plus the
-# structural keys the legacy card response always carried.
+# and this whitelist must stay a SUPERSET of every public ``card == true``
+# registry field (minus ``DOCUMENTED_CARD_EXCLUSIONS`` below). The drift is
+# guarded by ``tests/test_card_schema_drift.py`` — no more silent drops.
 _CARD_SCHEMA_KEYS = frozenset(
     {
         "id",
@@ -306,6 +349,31 @@ _CARD_SCHEMA_KEYS = frozenset(
         "categories",
         "main_category",
         "featured_image",
+        # --- Task 1.4: card badges/tier that the registry marks card:true ---
+        "listing_type",   # + is_sponsor drive the paid-tier card styling
+        "is_sponsor",
+        "difficulty",     # trail difficulty badge
+        "length_text",    # trail length badge
+        "start_datetime",  # event start-date badge
+        "icon_free_wifi",  # amenity icons (computed booleans)
+        "icon_pet_friendly",
+        "icon_public_restroom",
+        "icon_wheelchair_accessible",
+    }
+)
+
+# Registry fields that are ``card == true`` / ``audience == "public"`` but are
+# intentionally NOT emitted on the card, each with a one-line reason. The drift
+# guard allows exactly these to be absent from ``_CARD_SCHEMA_KEYS``.
+DOCUMENTED_CARD_EXCLUSIONS = frozenset(
+    {
+        # ``main_image`` (the images:main image[] collection) is not a card key.
+        # Task 2.5 made the images table the single source of truth for photos, so
+        # the card hero now comes from ``featured_image`` DERIVED from the main
+        # image via ``shared.poi_media.attach_hero_images`` — one batched query per
+        # nearby/card response (no per-result eager-load of the images relation).
+        # The card still renders a single hero URL, not the image[] collection.
+        "main_image",
     }
 )
 

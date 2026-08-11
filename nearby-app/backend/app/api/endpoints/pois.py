@@ -45,12 +45,34 @@ SEARCH_QUERY_MAX_LEN = 500
 _EXCLUDED_EVENT_STATUSES = ("Canceled", "Rescheduled")
 
 
+def _event_is_past(event, cutoff):
+    """True when an event is over as of `cutoff`.
+
+    A repeating event is judged by its recurrence, not by the first occurrence:
+    a weekly market that started last year is still running unless its
+    recurrence_end_date has passed.
+    """
+    if getattr(event, 'is_repeating', False):
+        recurrence_end = getattr(event, 'recurrence_end_date', None)
+        return bool(recurrence_end and recurrence_end < cutoff)
+
+    end = getattr(event, 'end_datetime', None)
+    start = getattr(event, 'start_datetime', None)
+    ref_dt = end if end else start
+    return bool(ref_dt and ref_dt < cutoff)
+
+
 def _exclude_past_and_cancelled_events(pois, include_past=False, include_cancelled=False):
     """Filter a list of POI objects to exclude past and cancelled/rescheduled events.
 
     Non-event POIs always pass through.
+
+    "Past" is measured from the START OF TODAY (UTC), not the current instant,
+    so an event that began this morning is still "happening today" (#127).
     """
-    now = datetime.now(timezone.utc)
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     result = []
     for poi in pois:
         poi_type = poi.poi_type.value if hasattr(poi.poi_type, 'value') else poi.poi_type
@@ -68,15 +90,33 @@ def _exclude_past_and_cancelled_events(pois, include_past=False, include_cancell
             continue
 
         # Check past
-        if not include_past:
-            end = getattr(event, 'end_datetime', None)
-            start = getattr(event, 'start_datetime', None)
-            ref_dt = end if end else start
-            if ref_dt and ref_dt < now:
-                continue
+        if not include_past and _event_is_past(event, today_start):
+            continue
 
         result.append(poi)
     return result
+
+
+# Recurrence definition shipped alongside a card's start_datetime (#141). The
+# stored start_datetime of a repeating event is the FIRST occurrence of the
+# series, so a card that renders it alone shows a stale date (and a bogus "Past"
+# badge). These are public registry fields with card == false, so they are
+# attached to the card payload here rather than widened in the registry.
+_CARD_RECURRENCE_FIELDS = (
+    'end_datetime', 'is_repeating', 'repeat_pattern',
+    'recurrence_end_date', 'excluded_dates',
+)
+
+
+def _attach_card_recurrence(poi, poi_dict: dict) -> dict:
+    """Add the recurrence block to an EVENT card so the client can resolve the
+    occurrence that is current today. Non-events are left untouched."""
+    event = getattr(poi, 'event', None)
+    if event is None:
+        return poi_dict
+    for field in _CARD_RECURRENCE_FIELDS:
+        poi_dict[field] = getattr(event, field, None)
+    return poi_dict
 
 
 def get_poi_images(db: Session, poi_id: uuid.UUID) -> List[dict]:
@@ -174,6 +214,7 @@ def api_search_pois(
     """Keyword + multi-signal search for POIs."""
     embedding_client = getattr(request.app.state, 'embedding_client', None)
     results = multi_signal_search(db, query=q, limit=10, poi_type=poi_type, client=embedding_client)
+    results = _exclude_past_and_cancelled_events(results)
     return _apply_event_search_filters(results, date_from, date_to, event_status)
 
 @router.get("/pois/semantic-search", response_model=List[schemas.poi.POISearchResult])
@@ -191,6 +232,7 @@ def api_semantic_search_pois(
     """Semantic search — now routed through the multi-signal engine."""
     embedding_client = getattr(request.app.state, 'embedding_client', None)
     results = multi_signal_search(db, query=q, limit=limit, poi_type=poi_type, client=embedding_client)
+    results = _exclude_past_and_cancelled_events(results)
     return _apply_event_search_filters(results, date_from, date_to, event_status)
 
 @router.get("/pois/hybrid-search", response_model=List[schemas.poi.POISearchResult])
@@ -211,6 +253,9 @@ def api_hybrid_search_pois(
     """
     embedding_client = getattr(request.app.state, 'embedding_client', None)
     results = multi_signal_search(db, query=q, limit=limit, poi_type=poi_type, client=embedding_client)
+    # Search feeds the homepage suggestion dropdown, Explore and the Nearby
+    # search box; none of them should surface events that already happened (#127).
+    results = _exclude_past_and_cancelled_events(results)
     return _apply_event_search_filters(results, date_from, date_to, event_status)
 
 def _apply_venue_inheritance(db: Session, poi_dict: dict, event) -> dict:
@@ -222,7 +267,25 @@ def _apply_venue_inheritance(db: Session, poi_dict: dict, event) -> dict:
     if not venue_poi:
         return poi_dict
 
+    # Task 2.3: the inheritable parking_locations / toilet_locations now live in
+    # poi_points; reconstruct them onto the venue instance (set_committed_value,
+    # never dirties) so inheritance reads real data, not the stale JSONB columns.
+    from shared.poi_points import enrich_poi_point_fields
+    enrich_poi_point_fields(db, venue_poi)
+
+    # Issue #124: the public page needs the venue's NAME to render the venue
+    # link. These are plain instance attributes (not columns, so the session is
+    # never dirtied) read by the nested Event schema. Resolving them live beats
+    # a snapshot column, which would go stale when the venue is renamed.
+    event.venue_name = venue_poi.name
+    event.venue_type = (
+        venue_poi.poi_type.value if hasattr(venue_poi.poi_type, 'value')
+        else venue_poi.poi_type
+    )
+
+    from sqlalchemy.orm.attributes import set_committed_value
     from shared.utils.venue_inheritance import resolve_venue_inheritance
+    from shared.constants.venue_sections import INHERITABLE_FIELDS, venue_entry_notes
 
     venue_data = {
         column.name: getattr(venue_poi, column.name)
@@ -235,27 +298,39 @@ def _apply_venue_inheritance(db: Session, poi_dict: dict, event) -> dict:
         for column in venue_poi.__table__.columns
     }
 
-    # Build a simpler dict from poi_dict for the fields we care about
-    inheritable_fields = [
-        "parking_types", "parking_locations", "parking_notes", "expect_to_pay_parking",
-        # public_transit_info removed (Migration A #33 — renamed to _deprecated_public_transit_info)
-        "public_toilets", "toilet_locations", "toilet_description",
-        # wheelchair_accessible removed (Issue #45 PR2 Migration B — column dropped)
-        "wheelchair_details", "hours", "amenities",
-        "pet_options", "pet_policy", "drone_usage", "drone_policy",
-    ]
+    # Issue #124: the inheritable field list is derived from the ONE section
+    # registry instead of being duplicated here (it used to drift from the
+    # resolver's own map, and it still carried "hours").
+    inheritable_fields = INHERITABLE_FIELDS
     event_fields = {f: poi_dict.get(f) for f in inheritable_fields}
     venue_fields = {f: getattr(venue_poi, f, None) for f in inheritable_fields}
+    # The venue's PostGIS geometry has to be shaped like the event's before it
+    # can stand in for it (P12: inherit the venue's point, never null our own).
+    if venue_poi.location is not None:
+        venue_fields["location"] = PointGeometry.from_wkb(venue_poi.location)
 
     config = getattr(event, 'venue_inheritance', None)
     resolved = resolve_venue_inheritance(event_fields, venue_fields, config)
 
-    # Merge resolved fields back into poi_dict
+    # Merge resolved fields back into poi_dict. Only keys the response ALREADY
+    # carries are written: poi_dict is pruned to the public field set by both
+    # assembly paths, so this keeps inheritance from introducing a key the
+    # public contract does not have (POIDetail allows extras).
     for field in inheritable_fields:
-        if field in resolved:
+        if field in resolved and field in poi_dict:
             poi_dict[field] = resolved[field]
     if "_venue_source" in resolved:
         poi_dict["_venue_source"] = resolved["_venue_source"]
+
+    # Entry notes are the one cross-table inheritance: the venue keeps them in a
+    # type-specific column and the event has its own event_entry_notes. That IS
+    # a real column, so it goes in via set_committed_value: a plain assignment
+    # would mark the event dirty and could flush an inherited value into the
+    # row on what is supposed to be a read.
+    if (config or {}).get("address") == "as_is":
+        notes = venue_entry_notes(venue_poi)
+        if notes:
+            set_committed_value(event, 'event_entry_notes', notes)
 
     return poi_dict
 
@@ -364,6 +439,32 @@ def _serialize_detail_response(db: Session, db_poi, images: list):
       leaves at its default), corrupting the structural shape.
     * shadow   -> build BOTH, log the diff at WARNING, RETURN legacy unchanged.
     """
+    # Task 2.3: point-geometry fields live in poi_points now; the retained JSONB
+    # columns are stale. Reconstruct all six onto the ORM instance (via
+    # set_committed_value — never dirties the session) so the nested ``trail``
+    # structural object (access_points / trailhead_location — what TrailDetail.jsx
+    # renders) and the legacy/shadow flat reads reflect poi_points. The registry
+    # path additionally reads the four flat fields via its ``points:`` source.
+    from shared.poi_points import enrich_poi_point_fields
+    enrich_poi_point_fields(db, db_poi)
+
+    # Task 2.5: featured_image / photos / gallery_photos are derived from the
+    # images table (the single source of truth); the retained legacy columns are
+    # no longer written. Reconstruct all three onto the ORM instance from the
+    # already-loaded ``images`` list (via set_committed_value — never dirties the
+    # session) so the registry flat fields and the legacy/shadow reads reflect
+    # images, not the stale columns. The frontend hero chain already prefers the
+    # images collection; this keeps featured_image (OG/SEO + cards) correct too.
+    from shared.poi_media import enrich_poi_media_fields
+    enrich_poi_media_fields(db, db_poi, images=images)
+
+    # Task 2.4: derive the trail's length_miles from geom_line (ST_Length over
+    # geography) and attach it to the nested trail object. length_text stays the
+    # display fallback when no line exists (length_miles is then None). One indexed
+    # single-row query; detail path only (no N+1 on list/card responses).
+    from shared.poi_geometry import enrich_trail_length
+    enrich_trail_length(db, db_poi)
+
     if POI_SERIALIZER == "legacy":
         legacy_dict = _build_legacy_detail_dict(db, db_poi, images)
         return schemas.poi.POIDetail.model_validate(legacy_dict)
@@ -476,7 +577,11 @@ def api_get_nearby_pois(
         joinedload(models.poi.PointOfInterest.event)
     ).filter(
         models.poi.PointOfInterest.publication_status == 'published'
-    ).order_by('distance_meters').limit(20).all()
+    ).order_by(
+        # Tie-break on id so equidistant POIs keep a stable order and the
+        # limit-20 cut is deterministic (#160).
+        'distance_meters', models.poi.PointOfInterest.id
+    ).limit(20).all()
 
     # Filter past/cancelled events, then limit to 8
     filtered_pairs = []
@@ -486,12 +591,20 @@ def api_get_nearby_pois(
             filtered_pairs.append((poi, distance))
     filtered_pairs = filtered_pairs[:8]
 
+    # Task 2.5: the card hero (featured_image) is derived from the images table
+    # (single source of truth) in ONE batched query rather than the retained,
+    # no-longer-written column. Attach it before serializing the cards.
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, [p for p, _ in filtered_pairs])
+
     # Format results with distance. Card body is built by the registry-driven
     # serialize_poi_card (public-only); the per-query distance is attached on top.
     results = []
     for poi, distance in filtered_pairs:
         poi_dict = serialize_poi_card(poi)
         poi_dict['distance_meters'] = distance
+        poi_dict['dont_display_location'] = bool(poi.dont_display_location)
+        _attach_card_recurrence(poi, poi_dict)
         results.append(schemas.poi.POINearbyResult.model_validate(poi_dict))
 
     return results
@@ -525,10 +638,30 @@ def api_get_nearby_pois_by_id(
     poi_id: uuid.UUID,
     radius_miles: float = Query(5.0, description="Search radius in miles"),
     include_past_events: bool = Query(False, description="Include past events in results"),
+    facet: Optional[List[str]] = Query(
+        None,
+        description="Repeatable attribute facet: pet_friendly, restrooms, "
+        "wheelchair_accessible, free_wifi, playground, alcohol, kid_friendly",
+    ),
+    payment: Optional[str] = Query(
+        None, description="Filter to POIs accepting this payment method (e.g. Cash)"
+    ),
     db: Session = Depends(get_db),
 ):
-    nearby_pois = crud.crud_poi.get_nearby_pois(db, poi_id=str(poi_id), radius_miles=radius_miles)
+    # Facets compose with radius + publication gating in SQL. The search-within-
+    # nearby path (SearchBar) intersects hybrid-search results against this
+    # already-facet-filtered id set client-side, so facets flow through search
+    # without touching the global hybrid-search endpoint.
+    nearby_pois = crud.crud_poi.get_nearby_pois(
+        db, poi_id=str(poi_id), radius_miles=radius_miles,
+        facets=facet, payment=payment,
+    )
     nearby_pois = _exclude_past_and_cancelled_events(nearby_pois, include_past=include_past_events)
+
+    # Task 2.5: attach the card hero (featured_image) from the images table in one
+    # batched query (the retained column is no longer written).
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, list(nearby_pois))
 
     # Convert location data for each POI. Card body is built by the registry-driven
     # serialize_poi_card (public-only); the per-query distance and the {id,name,slug}
@@ -548,6 +681,11 @@ def api_get_nearby_pois_by_id(
         poi_dict = serialize_poi_card(poi)
         poi_dict['distance_meters'] = poi.distance_meters
         poi_dict['categories'] = categories_data
+        # #130: the maps hide pins for POIs that opted out of showing an exact
+        # location. The flag is a detail-only registry field (card:false), so it
+        # is attached here (POINearbyResult allows extras).
+        poi_dict['dont_display_location'] = bool(poi.dont_display_location)
+        _attach_card_recurrence(poi, poi_dict)
         results.append(schemas.poi.POINearbyResult.model_validate(poi_dict))
 
     return results
@@ -624,6 +762,9 @@ def api_get_pois_by_category(
             'address_street': poi.address_street,
             'description_short': poi.description_short,
             'location': PointGeometry.from_wkb(poi.location) if poi.location else None,
+            # #130: the Explore map hides pins for POIs that opted out of showing
+            # an exact location, so the flag has to travel with the browse payload.
+            'dont_display_location': bool(poi.dont_display_location),
             'hours': poi.hours,
             # wheelchair_accessible removed (Issue #45 PR2 Migration B — column dropped)
         }
@@ -699,6 +840,8 @@ def api_get_pois_by_type(
             'address_street': poi.address_street,
             'description_short': poi.description_short,
             'location': PointGeometry.from_wkb(poi.location) if poi.location else None,
+            # #130: see by-category above; the Explore map needs this flag.
+            'dont_display_location': bool(poi.dont_display_location),
             'hours': poi.hours,
             'pet_options': poi.pet_options,
             'wifi_options': poi.wifi_options,
@@ -783,50 +926,44 @@ def get_event_vendors(
     poi_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
-    """Resolve vendor_poi_links JSONB to published POI summaries."""
-    from sqlalchemy.orm import joinedload
+    """Resolve event vendor links to published POI summaries.
 
-    poi = db.query(models.poi.PointOfInterest).options(
-        joinedload(models.poi.PointOfInterest.event)
-    ).filter(
+    Task 2.1: vendor links now live in the ``poi_relationships`` edge table
+    (relationship_type ``vendor``, source = the event POI); the per-vendor
+    ``vendor_type`` is carried in the edge's ``meta``. The response shape is
+    unchanged from the legacy vendor_poi_links JSONB path.
+    """
+    poi = db.query(models.poi.PointOfInterest).filter(
         models.poi.PointOfInterest.id == poi_id,
         models.poi.PointOfInterest.publication_status == "published",
     ).first()
     if not poi:
         raise HTTPException(status_code=404, detail="POI not found")
 
-    event = poi.event
-    if not event:
+    edges = db.query(models.poi.POIRelationship).filter(
+        models.poi.POIRelationship.source_poi_id == poi.id,
+        models.poi.POIRelationship.relationship_type == "vendor",
+    ).all()
+    if not edges:
         return []
 
-    vendor_links = event.vendor_poi_links
-    if not vendor_links or not isinstance(vendor_links, list):
-        return []
-
-    # Collect vendor POI IDs
-    vendor_poi_ids = [
-        v["poi_id"] for v in vendor_links
-        if isinstance(v, dict) and v.get("poi_id")
-    ]
-    if not vendor_poi_ids:
-        return []
-
-    # Fetch published vendor POIs
+    target_ids = [e.target_poi_id for e in edges]
     vendor_pois = db.query(models.poi.PointOfInterest).filter(
-        models.poi.PointOfInterest.id.in_(vendor_poi_ids),
+        models.poi.PointOfInterest.id.in_(target_ids),
         models.poi.PointOfInterest.publication_status == "published",
     ).all()
-
-    vendor_map = {str(vp.id): vp for vp in vendor_pois}
+    # Task 2.5: vendor thumbnails read featured_image, now derived from images.
+    from shared.poi_media import attach_hero_images
+    attach_hero_images(db, vendor_pois)
+    vendor_map = {vp.id: vp for vp in vendor_pois}
 
     results = []
-    for link in vendor_links:
-        if not isinstance(link, dict) or not link.get("poi_id"):
-            continue
-        vp = vendor_map.get(link["poi_id"])
+    for edge in edges:
+        vp = vendor_map.get(edge.target_poi_id)
         if not vp:
             continue
         poi_type = vp.poi_type.value if hasattr(vp.poi_type, 'value') else vp.poi_type
+        meta = edge.meta or {}
         results.append({
             "id": str(vp.id),
             "name": vp.name,
@@ -834,7 +971,7 @@ def get_event_vendors(
             "poi_type": poi_type,
             "address_city": vp.address_city,
             "featured_image": vp.featured_image,
-            "vendor_type": link.get("vendor_type"),
+            "vendor_type": meta.get("vendor_type"),
         })
 
     return results
@@ -878,6 +1015,9 @@ def get_event_sponsors(
             models.poi.PointOfInterest.id.in_(linked_ids),
             models.poi.PointOfInterest.publication_status == "published",
         ).all()
+        # Task 2.5: sponsor thumbnails read featured_image, now derived from images.
+        from shared.poi_media import attach_hero_images
+        attach_hero_images(db, sponsor_pois)
         sponsor_map = {str(sp.id): sp for sp in sponsor_pois}
 
     results = []

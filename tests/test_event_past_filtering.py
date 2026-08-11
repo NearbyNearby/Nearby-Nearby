@@ -207,3 +207,102 @@ class TestCancelledEventExclusion:
         resp = app_client.get(f"/api/pois/{cancelled.id}")
         assert resp.status_code == 200
         assert resp.json()["name"] == "Cancelled Direct"
+
+
+class TestRepeatingEventVisibility:
+    """Issue #131: newly added events missing from the Explore / Nearby maps.
+
+    Both maps are fed by the browse endpoints, which share
+    ``_exclude_past_and_cancelled_events``. A weekly market whose FIRST
+    occurrence is in the past but whose recurrence never ends was judged past by
+    ``start_datetime`` alone and silently dropped from every map. A repeating
+    event is now judged by ``recurrence_end_date``.
+    """
+
+    @staticmethod
+    def _open_ended_weekly(db, name, slug):
+        return orm_create_event(
+            db, name=name, published=True, slug=slug,
+            address_city="Pittsboro", address_state="NC",
+            location="POINT(-79.177397 35.720303)",
+            event_fields={
+                # First occurrence well in the past, recurrence never ends.
+                "start_datetime": datetime(2020, 7, 2, 15, 0, 0, tzinfo=timezone.utc),
+                "end_datetime": datetime(2020, 7, 2, 18, 0, 0, tzinfo=timezone.utc),
+                "is_repeating": True,
+                "repeat_pattern": {"frequency": "weekly", "interval": 1, "days_of_week": ["Thu"]},
+                "recurrence_end_date": None,
+            },
+        )
+
+    def test_open_ended_repeating_event_visible_in_by_type(self, db_session, app_client):
+        self._open_ended_weekly(db_session, "Weekly Farmers Market", "weekly-farmers-market")
+        db_session.commit()
+
+        resp = app_client.get("/api/pois/by-type/EVENT")
+        assert resp.status_code == 200
+        assert "Weekly Farmers Market" in [p["name"] for p in resp.json()]
+
+    def test_open_ended_repeating_event_visible_in_by_category(self, db_session, app_client):
+        cat = orm_create_category(db_session, name="Markets")
+        market = self._open_ended_weekly(db_session, "Category Weekly Market", "category-weekly-market")
+        orm_assign_main_category(db_session, market.id, cat.id)
+        db_session.commit()
+
+        resp = app_client.get(f"/api/pois/by-category/{cat.slug}")
+        assert resp.status_code == 200
+        assert "Category Weekly Market" in [p["name"] for p in resp.json()["pois"]]
+
+    def test_open_ended_repeating_event_visible_in_nearby(self, db_session, app_client):
+        self._open_ended_weekly(db_session, "Nearby Weekly Market", "nearby-weekly-market")
+        origin = orm_create_business(
+            db_session, name="Market Venue", published=True, slug="market-venue",
+            location="POINT(-79.177500 35.720400)",
+        )
+        db_session.commit()
+
+        resp = app_client.get(f"/api/pois/{origin.id}/nearby?radius_miles=5")
+        assert resp.status_code == 200
+        assert "Nearby Weekly Market" in [p["name"] for p in resp.json()]
+
+    def test_open_ended_repeating_event_visible_in_latlng_nearby(self, db_session, app_client):
+        self._open_ended_weekly(db_session, "LatLng Weekly Market", "latlng-weekly-market")
+        db_session.commit()
+
+        resp = app_client.get("/api/nearby?latitude=35.720303&longitude=-79.177397")
+        assert resp.status_code == 200
+        assert "LatLng Weekly Market" in [p["name"] for p in resp.json()]
+
+    def test_finished_recurrence_still_excluded(self, db_session, app_client):
+        """A repeating series whose recurrence_end_date has passed is still past."""
+        orm_create_event(
+            db_session, name="Retired Weekly Market", published=True,
+            slug="retired-weekly-market",
+            event_fields={
+                "start_datetime": datetime(2020, 7, 2, 15, 0, 0, tzinfo=timezone.utc),
+                "is_repeating": True,
+                "repeat_pattern": {"frequency": "weekly", "interval": 1},
+                "recurrence_end_date": datetime(2021, 7, 2, 15, 0, 0, tzinfo=timezone.utc),
+            },
+        )
+        db_session.commit()
+
+        resp = app_client.get("/api/pois/by-type/EVENT")
+        assert resp.status_code == 200
+        assert "Retired Weekly Market" not in [p["name"] for p in resp.json()]
+
+    def test_multi_day_event_visible_until_its_final_day(self, db_session, app_client):
+        """An event that started yesterday and ends tomorrow is still current."""
+        now = datetime.now(timezone.utc)
+        orm_create_event(
+            db_session, name="Running Festival", published=True, slug="running-festival",
+            event_fields={
+                "start_datetime": now - timedelta(days=1),
+                "end_datetime": now + timedelta(days=1),
+            },
+        )
+        db_session.commit()
+
+        resp = app_client.get("/api/pois/by-type/EVENT")
+        assert resp.status_code == 200
+        assert "Running Festival" in [p["name"] for p in resp.json()]

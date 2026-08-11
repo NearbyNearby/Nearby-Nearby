@@ -75,12 +75,6 @@ token.json
 client_secret*.json
 *.credentials.json
 
-# Local SCSS source files (Barry's per-component editing companions — not part
-# of the build). The ONE exception is the central app stylesheet, which IS the
-# source of truth and is compiled by Vite/sass at build time.
-*.scss
-!nearby-app/app/src/styles/app.scss
-
 # Claude Code
 .claude/
 
@@ -96,6 +90,14 @@ npm-debug.log*
 .npm
 .eslintcache
 
+# Vite/Vitest cache (bind-mounted so it persists across `docker compose run`)
+nearby-app/app/.vite/
+nearby-admin/frontend/.vite/
+
+# sass-embedded verification builds (see nearby-app/app CLAUDE workflow)
+nearby-app/app/dist-baseline/
+nearby-app/app/dist-new/
+
 # Ruff
 .ruff_cache/
 
@@ -110,3 +112,4 @@ npm-debug.log*
 *.tfvars
 !terraform/environments/prod/terraform.tfvars
 may-launch/
+.issue-media/

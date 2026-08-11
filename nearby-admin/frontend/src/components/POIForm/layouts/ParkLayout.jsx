@@ -23,6 +23,7 @@ import HoursSelector from '../../HoursSelector';
 import { FeaturedImageUpload, shouldUseImageUpload } from '../ImageIntegration';
 
 import { ParkingLocationGroup } from '../components/ParkingLocationGroup';
+import ParkingLotLinkGroup from '../components/ParkingLotLinkGroup';
 import { RestroomLocationGroup } from '../components/RestroomLocationGroup';
 import ServiceAnimalAlert from '../components/ServiceAnimalAlert';
 import {
@@ -125,6 +126,7 @@ export default function ParkLayout({ form, userRole, poiId }) {
         <Accordion.Control><Text fw={600}>Parking</Text></Accordion.Control>
         <Accordion.Panel>
           <ParkingLocationGroup form={form} id={poiId} isPark label="Parking Locations" />
+          <ParkingLotLinkGroup form={form} />
         </Accordion.Panel>
       </Accordion.Item>
 

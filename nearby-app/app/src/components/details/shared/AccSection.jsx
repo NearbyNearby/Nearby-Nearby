@@ -1,25 +1,69 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAccordionGroup } from './accordionGroupContext';
 
-export default function AccSection({ id, title, defaultOpen = false, col1, col2, children }) {
-  const [open, setOpen] = useState(!!defaultOpen);
+// Stable, unique DOM id per accordion, derived from its title so the SAME
+// accordion has the SAME id across every POI type (e.g. "Pet Policy" ->
+// poi_acc_pet_policy, "About + Hours" -> poi_acc_about_hours).
+function accSlug(title) {
+  return (title || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+// Matches the scrollOffset used by Barry's original nn-templates/inc/accordion.js
+// (its openSection() scrolls the newly-opened section to this far from the top).
+const SCROLL_OFFSET = 120;
+
+export default function AccSection({ title, defaultOpen = false, col1, col2, children }) {
+  const group = useAccordionGroup();
+  const [localOpen, setLocalOpen] = useState(!!defaultOpen);
 
   const hasC1 = col1 && (Array.isArray(col1) ? col1.some(Boolean) : true);
   const hasC2 = col2 && (Array.isArray(col2) ? col2.some(Boolean) : true);
   const hasChildren = children && (Array.isArray(children) ? children.some(Boolean) : true);
+  const visible = hasC1 || hasC2 || hasChildren;
 
-  if (!hasC1 && !hasC2 && !hasChildren) return null;
+  const slug = accSlug(title);
+  const sectionId = `poi_acc_${slug}`;
+  const panelId = `acc_panel_${slug}`;
 
-  const panelId = `acc_panel_${id || title?.replace(/\s+/g, '_')}`;
+  // Inside a group, the first visible section claims the initial open slot
+  // (claimInitial is first-wins, so later sections and re-renders are no-ops).
+  useEffect(() => {
+    if (group && visible) group.claimInitial(sectionId);
+  }, [group, visible, sectionId]);
+
+  if (!visible) return null;
+  // Single-open when inside an AccordionGroup; otherwise self-managed.
+  const open = group ? group.openId === sectionId : localOpen;
   const useColumns = hasC1 || hasC2;
 
+  // Only user-initiated opens scroll (matches original: the initial auto-open
+  // via claimInitial above never scrolls, since the page just loaded at top).
+  const toggleOpen = () => {
+    const willOpen = !open;
+    if (group) group.toggle(sectionId); else setLocalOpen((o) => !o);
+    if (willOpen) {
+      // Wait a frame for the panel's display change to actually reflow before
+      // measuring its position, then scroll it to the same offset from the
+      // top Barry's original template used.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const el = document.getElementById(sectionId);
+          if (!el) return;
+          const top = el.getBoundingClientRect().top + window.pageYOffset;
+          window.scrollTo({ top: top - SCROLL_OFFSET, behavior: 'smooth' });
+        });
+      });
+    }
+  };
+
   return (
-    <div id={id} className={`acc_section${open ? ' acc_active' : ''}`}>
+    <div id={sectionId} className={`acc_section${open ? ' acc_active' : ''}`}>
       <button
         className="btn_reset acc_head"
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
       >
         <h3 className="acc_title">{title}</h3>
         <div className="acc_toggles">

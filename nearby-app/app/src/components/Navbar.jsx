@@ -99,7 +99,7 @@ export default function Navbar({ navOverlay, searchOverlay }) {
                     <Link role="menuitem" to="/disaster-network" className="aaa_menu_1_link" onClick={navOverlay.close}>Disaster</Link>
                   </li>
                   <li role="none" className="aaa_menu_1_list_item">
-                    <a role="menuitem" href="https://blog.nearbynearby.com/" className="aaa_menu_1_link" target="_blank" rel="noopener noreferrer">Updates</a>
+                    <Link role="menuitem" to="/updates" className="aaa_menu_1_link" onClick={navOverlay.close}>Updates</Link>
                   </li>
 
                   {/* More dropdown — submenu always in DOM, toggled via class */}
@@ -129,9 +129,10 @@ export default function Navbar({ navOverlay, searchOverlay }) {
                       &#9662;
                     </button>
                     <ul role="menu" className={`aaa_menu_1_sub_menu${moreOpen ? ' aaa_menu_open' : ''}`}>
-                      <li role="none" className="aaa_menu_1_list_item">
+                      {/* Hidden until the Help / FAQ page has real content (#129). Restore this block to bring it back. */}
+                      {/* <li role="none" className="aaa_menu_1_list_item">
                         <Link role="menuitem" to="/help" className="aaa_menu_1_link" onClick={navOverlay.close}>Help / FAQ's</Link>
-                      </li>
+                      </li> */}
                       <li role="none" className="aaa_menu_1_list_item">
                         <Link role="menuitem" to="/contact" className="aaa_menu_1_link" onClick={navOverlay.close}>Contact</Link>
                       </li>

@@ -334,6 +334,9 @@ dist
 # Gatsby files
 .cache/
 public
+# Vite serves frontend/public as static source assets, keep it tracked
+!frontend/public/
+!frontend/public/**
 
 # Storybook build outputs
 .out

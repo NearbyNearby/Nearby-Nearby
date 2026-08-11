@@ -78,7 +78,7 @@ class TestCreateBusinessAllFields:
             "smoking_options": ["Outdoor Only"],
             "smoking_details": "Patio smoking area",
             "wifi_options": ["Free WiFi"],
-            "drone_usage": "Not Allowed",
+            "drone_usage": "No",
             "drone_policy": "No drones permitted",
             "pet_options": ["Dogs Allowed Outside"],
             "pet_policy": "Well-behaved dogs on patio",
@@ -181,15 +181,19 @@ class TestCreateBusinessTitledLinks:
 
 class TestCreateBusinessJsonbFields:
     def test_create_business_jsonb_fields(self, admin_client):
-        """Test JSONB fields: hours, amenities, photos, contact_info, compliance, custom_fields."""
+        """Test JSONB fields: hours, amenities, compliance, custom_fields.
+
+        Task 2.5: photos and contact_info are no longer round-tripped through the
+        create payload — the write path stops writing them (photos -> the images
+        table; contact_info -> the main_contact_* columns). Their new behavior is
+        covered by tests/test_one_representation.py.
+        """
         hours = {
             "monday": {"open": "08:00", "close": "20:00"},
             "tuesday": {"open": "08:00", "close": "20:00"},
             "wednesday": "closed",
         }
         amenities = {"wifi": True, "parking": "free"}
-        photos = {"featured": "https://example.com/img.jpg", "gallery": ["img1.jpg", "img2.jpg"]}
-        contact_info = {"best": {"name": "Bob", "phone": "555-1234"}}
         compliance = {"pre_approval_required": False}
         custom_fields = {"Note": "Test note"}
 
@@ -198,15 +202,11 @@ class TestCreateBusinessJsonbFields:
             name="JSONB Biz",
             hours=hours,
             amenities=amenities,
-            photos=photos,
-            contact_info=contact_info,
             compliance=compliance,
             custom_fields=custom_fields,
         )
 
         assert biz["hours"]["monday"]["open"] == "08:00"
         assert biz["amenities"]["wifi"] is True
-        assert biz["photos"]["featured"] == "https://example.com/img.jpg"
-        assert biz["contact_info"]["best"]["name"] == "Bob"
         assert biz["compliance"]["pre_approval_required"] is False
         assert biz["custom_fields"]["Note"] == "Test note"

@@ -2,7 +2,8 @@ import io
 import uuid
 import os
 from typing import Optional, List, Dict, Any
-from PIL import Image as PILImage
+from PIL import Image as PILImage, ImageOps
+import pillow_heif
 from fastapi import UploadFile, HTTPException
 import base64
 from sqlalchemy.orm import Session
@@ -11,6 +12,10 @@ import logging
 from app.models.image import Image, ImageType, IMAGE_TYPE_CONFIG
 from app.database import SessionLocal
 from app.core.s3 import s3_config, s3_client
+
+# Register HEIF/HEIC support with Pillow once at import time so PILImage.open()
+# can decode iPhone .heic/.heif files.
+pillow_heif.register_heif_opener()
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +81,23 @@ class ImageService:
             # Re-open for processing (verify() closes the image)
             img = PILImage.open(io.BytesIO(content))
 
+            mime_type = file.content_type
+            pil_format = (img.format or "").upper()
+
+            # Browsers other than Safari cannot render HEIC/HEIF, so transcode the
+            # stored original to JPEG. Apply the EXIF Orientation tag first so
+            # iPhone photos are stored upright rather than sideways.
+            if pil_format in ("HEIF", "HEIC") or mime_type in ("image/heic", "image/heif"):
+                img = ImageOps.exif_transpose(img)
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=90, optimize=True)
+                content = buf.getvalue()
+                file_size = len(content)
+                mime_type = "image/jpeg"
+                img = PILImage.open(io.BytesIO(content))
+
             return {
                 "content": content,
                 "width": img.width,
@@ -83,28 +105,38 @@ class ImageService:
                 "format": img.format,
                 "mode": img.mode,
                 "size_bytes": file_size,
-                "mime_type": file.content_type
+                "mime_type": mime_type
             }
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
 
     async def check_image_count(
         self,
         db: Session,
-        poi_id: uuid.UUID,
+        poi_id: Optional[uuid.UUID],
         image_type: ImageType,
-        context: Optional[str] = None
+        context: Optional[str] = None,
+        parking_lot_id: Optional[uuid.UUID] = None
     ) -> None:
-        """Check if adding an image would exceed the maximum count"""
+        """Check if adding an image would exceed the maximum count.
+
+        The owner is a PAIR (poi_id, parking_lot_id): a standalone parking lot's
+        photo has no POI, so the cap is counted against whichever id is set.
+        """
         config = IMAGE_TYPE_CONFIG.get(image_type)
         max_count = config["max_count"]
 
         # Count existing images (only original images, not variants)
         query = db.query(Image).filter(
-            Image.poi_id == poi_id,
             Image.image_type == image_type,
             Image.parent_image_id.is_(None)  # Only count original images
         )
+        if parking_lot_id is not None:
+            query = query.filter(Image.parking_lot_id == parking_lot_id)
+        else:
+            query = query.filter(Image.poi_id == poi_id)
         if context:
             query = query.filter(Image.image_context == context)
 
@@ -116,17 +148,34 @@ class ImageService:
                 detail=f"Maximum {max_count} images allowed for type {image_type.value}"
             )
 
-    def generate_filename(self, original_filename: str) -> str:
+    def generate_filename(self, original_filename: str, mime_type: Optional[str] = None) -> str:
         """Generate a unique filename for storage"""
         import pathlib
-        ext = pathlib.Path(original_filename).suffix.lower()
-        if not ext:
-            ext = ".jpg"  # Default extension
+        mime_ext = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+            "application/pdf": ".pdf",
+        }
+        if mime_type in mime_ext:
+            ext = mime_ext[mime_type]
+        else:
+            ext = pathlib.Path(original_filename).suffix.lower()
+            if not ext:
+                ext = ".jpg"  # Default extension
         return f"{uuid.uuid4()}{ext}"
 
-    def generate_s3_key(self, poi_id: uuid.UUID, image_type: ImageType, filename: str, size_variant: str = "original") -> str:
-        """Generate S3 key for organized storage"""
-        base_path = f"images/{poi_id}/{image_type.value}"
+    def generate_s3_key(self, poi_id: Optional[uuid.UUID], image_type: ImageType, filename: str,
+                        size_variant: str = "original", parking_lot_id: Optional[uuid.UUID] = None) -> str:
+        """Generate S3 key for organized storage.
+
+        Standalone parking-lot photos have no POI, so they get their own prefix
+        (``images/parking-lots/{lot_id}/...``) instead of ``images/None/...``.
+        """
+        if poi_id is None and parking_lot_id is not None:
+            base_path = f"images/parking-lots/{parking_lot_id}/{image_type.value}"
+        else:
+            base_path = f"images/{poi_id}/{image_type.value}"
         if size_variant != "original":
             return f"{base_path}/{size_variant}/{filename}"
         return f"{base_path}/{filename}"
@@ -138,6 +187,8 @@ class ImageService:
         try:
             img = PILImage.open(io.BytesIO(original_data))
             original_format = img.format or "JPEG"
+            # Honor the EXIF Orientation tag before resizing so variants are upright.
+            img = ImageOps.exif_transpose(img)
 
             # Store original
             variants["original"] = {
@@ -175,6 +226,8 @@ class ImageService:
                     resized_img.save(output, format="WEBP", quality=self.default_quality, optimize=True)
                     variant_mime = "image/webp"
                 else:
+                    if resized_img.mode not in ("RGB", "L"):
+                        resized_img = resized_img.convert("RGB")
                     resized_img.save(output, format="JPEG", quality=self.default_quality, optimize=True)
                     variant_mime = "image/jpeg"
 
@@ -194,24 +247,30 @@ class ImageService:
         self,
         db: Session,
         file: UploadFile,
-        poi_id: uuid.UUID,
+        poi_id: Optional[uuid.UUID],
         image_type: ImageType,
         user_id: Optional[uuid.UUID] = None,
         context: Optional[str] = None,
         alt_text: Optional[str] = None,
         caption: Optional[str] = None,
-        display_order: int = 0
+        display_order: int = 0,
+        parking_lot_id: Optional[uuid.UUID] = None
     ) -> Image:
-        """Upload and store image with support for both database and S3 storage"""
+        """Upload and store an image owned by a POI, a parking lot, or both.
+
+        Exactly one of ``poi_id`` / ``parking_lot_id`` is required (an OWNED lot
+        passes both, so its photo also stays in the owner POI's collection); the
+        ``ck_images_owner_present`` CHECK enforces that at the DB level too.
+        """
 
         # Validate file and extract metadata
         file_data = await self.validate_and_process_upload(file, image_type)
 
         # Check image count limits
-        await self.check_image_count(db, poi_id, image_type, context)
+        await self.check_image_count(db, poi_id, image_type, context, parking_lot_id)
 
         # Generate unique filename
-        filename = self.generate_filename(file.filename or "upload.jpg")
+        filename = self.generate_filename(file.filename or "upload.jpg", file_data["mime_type"])
 
         # Create size variants
         variants = self.create_size_variants(file_data["content"], file_data["mime_type"])
@@ -219,13 +278,14 @@ class ImageService:
         # S3 is the only storage option
         return await self._upload_to_s3(
             db, poi_id, image_type, filename, file_data, variants,
-            user_id, context, alt_text, caption, display_order, file.filename
+            user_id, context, alt_text, caption, display_order, file.filename,
+            parking_lot_id
         )
 
     async def _upload_to_s3(
         self,
         db: Session,
-        poi_id: uuid.UUID,
+        poi_id: Optional[uuid.UUID],
         image_type: ImageType,
         filename: str,
         file_data: Dict[str, Any],
@@ -235,7 +295,8 @@ class ImageService:
         alt_text: Optional[str],
         caption: Optional[str],
         display_order: int,
-        original_filename: Optional[str]
+        original_filename: Optional[str],
+        parking_lot_id: Optional[uuid.UUID] = None
     ) -> Image:
         """Upload image and variants to S3"""
 
@@ -244,13 +305,14 @@ class ImageService:
 
         try:
             # Upload original to S3
-            original_s3_key = self.generate_s3_key(poi_id, image_type, filename, "original")
+            original_s3_key = self.generate_s3_key(poi_id, image_type, filename, "original", parking_lot_id)
             original_url = await s3_client.upload_file(
                 file_data["content"],
                 original_s3_key,
                 file_data["mime_type"],
                 metadata={
                     "poi_id": str(poi_id),
+                    "parking_lot_id": str(parking_lot_id),
                     "image_type": image_type.value,
                     "size_variant": "original"
                 }
@@ -259,6 +321,7 @@ class ImageService:
             # Create original image record
             original_image = Image(
                 poi_id=poi_id,
+                parking_lot_id=parking_lot_id,
                 image_type=image_type,
                 image_context=context,
                 filename=filename,
@@ -287,7 +350,7 @@ class ImageService:
                     continue  # Already saved
 
                 # Upload variant to S3
-                variant_s3_key = self.generate_s3_key(poi_id, image_type, filename, size_name)
+                variant_s3_key = self.generate_s3_key(poi_id, image_type, filename, size_name, parking_lot_id)
                 variant_url = await s3_client.upload_file(
                     variant_data["data"],
                     variant_s3_key,
@@ -303,6 +366,7 @@ class ImageService:
                 # Create variant record
                 variant_image = Image(
                     poi_id=poi_id,
+                    parking_lot_id=parking_lot_id,
                     image_type=image_type,
                     image_context=context,
                     filename=f"{size_name}_{filename}",

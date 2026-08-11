@@ -22,6 +22,43 @@ TEST_DATABASE_URL = os.environ.get(
     "postgresql://test:test@localhost:5434/test_nearby",
 )
 
+# pytest-xdist: give each worker its own database. Every test in this suite
+# does a full DROP SCHEMA public CASCADE / create_all cycle (see db_session
+# below), so two workers sharing one database would stomp on each other.
+# Only workers (not the xdist master) have PYTEST_XDIST_WORKER set, so a
+# plain serial `pytest` run is unaffected and takes the branch below as-is.
+_xdist_worker = os.environ.get("PYTEST_XDIST_WORKER")
+if _xdist_worker:
+    from sqlalchemy import create_engine as _create_engine, text as _sqla_text
+    from sqlalchemy.engine import make_url as _make_url
+
+    _url = _make_url(TEST_DATABASE_URL)
+    _worker_db_name = f"{_url.database}_{_xdist_worker}"
+    _maintenance_engine = _create_engine(
+        _url.set(database="postgres"), isolation_level="AUTOCOMMIT"
+    )
+    try:
+        with _maintenance_engine.connect() as _conn:
+            _conn.execute(_sqla_text(f'CREATE DATABASE "{_worker_db_name}"'))
+    except Exception:
+        pass  # already exists -- created by this worker on a prior run, or a
+              # concurrent worker won the race to create it just now
+    finally:
+        _maintenance_engine.dispose()
+    TEST_DATABASE_URL = _url.set(database=_worker_db_name).render_as_string(hide_password=False)
+    # pytest-xdist's controller process imports this conftest once (with
+    # PYTEST_XDIST_WORKER unset) before forking/spawning workers, which runs
+    # the block above with _xdist_worker falsy and leaves DATABASE_URL/
+    # TEST_DATABASE_URL either unset or pointed at the unsuffixed default. That
+    # process's environment is inherited by the worker subprocess, so by the
+    # time THIS (worker) import reaches the os.environ.setdefault() calls
+    # below, the keys may already be present -- making setdefault() a no-op
+    # and silently binding the admin backend's own SessionLocal (app.database,
+    # which reads these vars at import time) to the wrong, unsuffixed
+    # database. Force them here so the worker's own values always win.
+    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+    os.environ["TEST_DATABASE_URL"] = TEST_DATABASE_URL
+
 # Admin backend settings
 os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
 # Admin's TestSettings fallback (nearby-admin core/config.py) reads TEST_DATABASE_URL

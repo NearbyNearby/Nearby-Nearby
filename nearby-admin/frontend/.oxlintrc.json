@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react"],
+  "categories": {
+    "correctness": "warn"
+  },
+  "env": {
+    "builtin": true,
+    "browser": true
+  },
+  "ignorePatterns": ["dist", "node_modules", ".vite"],
+  "rules": {
+    "no-unused-vars": "warn",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn"
+  }
+}

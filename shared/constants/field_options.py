@@ -174,6 +174,7 @@ AMENITIES_GENERAL = [
     "Lighting + Lit Pathways",
     "Lockers",
     "Lost and Found",
+    "No Drinking Water on Site",
     "No Drinking Water on Trail",
     "Outdoor Classroom",
     "Outdoor Shower",

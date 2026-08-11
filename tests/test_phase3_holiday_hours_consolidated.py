@@ -59,6 +59,31 @@ class TestHolidayHoursConsolidated:
         assert resp.status_code == 200
         assert "holiday_hours" not in resp.json()
 
+    def test_holiday_modes_stay_nested_under_hours(self, admin_client):
+        """#116 - the new per-holiday mode/note lives at hours.holidays only.
+
+        Adding richer holiday data must not tempt anything into resurrecting the
+        deprecated top-level column.
+        """
+        park = create_park(
+            admin_client,
+            name="Holiday Modes #116",
+            hours={
+                "holidays": {
+                    "christmas": {
+                        "name": "Christmas Day", "date": "12-25",
+                        "mode": "closed", "status": "closed", "note": "Reopens December 26",
+                    },
+                },
+            },
+        )
+        resp = admin_client.get(f"/api/pois/{park['id']}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "holiday_hours" not in data
+        assert data["hours"]["holidays"]["christmas"]["mode"] == "closed"
+        assert data["hours"]["holidays"]["christmas"]["note"] == "Reopens December 26"
+
     def test_legacy_top_level_holiday_hours_is_ignored(self, admin_client):
         """Sending the deprecated top-level field on create is silently dropped."""
         # Schema does not declare `holiday_hours` anymore, so Pydantic

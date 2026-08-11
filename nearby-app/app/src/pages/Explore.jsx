@@ -15,7 +15,9 @@ import {
   // WheelchairIcon removed — wheelchair_accessible column dropped (Issue #45 PR2 Migration B)
   WifiIcon,
   PetIcon,
+  formatDistanceMiles,
 } from '../components/nearby-feature/NearbyCard';
+import DirectionsModal from '../components/common/DirectionsModal';
 import { getApiUrl } from '../config';
 import { getOpenCloseStatusLabel } from '../utils/hoursUtils';
 
@@ -148,7 +150,7 @@ function exploreHasAmenity(values) {
   });
 }
 
-const ResultCard = forwardRef(function ResultCard({ poi, index, isHighlighted }, ref) {
+const ResultCard = forwardRef(function ResultCard({ poi, index, isHighlighted, onDirectionsClick }, ref) {
   const navigate = useNavigate();
   const slug = poi.slug || poi.id;
   const city = poi.address_city || poi.city || '';
@@ -171,9 +173,6 @@ const ResultCard = forwardRef(function ResultCard({ poi, index, isHighlighted },
   const lat = poi?.location?.coordinates?.[1];
   const lng = poi?.location?.coordinates?.[0];
   const statusLine = !isEvent ? exploreStatusLine(poi.hours, lat, lng) : null;
-  const directionsHref = lat && lng
-    ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
-    : null;
 
   const goDetails = () => navigate(`/poi/${slug}`);
   const stop = (e) => e.stopPropagation();
@@ -196,7 +195,7 @@ const ResultCard = forwardRef(function ResultCard({ poi, index, isHighlighted },
       {hasDistance && (
         <div className="one_search_map_result_distance">
           <span className="one_search_map_result_calculated">
-            {poi.distance.toFixed(1)} {poi.distance === 1 ? 'mile' : 'miles'}
+            {formatDistanceMiles(poi.distance)}
           </span>{' '}
           <span className="one_search_map_result_frompoint">from downtown Pittsboro</span>
         </div>
@@ -231,17 +230,15 @@ const ResultCard = forwardRef(function ResultCard({ poi, index, isHighlighted },
       )}
 
       <div className="one_search_map_result_single_buttons" onClick={stop}>
-        {directionsHref && (
-          <a
+        {lat && lng && !poi.dont_display_location && (
+          <button
+            type="button"
             className="btn_reset button btn_outline_teal btn_poi_button_1"
-            href={directionsHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={stop}
+            onClick={(e) => { stop(e); onDirectionsClick(poi); }}
           >
             <Navigation size={14} className="poi_button_icon" aria-hidden="true" style={{fill:'none'}} />
             <span className="poi_button_title">Directions</span>
-          </a>
+          </button>
         )}
         <Link
           className="btn_reset button btn_outline_teal btn_poi_button_1"
@@ -265,6 +262,8 @@ export default function Explore() {
 
   const urlQuery = searchParams.get('q') || '';
   const urlType  = searchParams.get('type') || null;
+  const urlCategory = searchParams.get('category') || null;
+  const urlCategoryLabel = searchParams.get('category_label') || null;
   const activePill = urlType || 'All';
 
   /* state ---------------------------------------------------------- */
@@ -286,6 +285,14 @@ export default function Explore() {
   // Marker click → scroll-to-card + highlight (#32)
   const [highlightedCardId, setHighlightedCardId] = useState(null);
   const cardRefs = useRef({});
+
+  // Directions modal (#109 — was linking straight to Google Maps)
+  const [showDirectionsModal, setShowDirectionsModal] = useState(false);
+  const [directionsPOI, setDirectionsPOI] = useState(null);
+  const handleDirectionsClick = useCallback((poi) => {
+    setDirectionsPOI(poi);
+    setShowDirectionsModal(true);
+  }, []);
 
   const handleMarkerClick = useCallback((poiId) => {
     setHighlightedCardId(poiId);
@@ -330,6 +337,12 @@ export default function Explore() {
           if (urlType) url += `&poi_type=${encodeURIComponent(urlType)}`;
           const res = await fetch(getApiUrl(url));
           data = res.ok ? await res.json() : [];
+        } else if (urlCategory) {
+          // Single-category mode (clicked a category chip on a POI detail page).
+          // Response shape is { category, pois }, unlike by-type's bare array.
+          const res = await fetch(getApiUrl(`api/pois/by-category/${encodeURIComponent(urlCategory)}`));
+          const json = res.ok ? await res.json() : null;
+          data = json?.pois || [];
         } else if (urlType) {
           // Single-type mode
           const res = await fetch(getApiUrl(`api/pois/by-type/${urlType}`));
@@ -355,7 +368,7 @@ export default function Explore() {
 
     fetchData();
     return () => { cancelled = true; };
-  }, [urlQuery, urlType]);
+  }, [urlQuery, urlType, urlCategory]);
 
   /* fetch event ids that match the active date filter -------------- */
   useEffect(() => {
@@ -405,9 +418,11 @@ export default function Explore() {
 
   const pageTitle = urlQuery
     ? <>Results for <span className="explore__title-q">&ldquo;{urlQuery}&rdquo;</span></>
-    : urlType
-      ? FILTER_PILLS.find((p) => p.type === urlType)?.label || 'Results'
-      : 'Explore Nearby';
+    : urlCategory
+      ? urlCategoryLabel || 'Category'
+      : urlType
+        ? FILTER_PILLS.find((p) => p.type === urlType)?.label || 'Results'
+        : 'Explore Nearby';
 
   const countLabel = !loading && filteredResults.length > 0
     ? `${filteredResults.length} ${filteredResults.length === 1 ? 'place' : 'places'}`
@@ -449,11 +464,12 @@ export default function Explore() {
     ? customDate
     : DATE_PRESETS.find((p) => p.value === dateFilter)?.label || 'Any Date';
 
-  /* map split ------------------------------------------------------ */
-  const mapCurrent = filteredResults.find((p) => p?.location?.coordinates) || null;
-  const mapOthers  = mapCurrent
-    ? filteredResults.filter((p) => p !== mapCurrent && p?.location?.coordinates)
-    : [];
+  /* map ------------------------------------------------------------ */
+  // #133: the map gets the SAME list, in the SAME order, that the cards render,
+  // so marker N is always card N. (It used to promote the first mapped result to
+  // a "current POI" gold pin and pass the rest, which shifted every number.)
+  // Explore has no current POI, so no gold pin; Map handles currentPOI={null}.
+  const hasMappedResult = filteredResults.some((p) => p?.location?.coordinates);
 
   /* render --------------------------------------------------------- */
   return (
@@ -569,9 +585,10 @@ export default function Explore() {
                       <div className="date_dropdown_custom">
                         <label className="date_dropdown_date_label">
                           <span>Pick a date</span>
+                          <span className="date_dropdown_date_field">
                           <input
                             type="date"
-                            className="date_dropdown_date_input"
+                            className={`date_dropdown_date_input${customDate ? '' : ' is-empty'}`}
                             value={customDate}
                             onChange={(e) => {
                               setCustomDate(e.target.value);
@@ -579,6 +596,8 @@ export default function Explore() {
                               setDateOpen(false);
                             }}
                           />
+                          {!customDate && <span className="date_dropdown_date_ph" aria-hidden="true">mm/dd/yyyy</span>}
+                          </span>
                         </label>
                       </div>
                     </div>
@@ -607,7 +626,7 @@ export default function Explore() {
       {/* ── Results title band ─────────────────────────────────── */}
       <div className="explore__title-band">
         <div className="wrapper_default explore__title-inner">
-          {(urlQuery || urlType) && (
+          {(urlQuery || urlType || urlCategory) && (
             <Link to="/explore" className="explore__back" aria-label="Back to all places">
               <X size={18} aria-hidden="true" color="white" />
             </Link>
@@ -648,14 +667,15 @@ export default function Explore() {
                 index={idx}
                 ref={(el) => (cardRefs.current[poi.id] = el)}
                 isHighlighted={highlightedCardId === poi.id}
+                onDirectionsClick={handleDirectionsClick}
               />
             ))}
           </div>
           <div className="map_results_layout_1_right_col">
-            {mapCurrent ? (
+            {hasMappedResult ? (
               <Map
-                currentPOI={mapCurrent}
-                nearbyPOIs={mapOthers}
+                currentPOI={null}
+                nearbyPOIs={filteredResults}
                 onMarkerClick={handleMarkerClick}
                 highlightedId={highlightedCardId}
               />
@@ -668,6 +688,18 @@ export default function Explore() {
           </div>
         </div>
       )}
+
+      <DirectionsModal
+        isOpen={showDirectionsModal && !!directionsPOI}
+        onClose={() => setShowDirectionsModal(false)}
+        poiName={directionsPOI?.name}
+        coords={
+          directionsPOI?.location?.coordinates
+            ? { lat: directionsPOI.location.coordinates[1], lng: directionsPOI.location.coordinates[0] }
+            : null
+        }
+        poi={directionsPOI}
+      />
     </div>
   );
 }

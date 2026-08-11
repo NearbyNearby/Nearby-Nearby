@@ -32,3 +32,24 @@ output "github_actions_role_arn" {
   value       = module.ecs.github_actions_role_arn
   description = "IAM role ARN for GitHub Actions — set as AWS_ROLE_TO_ASSUME secret"
 }
+
+output "db_backup_bucket_name" {
+  value       = module.backup.bucket_name
+  description = "S3 bucket holding nightly pg_dump backups"
+}
+
+output "db_backup_task_family" {
+  value       = module.backup.task_definition_family
+  description = "ECS task definition family for the nightly/on-demand DB dump"
+}
+
+# Origin TLS (Task 0.6): paste these CNAMEs into Cloudflare (DNS-only) to validate the ACM cert.
+output "origin_certificate_validation_records" {
+  value       = module.alb.origin_certificate_validation_records
+  description = "CNAME records to add in Cloudflare DNS (DNS-only) to validate the ACM origin certificate"
+}
+
+output "origin_certificate_arn" {
+  value       = module.alb.origin_certificate_arn
+  description = "ARN of the ACM certificate used by the ALB HTTPS listener"
+}

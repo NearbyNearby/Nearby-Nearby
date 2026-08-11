@@ -46,6 +46,78 @@ class TestExpandRecurringDates:
         weekdays = [d.weekday() for d in results]
         assert all(wd in (0, 4) for wd in weekdays)
 
+    def test_weekly_two_days_days_of_week_key_short_tokens(self):
+        """Issue #164: admin form writes "days_of_week" with Mon/Tue/... tokens,
+        not "days" with MO/TU/... tokens. A Wed+Sat weekly market must expand
+        to both weekdays, in order, not just the start date's weekday."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        # 2026-03-04 is a Wednesday
+        start = datetime(2026, 3, 4, 9, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "weekly", "interval": 1, "days_of_week": ["Wed", "Sat"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 3, 4, tzinfo=timezone.utc),
+            date_to=datetime(2026, 3, 17, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        weekdays = [d.weekday() for d in results]
+        assert weekdays == [2, 5, 2, 5]  # Wed, Sat, Wed, Sat (Mon=0 .. Sun=6)
+
+    def test_weekly_two_days_days_of_week_key_full_names_case_insensitive(self):
+        """Same pattern, full weekday names, mixed case."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        start = datetime(2026, 3, 4, 9, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "weekly", "interval": 1, "days_of_week": ["WEDNESDAY", "saturday"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 3, 4, tzinfo=timezone.utc),
+            date_to=datetime(2026, 3, 17, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        weekdays = [d.weekday() for d in results]
+        assert weekdays == [2, 5, 2, 5]
+
+    def test_weekly_two_days_legacy_days_key_dateutil_tokens(self):
+        """The legacy "days" key with MO/TU/... tokens must keep working."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        start = datetime(2026, 3, 4, 9, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "weekly", "interval": 1, "days": ["WE", "SA"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 3, 4, tzinfo=timezone.utc),
+            date_to=datetime(2026, 3, 17, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        weekdays = [d.weekday() for d in results]
+        assert weekdays == [2, 5, 2, 5]
+
+    def test_weekly_two_days_respects_recurrence_end_date_and_excluded_dates(self):
+        """Wed+Sat market: recurrence_end_date cuts the series short and an
+        excluded Saturday is dropped, while the other Saturdays remain."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        start = datetime(2026, 3, 4, 9, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "weekly", "interval": 1, "days_of_week": ["Wed", "Sat"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 3, 4, tzinfo=timezone.utc),
+            date_to=datetime(2026, 4, 30, 23, 59, 59, tzinfo=timezone.utc),
+            excluded_dates=["2026-03-07"],  # the first Saturday
+            recurrence_end_date=datetime(2026, 3, 18, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        dates = [d.strftime("%Y-%m-%d") for d in results]
+        # Wed 3/4, Sat 3/7 (excluded), Wed 3/11, Sat 3/14, Wed 3/18. Series ends
+        # 3/18 (recurrence_end_date); Sat 3/21 onward must not appear.
+        assert dates == ["2026-03-04", "2026-03-11", "2026-03-14", "2026-03-18"]
+
     def test_monthly_expansion(self):
         """Monthly event over 3 months should produce 3 occurrences."""
         from shared.utils.recurring_events import expand_recurring_dates

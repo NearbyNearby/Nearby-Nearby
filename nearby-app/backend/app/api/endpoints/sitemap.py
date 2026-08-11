@@ -17,10 +17,30 @@ _STATIC_PAGES = [
     ("", "weekly", "1.0"),
     ("explore", "daily", "0.9"),
     ("events-calendar", "daily", "0.8"),
+    ("updates", "weekly", "0.7"),
+    ("disaster-network", "monthly", "0.7"),
+    ("claim-business", "monthly", "0.6"),
+    ("suggest-event", "monthly", "0.6"),
+    ("community-interest", "monthly", "0.5"),
+    ("services", "monthly", "0.5"),
+    ("feedback", "monthly", "0.4"),
+    ("contact", "monthly", "0.4"),
+    ("sitemap", "monthly", "0.3"),
     ("privacy-policy", "monthly", "0.3"),
     ("terms-of-service", "monthly", "0.3"),
-    ("contact", "monthly", "0.4"),
-    ("services", "monthly", "0.5"),
+]
+
+# Update (blog) posts. These live in the frontend registry
+# (app/src/data/updates.jsx), not the database, so the slugs are mirrored here.
+# Keep in sync when a post is added or removed.
+_UPDATE_POSTS = [
+    ("rural-and-small-town-america-deserves-better-here-is-what-we-have-been-doing-about-it", "2026-06-05"),
+    ("rural-america-was-never-broken-its-just-been-overlooked", "2025-02-27"),
+    ("looking-ahead-through-2025-strengthening-rural-connections-and-opportunities", "2025-01-22"),
+    ("a-day-of-service-chatham-county-volunteer-fair", "2024-09-11"),
+    ("nearby-nearby-joins-the-ced-gro-accelerator-driving-innovation-in-tech", "2024-05-24"),
+    ("sharing-the-vision-of-nearby-nearby-featured-speaker-at-two-chatham-county-networking-events", "2024-05-24"),
+    ("from-innovation-to-impact-the-evolution-of-nearby-nearby-and-our-vision-for-the-future", "2024-05-24"),
 ]
 
 _TYPE_PREFIX = {
@@ -59,6 +79,7 @@ def sitemap_index():
     """Master sitemap index pointing to all sub-sitemaps."""
     sitemaps = [
         "sitemap-pages.xml",
+        "sitemap-updates.xml",
         "sitemap-places.xml",
         "sitemap-parks.xml",
         "sitemap-trails.xml",
@@ -93,6 +114,23 @@ def sitemap_pages():
             priority=priority,
         )
         for path, changefreq, priority in _STATIC_PAGES
+    ]
+    return _xml_response(urls)
+
+
+# ── Update (blog) posts ───────────────────────────────────────────────────────
+
+@router.get("/sitemap-updates.xml")
+def sitemap_updates():
+    """Sitemap for Update (blog) posts."""
+    urls = [
+        _url_tag(
+            loc=f"{_BASE_URL}/updates/{slug}",
+            changefreq="yearly",
+            priority="0.6",
+            lastmod=published,
+        )
+        for slug, published in _UPDATE_POSTS
     ]
     return _xml_response(urls)
 

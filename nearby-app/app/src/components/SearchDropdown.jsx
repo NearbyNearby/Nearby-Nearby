@@ -100,7 +100,9 @@ function SearchDropdown({
         <>
           <ul className="search-dropdown__list">
             {results.map((poi, index) => {
-              const typeLabel = TYPE_LABELS[poi.poi_type] || poi.poi_type;
+              // #126: show the POI's primary category (e.g. "Shopping & Retail");
+              // fall back to the generic type label when no main_category is set.
+              const badgeLabel = poi.main_category?.name || TYPE_LABELS[poi.poi_type] || poi.poi_type;
               return (
                 <li
                   key={poi.id}
@@ -112,7 +114,7 @@ function SearchDropdown({
                   <div className="search-dropdown__content">
                     <div className="search-dropdown__name-row">
                       <span className="search-dropdown__name">{poi.name}</span>
-                      <span className="search-dropdown__type-badge">{typeLabel}</span>
+                      <span className="search-dropdown__type-badge">{badgeLabel}</span>
                     </div>
                     {(poi.address_city || poi.address_state) && (
                       <div className="search-dropdown__city">

@@ -8,6 +8,17 @@ import {
   formatDayHours 
 } from '../utils/hoursFormatter';
 
+// #116 - read the holiday `mode`, falling back to the legacy `status` where the
+// old meaning of 'open' was "follows the regular schedule".
+function holidayModeLabel(holiday) {
+  const mode = holiday.mode
+    || (holiday.status === 'open' ? 'follows_regular' : holiday.status);
+  if (mode === 'closed') return 'Closed';
+  if (mode === 'open') return 'Open';
+  if (mode === 'follows_regular') return 'Follows Regular Hours';
+  return 'Modified Hours';
+}
+
 export default function HoursDisplay({ hours }) {
   if (!hours || !hours.regular) {
     return (
@@ -71,9 +82,7 @@ export default function HoursDisplay({ hours }) {
               <Group key={id} justify="space-between">
                 <Text size="sm">{holiday.name}</Text>
                 <Badge size="sm" variant="light">
-                  {holiday.status === 'closed' ? 'Closed' : 
-                   holiday.status === 'open' ? 'Regular Hours' : 
-                   'Modified Hours'}
+                  {holidayModeLabel(holiday)}
                 </Badge>
               </Group>
             ))}

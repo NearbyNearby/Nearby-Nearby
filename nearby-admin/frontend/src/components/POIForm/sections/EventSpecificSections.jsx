@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Stack, SimpleGrid, Switch, Divider, Text, Checkbox, Button,
-  TextInput, NumberInput, Card, Select, Alert, Badge, Group, Textarea
+  TextInput, NumberInput, Card, Select, Alert, Badge, Group, Textarea, FileInput
 } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
@@ -20,6 +20,15 @@ import VenueInheritanceControls from './VenueInheritanceControls';
 import useEventStatuses from '../../../hooks/useEventStatuses';
 import RescheduleModal from '../components/RescheduleModal';
 import POISearchSelect from '../../common/POISearchSelect';
+import { ImageUploadField } from '../../ImageUpload/ImageUploadField';
+
+// Short, collision-resistant id used to give each sponsor a STABLE key so its
+// uploaded logo (scoped by image_context=`sponsor_${id}`) is not reassigned
+// when sponsors are reordered or removed. Index-based keys cannot be used for
+// the image context for exactly that reason.
+function makeSponsorId() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
 
 // Flat vendor type data for the per-row Select (no group headers needed here)
 const VENDOR_TYPE_SELECT_DATA = VENDOR_TYPES.map(({ value, label }) => ({ value, label }));
@@ -79,6 +88,7 @@ export const EventVendorsSection = React.memo(function EventVendorsSection({ for
               <Stack gap="xs">
                 <POISearchSelect
                   placeholder="Search for a vendor business..."
+                  filterTypes={['BUSINESS']}
                   onSelect={(poi) => handleVendorPoiSelect(index, poi)}
                 />
                 <Select
@@ -438,6 +448,16 @@ export const EventOrganizerSection = React.memo(function EventOrganizerSection({
   function handlePoiSelect(poi) {
     form.setFieldValue('event.organizer_poi_id', poi.id);
     form.setFieldValue('event.organizer_name', poi.name);
+    // Issue #122: copy the linked POI's contact info over so it doesn't have
+    // to be re-typed. POISearchSelect includes these on its onSelect payload.
+    form.setFieldValue('event.organizer_email', poi.email || '');
+    form.setFieldValue('event.organizer_phone', poi.phone_number || '');
+    form.setFieldValue('event.organizer_website', poi.website_url || '');
+    form.setFieldValue('event.organizer_social_media', {
+      ...(form.values.event?.organizer_social_media || {}),
+      instagram: poi.instagram_username || '',
+      facebook: poi.facebook_username || '',
+    });
   }
 
   function handleLinkToggle(e) {
@@ -601,8 +621,28 @@ export const EventCostSection = React.memo(function EventCostSection({ form }) {
 });
 
 // Task 140 / Phase A5: Event Sponsors Section — with optional POI linking per sponsor row
-export const EventSponsorsSection = React.memo(function EventSponsorsSection({ form }) {
+//
+// Bug #87: the sponsor logo is now a real image upload (stored as an Image row
+// with image_type='sponsor_logo') instead of a raw URL box. Each sponsor gets a
+// STABLE `_id` so its logo is scoped by image_context=`sponsor_${_id}` and never
+// reassigned when rows are reordered or removed. The resulting image URL is
+// mirrored back onto `sponsor.logo_url` (and its id onto `sponsor.logo_image_id`)
+// so the public app (which renders `sponsor.logo_url`) keeps working unchanged.
+export const EventSponsorsSection = React.memo(function EventSponsorsSection({ form, id }) {
   const sponsors = form.values.event?.sponsors || [];
+
+  // Backfill a stable `_id` for any sponsor that lacks one (legacy rows loaded
+  // from the DB predate this field). Done once on mount / when the count grows
+  // so every row has a stable image_context key. Guarded to avoid a render loop.
+  React.useEffect(() => {
+    if (sponsors.length && sponsors.some((s) => !s._id)) {
+      form.setFieldValue(
+        'event.sponsors',
+        sponsors.map((s) => (s._id ? s : { ...s, _id: makeSponsorId() })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sponsors.length]);
 
   // Per-row toggle state: track which rows are in "POI link" mode.
   // We initialise based on whether the sponsor already has a poi_id.
@@ -613,7 +653,7 @@ export const EventSponsorsSection = React.memo(function EventSponsorsSection({ f
   function addSponsor() {
     form.setFieldValue('event.sponsors', [
       ...sponsors,
-      { name: '', url: '', logo_url: '', tier: '' },
+      { _id: makeSponsorId(), name: '', url: '', logo_url: '', logo_image_id: null, tier: '' },
     ]);
     setPoiLinkModes((prev) => [...prev, false]);
   }
@@ -652,6 +692,23 @@ export const EventSponsorsSection = React.memo(function EventSponsorsSection({ f
     form.setFieldValue('event.sponsors', updated);
   }
 
+  // Mirror the uploaded logo image (first of the scoped context) onto the
+  // sponsor so the public app's `sponsor.logo_url` keeps working. Clears both
+  // fields when the logo is deleted. Only writes when the value changes to avoid
+  // needless form updates / render churn.
+  function handleLogoImagesChange(index, images) {
+    const img = Array.isArray(images) && images.length ? images[0] : null;
+    const nextUrl = img ? (img.url || img.medium_url || img.thumbnail_url || '') : '';
+    const nextImageId = img ? img.id : null;
+    const current = sponsors[index] || {};
+    if (current.logo_url === nextUrl && current.logo_image_id === nextImageId) {
+      return;
+    }
+    const updated = [...sponsors];
+    updated[index] = { ...current, logo_url: nextUrl, logo_image_id: nextImageId };
+    form.setFieldValue('event.sponsors', updated);
+  }
+
   return (
     <Stack>
       <Text size="sm" c="dimmed" mb="md">
@@ -660,7 +717,7 @@ export const EventSponsorsSection = React.memo(function EventSponsorsSection({ f
       {sponsors.map((sponsor, index) => {
         const isPoiMode = poiLinkModes[index] ?? Boolean(sponsor.poi_id);
         return (
-          <Card key={index} withBorder p="sm" mb="xs">
+          <Card key={sponsor._id || index} withBorder p="sm" mb="xs">
             <Stack gap="xs">
               {/* Issue #51: Tier renders first in the sponsor card, required, not clearable */}
               <Select
@@ -683,10 +740,11 @@ export const EventSponsorsSection = React.memo(function EventSponsorsSection({ f
                 /* POI-linked mode: search select + tier */
                 <POISearchSelect
                   placeholder="Search for sponsor business..."
+                  filterTypes={['BUSINESS']}
                   onSelect={(poi) => handlePoiSelect(index, poi)}
                 />
               ) : (
-                /* Manual mode: name + url + logo_url */
+                /* Manual mode: name + url + logo image upload */
                 <>
                   <TextInput
                     label="Sponsor Name"
@@ -700,12 +758,45 @@ export const EventSponsorsSection = React.memo(function EventSponsorsSection({ f
                     value={sponsor.url || ''}
                     onChange={(e) => updateSponsorField(index, 'url', e.target.value)}
                   />
-                  <TextInput
-                    label="Logo URL"
-                    placeholder="https://sponsor.com/logo.png"
-                    value={sponsor.logo_url || ''}
-                    onChange={(e) => updateSponsorField(index, 'logo_url', e.target.value)}
-                  />
+
+                  {/* Bug #87: logo is a real image upload. Scoped per sponsor via
+                      the stable _id so reordering/removing never reassigns logos.
+                      The upload result is mirrored to sponsor.logo_url for the app. */}
+                  {id && sponsor._id ? (
+                    <ImageUploadField
+                      poiId={id}
+                      imageType="sponsor_logo"
+                      context={`sponsor_${sponsor._id}`}
+                      label="Sponsor Logo"
+                      description="Upload the sponsor's logo (1 image, max 5MB)"
+                      maxCount={1}
+                      onImagesChange={(images) => handleLogoImagesChange(index, images)}
+                    />
+                  ) : (
+                    /* Issue #123: the POI (and therefore the real image-upload
+                       endpoint) doesn't exist yet the instant this section
+                       renders. Rather than blocking the user, hold the picked
+                       file in form state (`_pendingLogoFile`) and upload it
+                       transparently right after the draft POI is created;
+                       see uploadPendingSponsorLogos() in usePOIHandlers.jsx,
+                       called from handleAutoCreate / handleSubmit. */
+                    <Stack gap={4}>
+                      {sponsor.logo_url ? (
+                        <Text size="xs" c="dimmed" truncate>
+                          Current logo: {sponsor.logo_url}
+                        </Text>
+                      ) : null}
+                      <FileInput
+                        label="Sponsor Logo"
+                        description="Pick the logo now. It uploads automatically once the event is saved"
+                        placeholder={sponsor._pendingLogoFile ? sponsor._pendingLogoFile.name : 'Choose image...'}
+                        accept="image/*"
+                        value={sponsor._pendingLogoFile || null}
+                        onChange={(file) => updateSponsorField(index, '_pendingLogoFile', file)}
+                        clearable
+                      />
+                    </Stack>
+                  )}
                 </>
               )}
 

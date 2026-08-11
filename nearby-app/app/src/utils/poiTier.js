@@ -35,31 +35,3 @@ export function sponsorLabel(poi) {
   }
   return 'Sponsor';
 }
-
-/**
- * Fallback chain for detail-page hero image:
- *   1. First poi.images entry with image_size_variant === 'original'
- *   2. poi.featured_image
- *   3. poi.gallery_photos[0]
- *   4. null
- */
-export function getHeroImageUrl(poi) {
-  if (!poi) return null;
-  if (Array.isArray(poi.images) && poi.images.length > 0) {
-    const original = poi.images.find((img) => img && img.image_size_variant === 'original');
-    if (original) {
-      const url = original.url || original.storage_url || original.src;
-      if (url) return url;
-    }
-  }
-  if (poi.featured_image) {
-    if (typeof poi.featured_image === 'string') return poi.featured_image;
-    return poi.featured_image.url || poi.featured_image.storage_url || null;
-  }
-  if (Array.isArray(poi.gallery_photos) && poi.gallery_photos.length > 0) {
-    const first = poi.gallery_photos[0];
-    if (typeof first === 'string') return first;
-    if (first) return first.url || first.storage_url || null;
-  }
-  return null;
-}

@@ -312,6 +312,8 @@ export const AMENITIES_GENERAL = [
   { value: 'darts',                   label: 'Darts',                              visibility: 'B+E' },
   { value: 'drive_up_pickup_area',    label: 'Drive-Up Pickup Area',               visibility: 'B+E' },
   { value: 'drinking_fountain',       label: 'Drinking Fountain',                  visibility: 'ALL', hasSubSelect: 'drinking_fountain' },
+  { value: 'no_drinking_water_on_site',  label: 'No Drinking Water on Site',        visibility: 'ALL' },
+  { value: 'no_drinking_water_on_trail', label: 'No Drinking Water on Trail',       visibility: 'PT' },
   { value: 'dump_station_rvs',        label: 'Dump Station for RVs',               visibility: 'ALL' },
   { value: 'equestrian_facilities',   label: 'Equestrian Facilities',              visibility: 'ALL', hasSubSelect: 'equestrian' },
   { value: 'equipment_storage',       label: 'Equipment Storage',                  visibility: 'ALL' },
@@ -339,7 +341,6 @@ export const AMENITIES_GENERAL = [
   { value: 'showers',                 label: 'Showers',                            visibility: 'ALL' },
   { value: 'shuttle_trolley_service', label: 'Shuttle + Trolley Service',          visibility: 'ALL' },
   { value: 'sports_on_tv',            label: 'Sports on TV',                       visibility: 'B+E' },
-  { value: 'stroller_check',          label: 'Stroller Check',                     visibility: 'ALL' },
   { value: 'vending_machines',        label: 'Vending Machines',                   visibility: 'ALL' },
   { value: 'weather_station',         label: 'Weather Station',                    visibility: 'ALL' },
   { value: 'wildlife_observation',    label: 'Wildlife Observation Platform',      visibility: 'ALL' },
@@ -402,8 +403,6 @@ export const AMENITY_SUBSELECT_OPTIONS = {
     { value: 'standard',                    label: 'Standard Drinking Fountain' },
     { value: 'bottle_refill',               label: 'Bottle Refill Station' },
     { value: 'pet_water',                   label: 'Pet Water Station' },
-    { value: 'no_drinking_water_on_site',   label: 'No Drinking Water on Site' },
-    { value: 'no_drinking_water_on_trail',  label: 'No Drinking Water on Trail',    visibility: 'PT' },
   ],
   equestrian: [
     { value: 'tie_up_hitching_post', label: 'Equestrian Tie-Up + Hitching Post' },
@@ -952,14 +951,23 @@ export const getStatusOptions = (poiType) => {
 };
 
 // Venue Inheritance Sections — which venue fields an event can inherit
+// Venue Inheritance Sections (issue #124), mirroring UI_SECTIONS in
+// shared/constants/venue_sections.py, the single source of truth for which POI
+// columns each section covers. `accordion` keys each section to the Event form
+// panel that hosts its mode control.
+// Hours is deliberately absent: an event's schedule is its own, not the venue's
+// opening hours. Stale {"hours": ...} config already stored is ignored.
 export const VENUE_INHERITANCE_SECTIONS = [
-  { value: 'address', label: 'Address & Location' },
-  { value: 'parking', label: 'Parking' },
-  { value: 'accessibility', label: 'Accessibility' },
-  { value: 'restrooms', label: 'Restrooms' },
-  { value: 'contact', label: 'Contact Info' },
-  { value: 'hours', label: 'Hours' },
-  { value: 'amenities', label: 'Amenities' },
+  { value: 'address', label: 'Address & Location', accordion: 's8-address' },
+  { value: 'parking', label: 'Parking', accordion: 's9-parking' },
+  { value: 'accessibility', label: 'Accessibility', accordion: 's10-accessibility' },
+  { value: 'restrooms', label: 'Restrooms', accordion: 's11-restrooms' },
+  { value: 'playground', label: 'Playground', accordion: 's12-playground' },
+  { value: 'amenities', label: 'Amenities', accordion: 's13-onsite-facilities' },
+  { value: 'pet_policy', label: 'Pet Policy', accordion: 's14-pets' },
+  { value: 'alcohol_smoking', label: 'Alcohol & Smoking', accordion: 's15-alcohol-smoking' },
+  // phone/email/website live in ContactSection, inside the identity panel.
+  { value: 'contact', label: 'Contact Info', accordion: 's1-identity' },
 ];
 
 // Venue Inheritance Modes — how each inherited section is used

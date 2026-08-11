@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 
 import NearbySection from '../../nearby-feature/NearbySection';
 import PhotoLightbox from '../PhotoLightbox';
-import HeroBanner from '../HeroBanner';
 import SuggestEditOverlay from '../SuggestEditOverlay';
 import PoiHeader from '../PoiHeader';
+import AccordionGroup from './AccordionGroup';
 import DirectionsModal from '../../common/DirectionsModal';
-import AttributeSections from '../AttributeSections';
-import { bespokeAutoKeysFor } from '../widgets/bespokeCoverage';
+// Auto-dump sections (Core Information / Business Details / Pricing / Metadata)
+// hidden per the POI Accordion show/hide doc — see the commented render below.
+// import AttributeSections from '../AttributeSections';
+// import { bespokeAutoKeysFor } from '../widgets/bespokeCoverage';
 
 import { getDisplayableLocation } from '../../../utils/getDisplayableLocation';
 import { isPaidTier } from '../../../utils/poiTier';
@@ -23,11 +25,12 @@ export default function POIDetailLayout({
   extraButtons,
   titleLeader,
   subtitleExtras,
-  showHero = true,
+  typeInfoBox,
   children,
   seoComponent,
   beforeHeader,
   afterMain,
+  hideStatus,
 }) {
   const [copiedCoords, setCopiedCoords] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -58,12 +61,16 @@ export default function POIDetailLayout({
   const typeLabel = _typeRaw ? _typeRaw.charAt(0).toUpperCase() + _typeRaw.slice(1).toLowerCase() : '';
 
   const handleDirections = () => setDirectionsOpen(true);
+  // Returns whether the copy landed so PoiHeader's "Copied!" flash can stay
+  // honest when the clipboard write fails (#142 item 5).
   const handleCopyCoords = async () => {
-    if (!coords) return;
-    if (await copyToClipboard(`${coords.lat}, ${coords.lng}`)) {
+    if (!coords) return false;
+    const ok = await copyToClipboard(`${coords.lat}, ${coords.lng}`);
+    if (ok) {
       setCopiedCoords(true);
       setTimeout(() => setCopiedCoords(false), 2000);
     }
+    return ok;
   };
   const handleShare = async () => {
     const url = window.location.href;
@@ -84,7 +91,6 @@ export default function POIDetailLayout({
   return (
     <div className="poi_detail_page">
       {seoComponent}
-      {showHero && <HeroBanner poi={poi} />}
 
       <div id="search_back_wrapper">
         <div id="show_back_or_breadcrumbs" className="wrapper_default">
@@ -121,20 +127,24 @@ export default function POIDetailLayout({
         extraButtons={extraButtons}
         titleLeader={titleLeader}
         subtitleExtras={subtitleExtras}
+        typeInfoBox={typeInfoBox}
+        hideStatus={hideStatus}
       />
 
       <main id="main_content" className="pb50px">
         <div className="wrapper_default">
-          {typeof children === 'function'
-            ? children({ images, openLightbox, paid, displayLoc, coords, copiedCoords })
-            : children}
+          {/* Single-open accordions: only one POI accordion open at a time */}
+          <AccordionGroup>
+            {typeof children === 'function'
+              ? children({ images, openLightbox, paid, displayLoc, coords, copiedCoords })
+              : children}
+          </AccordionGroup>
 
-          {/* Registry-driven auto fields: renders every public render==="auto"
-              field for this POI type below the bespoke sections. render!=="auto"
-              fields are excluded by groupsFor; auto fields a detail page already
-              renders in a curated section are excluded via bespokeAutoKeysFor so
-              nothing is double-rendered. */}
-          <AttributeSections poi={poi} excludeKeys={bespokeAutoKeysFor(poi?.poi_type)} />
+          {/* Registry-driven auto fields (Core Information / Business Details /
+              Pricing / Metadata) hidden per the POI Accordion show/hide doc so
+              only the bespoke, doc-specified accordions show. Restore by
+              uncommenting this line and the two imports at the top of the file.
+              <AttributeSections poi={poi} excludeKeys={bespokeAutoKeysFor(poi?.poi_type)} /> */}
         </div>
       </main>
 

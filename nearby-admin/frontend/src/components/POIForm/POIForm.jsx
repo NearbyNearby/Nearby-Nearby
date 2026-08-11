@@ -373,7 +373,7 @@ export default function POIForm() {
                     <Text fw={600}>Event Sponsors</Text>
                   </Accordion.Control>
                   <Accordion.Panel>
-                    <EventSponsorsSection form={form} />
+                    <EventSponsorsSection form={form} id={poiId} />
                   </Accordion.Panel>
                 </Accordion.Item>
               )}
