@@ -30,6 +30,7 @@ from app.models.parking_lot import ParkingLot
 from app.models.user import User
 from app.core.security import get_password_hash
 from app.crud.crud_user import get_user_by_email
+from app.schemas.category import generate_slug
 from app.crud.crud_poi import (
     compute_accessible_restroom,
     compute_icon_booleans,
@@ -123,6 +124,111 @@ def ensure_categories(db: Session):
 
 def get_category(db: Session, name: str) -> Category | None:
     return db.query(Category).filter(Category.name == name).first()
+
+
+# (name, applicable_to, parent_name, is_active)
+#
+# ensure_categories only seeds when the table is empty, and older local DBs were
+# filled from a flat snapshot, so the category tree screen renders as one long
+# list. This gives local dev a small, realistic hierarchy without duplicating
+# anything: two existing top-level categories adopt leaves they already read
+# like ("Food & Drink", "Sports Fields"), one new parent groups the outdoor
+# leaves, and one child is seeded inactive so the Inactive badge has something
+# to render. Parents are listed before their children so the name lookup always
+# resolves, which also means the spec itself cannot describe a cycle.
+CATEGORY_HIERARCHY = [
+    ("Outdoor Recreation", ["PARK", "TRAIL"], None, True),
+    ("Trail Hiking", ["TRAIL"], "Outdoor Recreation", True),
+    ("Backpacking", ["TRAIL"], "Trail Hiking", True),
+    ("Mountain Biking", ["TRAIL"], "Outdoor Recreation", True),
+    ("Park Hiking Trails", ["PARK"], "Outdoor Recreation", True),
+    ("Snowshoe & Winter Trails", ["TRAIL"], "Outdoor Recreation", False),
+    ("Food & Drink", ["BUSINESS", "EVENT"], None, True),
+    ("Restaurant & Food", ["BUSINESS"], "Food & Drink", True),
+    ("Takeout", ["BUSINESS"], "Restaurant & Food", True),
+    ("Farmers Markets", ["BUSINESS", "EVENT"], "Food & Drink", True),
+    ("Catering", ["BUSINESS"], "Food & Drink", True),
+    ("Sports Fields", ["PARK"], None, True),
+    ("Baseball Field", ["PARK"], "Sports Fields", True),
+    ("Basketball Court", ["PARK"], "Sports Fields", True),
+    ("Soccer Field", ["PARK"], "Sports Fields", True),
+    ("Tennis Court", ["PARK"], "Sports Fields", True),
+]
+
+
+def _is_descendant_of(node: Category, maybe_ancestor: Category) -> bool:
+    """True when `node` already sits somewhere under `maybe_ancestor`."""
+    seen = set()
+    while node is not None and node.id not in seen:
+        if node.id == maybe_ancestor.id:
+            return True
+        seen.add(node.id)
+        node = node.parent
+    return False
+
+
+def ensure_category_hierarchy(db: Session):
+    """Nest a handful of categories so the admin tree view has real depth.
+
+    Idempotent: categories are matched by their unique name, missing ones are
+    created, and existing ones are only touched when their parent, POI types or
+    active flag differ from the spec. POI types are widened by union so a
+    category never loses an applicability it already had.
+    """
+    created = 0
+    updated = 0
+
+    for name, applicable_to, parent_name, is_active in CATEGORY_HIERARCHY:
+        parent = get_category(db, parent_name) if parent_name else None
+        if parent_name and not parent:
+            print(f"  WARNING: parent '{parent_name}' not found; leaving '{name}' where it is.")
+            continue
+
+        category = get_category(db, name)
+        if not category:
+            category = Category(
+                name=name,
+                slug=generate_slug(name),
+                applicable_to=sorted(applicable_to),
+                parent_id=parent.id if parent else None,
+                is_active=is_active,
+                sort_order=0,
+            )
+            db.add(category)
+            db.commit()
+            created += 1
+            where = f" under {parent_name}" if parent_name else " (top level)"
+            print(f"  Created category: {name}{where}")
+            continue
+
+        if parent and _is_descendant_of(parent, category):
+            print(f"  WARNING: '{parent_name}' sits under '{name}'; skipping to avoid a cycle.")
+            continue
+
+        changes = []
+        target_parent_id = parent.id if parent else None
+        if category.parent_id != target_parent_id:
+            category.parent_id = target_parent_id
+            changes.append(f"nested under {parent_name}" if parent_name else "moved to top level")
+
+        merged_types = sorted(set(category.applicable_to or []) | set(applicable_to))
+        if merged_types != sorted(category.applicable_to or []):
+            category.applicable_to = merged_types
+            changes.append(f"POI types {', '.join(merged_types)}")
+
+        if bool(category.is_active) != is_active:
+            category.is_active = is_active
+            changes.append("marked inactive" if not is_active else "marked active")
+
+        if changes:
+            db.commit()
+            updated += 1
+            print(f"  Updated category: {name} ({'; '.join(changes)})")
+
+    if created or updated:
+        print(f"  Hierarchy: {created} categories created, {updated} updated")
+    else:
+        print("  Hierarchy already in place")
 
 
 def attach_image(
@@ -1680,6 +1786,89 @@ def create_extra_events(db: Session):
     print(f"  Created: Chatham Piedmont Storytelling Festival (slug: {festival.slug})")
 
 
+# Second column of the public Event page (#142): cost, ticketing, payment,
+# venue setting and organizer contact. Kept as an update pass rather than being
+# folded into the create dicts above, because those skip any POI that already
+# exists, so a database seeded before these fields were added would never get
+# them. Keys are POI slugs; "poi" values land on points_of_interest, "event"
+# values on the events row.
+EVENT_ENRICHMENTS = {
+    "chatham-piedmont-storytelling-festival-pittsboro": {
+        "poi": {
+            "cost": "$15",
+            "pricing_details": (
+                "<p>Day pass $15, three-day pass $35. Kids under 6 get in free, "
+                "and Chatham County students pay $5 with a school ID. The "
+                "Saturday family matinee is free to everyone, no ticket needed.</p>"
+            ),
+            "payment_methods": ["Cash", "Credit Cards", "Apple Pay", "Venmo"],
+        },
+        "event": {
+            "cost_type": "single_price",
+            "ticket_links": [
+                {"platform": "Eventbrite", "url": "https://eventbrite.example.com/e/chatham-piedmont-storytelling"},
+                {"platform": "Box Office", "url": "https://shakorihills.example.com/tickets"},
+            ],
+            "venue_settings": ["Outdoor", "Hybrid (In-Person and Online)"],
+            "organizer_name": "Shakori Hills Community Arts Center",
+            "organizer_phone": "(919) 555-0142",
+            "organizer_email": "tellers@shakorihills.example.com",
+            "organizer_website": "https://shakorihills.example.com",
+            "organizer_social_media": {
+                "facebook": "https://facebook.com/shakorihillsarts",
+                "instagram": "https://instagram.com/shakorihillsarts",
+            },
+            "contact_organizer_toggle": True,
+        },
+    },
+    "pittsboro-saturday-farmers-market-pittsboro": {
+        # cost stays "0" on purpose: it is the regression fixture for a zero
+        # amount rendering as "Free" (#142 follow-up). Setting cost_type here
+        # would short-circuit that path in formatCost, so it is left unset too.
+        "poi": {
+            "payment_methods": ["Cash", "Credit Cards", "Venmo", "Zelle"],
+        },
+        "event": {
+            "venue_settings": ["Outdoor"],
+        },
+    },
+}
+
+
+def enrich_events(db: Session):
+    """Fill in the Event page's second column on the seeded events.
+
+    Idempotent: every field is compared before it is written, so a second run
+    reports nothing to do.
+    """
+    print("\n--- Event details (cost, ticketing, payment, organizer) ---")
+
+    for slug, spec in EVENT_ENRICHMENTS.items():
+        poi = db.query(PointOfInterest).filter(PointOfInterest.slug == slug).first()
+        if not poi:
+            print(f"  WARNING: {slug} not found; skipping enrichment.")
+            continue
+        if not poi.event:
+            print(f"  WARNING: {slug} has no event row; skipping enrichment.")
+            continue
+
+        changed = []
+        for field, value in spec.get("poi", {}).items():
+            if getattr(poi, field) != value:
+                setattr(poi, field, value)
+                changed.append(field)
+        for field, value in spec.get("event", {}).items():
+            if getattr(poi.event, field) != value:
+                setattr(poi.event, field, value)
+                changed.append(field)
+
+        if changed:
+            db.commit()
+            print(f"  Enriched: {poi.name} ({len(changed)} fields: {', '.join(changed)})")
+        else:
+            print(f"  Already enriched: {poi.name}")
+
+
 def create_parking_lots(db: Session):
     """Shareable parking lots (issues #90/#161): one owned by a business, one
     standalone lot shared by two POIs with sort_order + a label, and one draft
@@ -1800,6 +1989,7 @@ def main():
 
         print("\n[2/10] Ensuring categories...")
         ensure_categories(db)
+        ensure_category_hierarchy(db)
 
         print("\n[3/10] Creating businesses...")
         create_businesses(db)
@@ -1821,6 +2011,7 @@ def main():
 
         print("\n[9/10] Creating extra events (visibility cutoffs, recurrence, sponsors, venue tie-break)...")
         create_extra_events(db)
+        enrich_events(db)
 
         print("\n[10/10] Creating parking lots...")
         create_parking_lots(db)
