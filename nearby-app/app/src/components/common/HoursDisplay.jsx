@@ -15,6 +15,8 @@ import { sanitizeHtml } from '../../utils/sanitize';
  *
  * Props:
  * - hours: JSONB hours data (new format with regular/seasonal/holidays/exceptions)
+ * - lat, lng: POI coordinates; let solar ends (dawn/dusk) render as real clock
+ *   times in the weekly grid (#174). Without them the grid keeps the bare words.
  * - appointmentLinks: Array of {title, url} for appointment services
  * - appointmentBookingUrl: Single URL string for booking
  * - appointmentRequired: Boolean flag for "appointment required" notice
@@ -26,6 +28,8 @@ import { sanitizeHtml } from '../../utils/sanitize';
  */
 function HoursDisplay({
   hours,
+  lat = null,
+  lng = null,
   appointmentLinks,
   appointmentBookingUrl,
   appointmentRequired,
@@ -38,8 +42,9 @@ function HoursDisplay({
   // instead of a grid that would read "Closed" every day.
   const noRegularHours = hours?.no_regular_hours === true;
 
-  // Get week hours using the utility function
-  const weekHours = hours ? getWeekHours(hours) : [];
+  // Get week hours using the utility function (#174: coords make solar ends
+  // render as that day's computed clock times)
+  const weekHours = hours ? getWeekHours(hours, new Date(), lat, lng) : [];
 
   // Handle legacy hours format (simple day: time strings)
   const legacyHours = !weekHours.length && hours && !noRegularHours ? formatLegacyHours(hours) : [];

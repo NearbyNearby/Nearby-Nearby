@@ -173,6 +173,10 @@ export default function PoiHeader({
 
   const hideExact = !!displayLoc.hideExact;
   const coords = hideExact ? null : getCoords(poi);
+  // GeoJSON coords feed the hours panel so dawn/dusk ends show real times (#174)
+  const _coords = poi?.location?.coordinates;
+  const _lat = Array.isArray(_coords) ? _coords[1] : null;
+  const _lng = Array.isArray(_coords) ? _coords[0] : null;
 
   const countyRaw = displayLoc.county || poi?.address_county;
   const countyFmt = countyRaw
@@ -318,6 +322,8 @@ export default function PoiHeader({
                       <div id="poi_hours_panel" className="poi_hours_panel box_style_1">
                         <HoursDisplay
                           hours={poi.hours}
+                          lat={_lat}
+                          lng={_lng}
                           appointmentBookingUrl={poi.appointment_booking_url}
                           appointmentRequired={poi.hours_but_appointment_required}
                           hoursNotes={poi.hours?.notes}
