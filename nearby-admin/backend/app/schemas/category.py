@@ -3,6 +3,8 @@ from typing import List, Optional
 from pydantic import BaseModel, model_validator, ConfigDict
 import re
 
+from app import models
+
 # Helper for slug generation (can be shared)
 def generate_slug(value: str) -> str:
     s = value.lower().strip()
@@ -10,6 +12,34 @@ def generate_slug(value: str) -> str:
     s = re.sub(r'[\s_-]+', '-', s)
     s = re.sub(r'^-+|-+$', '', s)
     return s
+
+def unique_slug(base: str, db, parent_id: Optional[uuid.UUID], exclude_id: Optional[uuid.UUID] = None) -> str:
+    """
+    Slugs stay globally unique (the public app looks categories up by slug).
+    Prefer the plain name slug; when it is taken, prefix the parent's slug
+    (hair-salon-womens); when that is taken too, append -2, -3, ...
+    exclude_id lets a rename keep its own current slug.
+    """
+    def taken(candidate: str) -> bool:
+        query = db.query(models.Category).filter(models.Category.slug == candidate)
+        if exclude_id is not None:
+            query = query.filter(models.Category.id != exclude_id)
+        return query.first() is not None
+
+    slug = base
+    if not taken(slug):
+        return slug
+    if parent_id is not None:
+        parent = db.query(models.Category).filter(models.Category.id == parent_id).first()
+        if parent is not None:
+            prefixed = f"{generate_slug(parent.slug)}-{base}"
+            if not taken(prefixed):
+                return prefixed
+            slug = prefixed
+    suffix = 2
+    while taken(f"{slug}-{suffix}"):
+        suffix += 1
+    return f"{slug}-{suffix}"
 
 class CategoryBase(BaseModel):
     name: str
@@ -25,6 +55,9 @@ class CategoryCreate(CategoryBase):
     @model_validator(mode='before')
     @classmethod
     def generate_slug_from_name(cls, values):
+        # Slug uniqueness against the DB needs a session, which the schema does
+        # not have; the plain slug is filled here and crud_category makes it
+        # unique (parent prefix, then -2/-3/...).
         if isinstance(values, dict):
             if not values.get('slug') and values.get('name'):
                 values['slug'] = generate_slug(values['name'])

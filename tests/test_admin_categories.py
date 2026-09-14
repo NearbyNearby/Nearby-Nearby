@@ -294,28 +294,56 @@ class TestSameNameUnderDifferentParents:
         })
         assert created.status_code == 201, created.text
         cat = created.json()
-        assert cat["slug"] == "rename-salon-192-woeman"
+        assert cat["slug"] == "woeman"
 
+        # Rename regenerates the slug instead of keeping "woeman".
         renamed = admin_client.put(
             f"/api/categories/{cat['id']}", json={"name": "Women's"},
         )
         assert renamed.status_code == 200, renamed.text
-        assert renamed.json()["slug"] == "rename-salon-192-womens"
+        assert renamed.json()["slug"] == "womens"
 
-        # A rename into an existing sibling slug still succeeds with a suffixed slug.
-        admin_client.post("/api/categories/", json={
+        # ...and the renamed category counts as a "Women's" sibling from now on.
+        again = admin_client.post("/api/categories/", json={
             "name": "Women's", "parent_id": salon["id"], "applicable_to": ["BUSINESS"],
         })
+        assert again.status_code == 409, again.text
+
+        # Plain slug taken, parent slug free: a second "Kids" under another
+        # parent gets the parent-prefixed slug.
+        salon2 = create_category(admin_client, name="Suffix Salon 192")
+        first_kids = admin_client.post("/api/categories/", json={
+            "name": "Kids", "parent_id": salon["id"], "applicable_to": ["BUSINESS"],
+        })
+        assert first_kids.status_code == 201, first_kids.text
+        assert first_kids.json()["slug"] == "kids"
+        second_kids = admin_client.post("/api/categories/", json={
+            "name": "Kids", "parent_id": salon2["id"], "applicable_to": ["BUSINESS"],
+        })
+        assert second_kids.status_code == 201, second_kids.text
+        assert second_kids.json()["slug"] == "suffix-salon-192-kids"
+
+        # Plain AND parent-prefixed slugs both taken: -2 suffix via rename.
         other = create_category(admin_client, name="Rename Other Salon 192")
-        created2 = admin_client.post("/api/categories/", json={
+        mens = admin_client.post("/api/categories/", json={
             "name": "Men's", "parent_id": other["id"], "applicable_to": ["BUSINESS"],
         })
-        assert created2.status_code == 201, created2.text
+        assert mens.status_code == 201, mens.text
+        blocker_plain = admin_client.post("/api/categories/", json={
+            "name": "Barber", "parent_id": salon2["id"], "applicable_to": ["BUSINESS"],
+        })
+        assert blocker_plain.status_code == 201, blocker_plain.text  # takes "barber"
+        blocker_prefixed = admin_client.post("/api/categories/", json={
+            "name": "Rename Other Salon 192 Barber",
+            "parent_id": other["id"],
+            "applicable_to": ["BUSINESS"],
+        })
+        assert blocker_prefixed.status_code == 201, blocker_prefixed.text  # takes the prefixed slug
         renamed2 = admin_client.put(
-            f"/api/categories/{created2.json()['id']}", json={"name": "Men's 2"},
+            f"/api/categories/{mens.json()['id']}", json={"name": "Barber"},
         )
         assert renamed2.status_code == 200, renamed2.text
-        assert renamed2.json()["slug"] == "rename-other-salon-192-mens-2"
+        assert renamed2.json()["slug"] == "rename-other-salon-192-barber-2"
 
 
 class TestDeleteCategory:

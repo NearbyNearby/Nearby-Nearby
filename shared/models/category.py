@@ -17,7 +17,10 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False, unique=True)
+    # Name only has to be unique among siblings (per parent_id, enforced by the
+    # ix_categories_parent_lower_name index in the DB); the same name may repeat
+    # under different parents, e.g. "Women's" under Clothing and under Hair Salon.
+    name = Column(String, nullable=False)
     slug = Column(String, nullable=False, unique=True, index=True)
 
     # For self-referencing hierarchy (subcategories) - enables infinite depth
