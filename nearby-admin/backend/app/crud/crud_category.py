@@ -16,7 +16,9 @@ def create_category(db: Session, category: schemas.CategoryCreate) -> models.Cat
         name=category.name,
         slug=category.slug,
         parent_id=category.parent_id,
-        applicable_to=category.applicable_to
+        applicable_to=category.applicable_to,
+        is_active=category.is_active,
+        sort_order=category.sort_order,
     )
     db.add(db_category)
     db.commit()
@@ -80,6 +82,27 @@ def get_category_tree_by_poi_type(db: Session, poi_type: str) -> List[schemas.Ca
 
     return root_nodes
 
+def _creates_cycle(db: Session, category_id: uuid.UUID, new_parent_id) -> bool:
+    """
+    True if making new_parent_id the parent of category_id would create a cycle
+    (the new parent is the category itself or one of its descendants).
+    Walks the ancestor chain of the proposed parent and guards against an
+    already-cyclic chain so it cannot loop forever.
+    """
+    current_id = new_parent_id
+    seen: set = set()
+    while current_id is not None:
+        if uuid.UUID(str(current_id)) == category_id:
+            return True
+        if current_id in seen:
+            break  # already-cyclic chain; stop instead of looping
+        seen.add(current_id)
+        parent = db.query(models.Category.parent_id).filter(
+            models.Category.id == current_id
+        ).scalar()
+        current_id = parent
+    return False
+
 def update_category(db: Session, category_id: uuid.UUID, category_update: schemas.CategoryUpdate) -> models.Category:
     """
     Updates an existing category.
@@ -89,8 +112,14 @@ def update_category(db: Session, category_id: uuid.UUID, category_update: schema
     if not db_category:
         raise HTTPException(status_code=404, detail="Category not found.")
 
-    # Update fields that are provided
     update_data = category_update.model_dump(exclude_unset=True)
+
+    new_parent_id = update_data.get("parent_id")
+    if new_parent_id and _creates_cycle(db, category_id, new_parent_id):
+        raise HTTPException(
+            status_code=422,
+            detail="A category cannot be nested under itself or one of its subcategories.",
+        )
 
     for field, value in update_data.items():
         setattr(db_category, field, value)
