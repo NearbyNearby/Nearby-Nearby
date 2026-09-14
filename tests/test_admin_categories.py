@@ -345,6 +345,67 @@ class TestSameNameUnderDifferentParents:
         assert renamed2.status_code == 200, renamed2.text
         assert renamed2.json()["slug"] == "rename-other-salon-192-barber-2"
 
+    def test_sibling_names_differing_only_by_underscore_both_save(self, admin_client):
+        """ILIKE treats _ as a wildcard; the exact compare must not. The false
+        clash fires when the underscore name is created second (pattern _ then
+        matches the stored hyphen)."""
+        parent = create_category(admin_client, name="Wildcard Parent 192")
+        first = admin_client.post("/api/categories/", json={
+            "name": "Kids-Nights", "parent_id": parent["id"], "applicable_to": ["BUSINESS"],
+        })
+        assert first.status_code == 201, first.text
+        second = admin_client.post("/api/categories/", json={
+            "name": "Kids_Nights", "parent_id": parent["id"], "applicable_to": ["BUSINESS"],
+        })
+        assert second.status_code == 201, second.text
+
+    def test_sibling_name_index_exists_in_test_db(self, admin_client, db_session):
+        """The per-parent case-insensitive index must exist via create_all too."""
+        from sqlalchemy import text
+        row = db_session.execute(text(
+            "SELECT indexdef FROM pg_indexes "
+            "WHERE indexname = 'ix_categories_parent_lower_name'"
+        )).fetchone()
+        assert row is not None
+        assert "lower(" in row[0] and "name" in row[0]
+        assert "COALESCE(parent_id" in row[0]
+
+    def test_rename_to_sibling_name_is_409_and_unchanged(self, admin_client):
+        parent = create_category(admin_client, name="Rename Clash Parent 192")
+        admin_client.post("/api/categories/", json={
+            "name": "Occupied", "parent_id": parent["id"], "applicable_to": ["BUSINESS"],
+        })
+        cat = admin_client.post("/api/categories/", json={
+            "name": "Renamable", "parent_id": parent["id"], "applicable_to": ["BUSINESS"],
+        }).json()
+
+        resp = admin_client.put(f"/api/categories/{cat['id']}", json={"name": "occupied"})
+        assert resp.status_code == 409, resp.text
+        assert "already exists" in resp.json()["detail"]
+
+        get_resp = admin_client.get(f"/api/categories/{cat['id']}")
+        assert get_resp.json()["name"] == "Renamable"
+        assert get_resp.json()["slug"] == cat["slug"]
+
+    def test_reparent_onto_existing_sibling_name_is_409_and_unchanged(self, admin_client):
+        old_parent = create_category(admin_client, name="Old Parent 192")
+        new_parent = create_category(admin_client, name="New Parent 192")
+        admin_client.post("/api/categories/", json={
+            "name": "Taken Name", "parent_id": new_parent["id"], "applicable_to": ["BUSINESS"],
+        })
+        cat = admin_client.post("/api/categories/", json={
+            "name": "Taken Name", "parent_id": old_parent["id"], "applicable_to": ["BUSINESS"],
+        }).json()
+
+        resp = admin_client.put(
+            f"/api/categories/{cat['id']}", json={"parent_id": new_parent["id"]},
+        )
+        assert resp.status_code == 409, resp.text
+        assert "already exists" in resp.json()["detail"]
+
+        get_resp = admin_client.get(f"/api/categories/{cat['id']}")
+        assert get_resp.json()["parent_id"] == old_parent["id"]
+
 
 class TestDeleteCategory:
     def test_delete_leaf_category(self, admin_client):

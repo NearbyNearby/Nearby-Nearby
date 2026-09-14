@@ -15,6 +15,16 @@ The Category System provides hierarchical classification for POIs. Categories su
 
 ## Data Model
 
+Category names are **unique per parent, case-insensitive** (expression index
+`ix_categories_parent_lower_name` on `COALESCE(parent_id, zero uuid)` and
+`lower(name)`), so the same name can exist under different parents ("Women's"
+under Clothing and under Hair Salon) but not twice under the same parent or as
+two same-named roots. Slugs stay **globally unique** because the public app
+looks categories up by slug; on a slug clash the parent's slug is prefixed,
+then `-2`, `-3`, ... are appended. A rename regenerates the slug the same way.
+Creating or updating a category into a sibling-name clash returns HTTP 409
+with a readable message.
+
 ```python
 # nearby-admin/backend/app/models/category.py
 
@@ -27,6 +37,9 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Unique per parent, case-insensitive (ix_categories_parent_lower_name);
+    # the same name may repeat under different parents, e.g. "Women's" under
+    # both Clothing and Hair Salon.
     name = Column(String(100), nullable=False)
     slug = Column(String(100), unique=True)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"))
@@ -104,7 +117,10 @@ def create_category(db: Session, category: CategoryCreate) -> Category:
     """Create a new category with auto-generated slug."""
     slug = slugify(category.name)
 
-    # Ensure unique slug
+    # Ensure unique slug: slugs stay globally unique (public app URLs look
+    # categories up by slug). When the plain slug is taken, the parent's slug
+    # is prefixed (hair-salon-womens); when that is taken too, -2, -3, ...
+    # are appended. A rename regenerates the slug the same way.
     existing = db.query(Category).filter(Category.slug == slug).first()
     if existing:
         slug = f"{slug}-{uuid.uuid4().hex[:6]}"

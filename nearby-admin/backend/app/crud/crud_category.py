@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from fastapi import HTTPException
 from typing import List, Dict
 import uuid
@@ -30,9 +31,11 @@ def get_category(db: Session, category_id: str) -> models.Category:
 
 
 def create_category(db: Session, category: schemas.CategoryCreate) -> models.Category:
+    # Exact case-insensitive compare: ILIKE would treat "_" and "%" in the
+    # name as wildcards and falsely clash e.g. "Kids_Nights" with "Kids-Nights".
     clash = db.query(models.Category).filter(
         models.Category.parent_id == category.parent_id,
-        models.Category.name.ilike(category.name),
+        func.lower(models.Category.name) == category.name.lower(),
     ).first()
     if clash:
         _raise_sibling_clash(db, category.name, category.parent_id)
@@ -154,6 +157,19 @@ def update_category(db: Session, category_id: uuid.UUID, category_update: schema
     # A rename regenerates the slug (the update schema has no slug field) so
     # "Woeman" renamed to "Women's" does not keep the woeman slug.
     effective_parent_id = new_parent_id if "parent_id" in update_data else db_category.parent_id
+    if "name" in update_data or ("parent_id" in update_data and new_parent_id != db_category.parent_id):
+        # Same readable pre-check as create, excluding the category itself:
+        # a rename must not take a sibling's name (any case), and reparenting
+        # must not land on a parent that already has a child with this name.
+        new_name = update_data.get("name", db_category.name)
+        clash = db.query(models.Category).filter(
+            models.Category.id != category_id,
+            models.Category.parent_id == effective_parent_id,
+            func.lower(models.Category.name) == new_name.lower(),
+        ).first()
+        if clash:
+            _raise_sibling_clash(db, new_name, effective_parent_id)
+
     if "name" in update_data:
         update_data["slug"] = schemas.category.unique_slug(
             schemas.category.generate_slug(update_data["name"]),
