@@ -38,7 +38,7 @@ export const updates = [
     slug: 'a-day-of-service-chatham-county-volunteer-fair',
     title: "A Day of Service: Chatham County Volunteer Fair",
     dateLabel: 'September 11, 2024',
-    image: '/media/featured-image-a-day-of-service-chatham-county-volunteer-fair-01.webp',
+    image: '/media/featured-image-a-day-of-service-chatham-county-volunteer-fair-02.webp',
     excerpt: "On September 11th, the Chatham County Community Engagement Task Force hosted a Day of Service, connecting 22 local organizations with over 60 attendees eager to volunteer. The event showcased various ways to serve the community.…",
     Component: DayOfServiceVolunteerFair,
   },

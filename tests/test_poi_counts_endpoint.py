@@ -6,6 +6,8 @@ Verifies that the endpoint returns correct counts by type and by amenity
 counted.  Routes are exercised via the nearby-app TestClient (app_client).
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from conftest import (
     orm_create_business,
@@ -147,3 +149,40 @@ class TestPoiCountsByAmenity:
         data = resp.json()
 
         assert data["by_amenity"]["pet_friendly"] == 3
+
+
+class TestPoiCountsMatchExplore:
+    """#175: each homepage tile links to Explore, so it counts what Explore lists."""
+
+    def test_past_and_cancelled_events_are_not_counted(self, db_session, app_client):
+        soon = datetime.now(timezone.utc) + timedelta(days=30)
+        past = datetime.now(timezone.utc) - timedelta(days=30)
+        orm_create_event(
+            db_session, name="Upcoming Event", published=True,
+            event_fields={"start_datetime": soon},
+        )
+        orm_create_event(
+            db_session, name="Past Event", published=True, icon_pet_friendly=True,
+            event_fields={"start_datetime": past},
+        )
+        orm_create_event(
+            db_session, name="Canceled Event", published=True,
+            event_fields={"start_datetime": soon, "event_status": "Canceled"},
+        )
+        db_session.commit()
+
+        data = app_client.get("/api/pois/counts").json()
+        assert data["by_type"]["EVENT"] == 1
+        assert data["by_amenity"]["pet_friendly"] == 0
+        listed = app_client.get("/api/pois/by-type/EVENT").json()
+        assert [row["name"] for row in listed] == ["Upcoming Event"]
+
+    def test_hidden_location_pois_are_not_counted(self, db_session, app_client):
+        orm_create_business(db_session, name="Shown Biz", published=True)
+        orm_create_business(
+            db_session, name="Hidden Biz", published=True, dont_display_location=True,
+        )
+        db_session.commit()
+
+        data = app_client.get("/api/pois/counts").json()
+        assert data["by_type"]["BUSINESS"] == 1

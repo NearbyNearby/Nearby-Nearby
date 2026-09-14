@@ -502,7 +502,7 @@ export const usePOIHandlers = (id, isEditing, form, setPoiId) => {
 
     // Add required subtype data based on POI type
     if (poiType === 'BUSINESS') {
-      minimalPOI.business = { price_range: '$' };
+      minimalPOI.business = {};
     } else if (poiType === 'PARK') {
       minimalPOI.park = { drone_usage_policy: '' };
     } else if (poiType === 'TRAIL') {

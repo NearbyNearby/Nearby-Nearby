@@ -4,7 +4,7 @@ import { Container, Title, Text, SimpleGrid, Paper, Group, Badge, Button, Image,
 import { IconShare, IconHeart, IconMapPin, IconPhone, IconMail, IconWorldWww, IconCheck, IconArrowRight, IconCurrentLocation, IconClock, IconCar, IconInfoCircle, IconCamera, IconMap, IconBuilding, IconTree, IconRoute, IconCalendar, IconLink } from '@tabler/icons-react';
 import api from '../utils/api';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Popup, Tooltip as LeafletTooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Tooltip as LeafletTooltip, AttributionControl } from 'react-leaflet';
 import { createCustomIcon, getPoiColor, legendData, createTooltipText, getIconSymbol } from '../utils/mapUtils';
 import RelationshipManager from '../components/RelationshipManager';
 
@@ -205,8 +205,13 @@ const NearbyMap = ({ poi }) => {
 
     return (
         <Box style={{ position: 'relative' }}>
-            <MapContainer center={centerPosition} zoom={13} style={{ height: '400px', width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <MapContainer center={centerPosition} zoom={13} style={{ height: '400px', width: '100%', borderRadius: '12px', overflow: 'hidden' }} attributionControl={false}>
+                {/* #102: Leaflet's default prefix is "🇺🇦 Leaflet"; drop the flag, keep the credit. */}
+                <AttributionControl position="bottomright" prefix="Leaflet" />
+                <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                />
                 {/* Current POI Marker */}
                 <Marker position={centerPosition} icon={L.divIcon({
                     html: `

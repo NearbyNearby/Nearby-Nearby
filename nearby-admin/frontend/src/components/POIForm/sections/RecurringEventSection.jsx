@@ -76,14 +76,33 @@ function formatTimeLabel(hm) {
   return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
+// Local midnight of the Monday that starts `date`'s week.
+function mondayOf(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
+}
+
+// The last minute of the series' end day, read as a local calendar date.
+function endOfDay(value) {
+  if (!value) return null;
+  const ymd = typeof value === 'string' ? value.slice(0, 10) : dateToLocalYMD(value);
+  const d = ymdHmToDate(ymd, '23:59');
+  return d && !isNaN(d.getTime()) ? d : null;
+}
+
+// The preview lists this many dates, and "Show more dates" adds this many.
+const PREVIEW_PAGE = 10;
+
 // ---------------------------------------------------------------------------
 // Preview calculation helper — returns up to `limit` future occurrence Dates
 // starting from `startDate`, applying the given repeat_pattern and skipping
-// any dates found in `excludedDates`.
+// any dates found in `excludedDates`. Dates before `from` are skipped and
+// nothing after `until` (the series end) is returned.
 //
 // Kept intentionally simple — no rrule dependency.
 // ---------------------------------------------------------------------------
-function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit = 5) {
+function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit = 5, { from = null, until = null } = {}) {
   if (!startDate || !pattern?.frequency) return [];
 
   const excluded = new Set(
@@ -105,27 +124,35 @@ function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit 
   // Ensure we start from the next valid occurrence after startDate
   cursor.setHours(startDate.getHours ? startDate.getHours() : 0);
 
-  // Safety cap — never iterate more than 1 000 steps to prevent infinite loops
-  const MAX_ITERATIONS = 1000;
-  let iterations = 0;
+  // Stop at the series end, and never look more than 60 months (the server's
+  // expansion cap) past today, or the start if later, so an open-ended series
+  // ends the loop too, however long ago it began.
+  const horizon = new Date(from && from > startDate ? from : startDate);
+  horizon.setMonth(horizon.getMonth() + 60);
+  const stopAt = until && until < horizon ? until : horizon;
 
-  while (results.length < limit && iterations < MAX_ITERATIONS) {
-    iterations++;
-
+  while (results.length < limit && cursor <= stopAt) {
     // Advance cursor by one unit *before* the first check so we don't include
     // the start date itself (it's the "current" event, not a future occurrence).
     const candidate = new Date(cursor);
 
-    // Should this candidate be skipped based on days_of_week?
+    // Should this candidate be skipped based on days_of_week and the week
+    // interval? Weeks run Monday to Sunday, matching the public site's resolver
+    // and the server's rrule; "biweekly" is weekly at twice the interval.
     let include = true;
 
-    if (WEEKLY_FREQUENCIES.includes(frequency) && daysOfWeek.length > 0) {
-      const candidateDay = candidate.getDay(); // 0=Sun
-      const selectedIndices = daysOfWeek.map((d) => dayMap[d]).filter((i) => i !== undefined);
-      include = selectedIndices.includes(candidateDay);
+    if (WEEKLY_FREQUENCIES.includes(frequency)) {
+      const selectedIndices = daysOfWeek.length > 0
+        ? daysOfWeek.map((d) => dayMap[d]).filter((i) => i !== undefined)
+        : [startDate.getDay()];
+      const weekStep = frequency === 'biweekly' ? interval * 2 : interval;
+      const weeksSinceStart = Math.round(
+        (mondayOf(candidate) - mondayOf(startDate)) / (7 * 24 * 60 * 60 * 1000)
+      );
+      include = selectedIndices.includes(candidate.getDay()) && weeksSinceStart % weekStep === 0;
     }
 
-    if (include && !excluded.has(candidate.toDateString())) {
+    if (include && !(from && candidate < from) && !excluded.has(candidate.toDateString())) {
       results.push(new Date(candidate));
     }
 
@@ -135,21 +162,10 @@ function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit 
         cursor.setDate(cursor.getDate() + interval);
         break;
       case 'weekly':
-        // For weekly with day selection, step one day at a time so we can
-        // hit each selected weekday within the same week
-        cursor.setDate(cursor.getDate() + 1);
-        break;
       case 'biweekly':
-        // Same as weekly — step daily but the outer interval semantics are
-        // encoded by stepping two calendar weeks when no specific day matched
-        // within the current week.  Simplify: step 1 day and let the
-        // days_of_week filter do the work; after finishing the week, skip
-        // the next week.
+        // Step one day at a time; the include check above picks the selected
+        // weekdays in the right weeks.
         cursor.setDate(cursor.getDate() + 1);
-        // If we just moved into a new week (Mon), skip the alternate week
-        if (cursor.getDay() === 1 && interval > 1) {
-          cursor.setDate(cursor.getDate() + 7);
-        }
         break;
       case 'monthly':
         cursor.setMonth(cursor.getMonth() + interval);
@@ -193,6 +209,7 @@ export default function RecurringEventSection({ form }) {
   const [pendingManualDate, setPendingManualDate] = useState(null);
   const [pendingManualStart, setPendingManualStart] = useState('');
   const [pendingManualEnd, setPendingManualEnd] = useState('');
+  const [previewCount, setPreviewCount] = useState(PREVIEW_PAGE);
 
   const isRepeating = form.values.event?.is_repeating || false;
   const pattern = form.values.event?.repeat_pattern || {};
@@ -319,15 +336,22 @@ export default function RecurringEventSection({ form }) {
     );
   }
 
-  // Compute preview occurrences
-  const previewOccurrences =
+  // Compute preview occurrences: upcoming dates only (#186), through the
+  // series end, one extra to know whether "Show more dates" has more to show.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcoming =
     isRepeating && startDatetime
       ? calculateNextOccurrences(
           startDatetime instanceof Date ? startDatetime : new Date(startDatetime),
           pattern,
-          excludedDates
+          excludedDates,
+          previewCount + 1,
+          { from: today, until: endOfDay(recurrenceEndDate) }
         )
       : [];
+  const previewOccurrences = upcoming.slice(0, previewCount);
+  const hasMoreOccurrences = upcoming.length > previewCount;
 
   const showDaysOfWeek = isRepeating && WEEKLY_FREQUENCIES.includes(frequency);
 
@@ -635,6 +659,15 @@ export default function RecurringEventSection({ form }) {
                     </Group>
                   );
                 })
+              )}
+              {hasMoreOccurrences && (
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  onClick={() => setPreviewCount((n) => n + PREVIEW_PAGE)}
+                >
+                  Show more dates
+                </Button>
               )}
             </Stack>
           </Card>

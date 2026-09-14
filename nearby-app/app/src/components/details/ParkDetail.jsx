@@ -22,6 +22,7 @@ function buildSections(poi, helpers) {
   const {
     displayLoc, handleDirections, handleCopyAddress, handleCopyCoords,
     copiedAddress, copiedCoords, handleCopyPhone, copiedPhone, handleCopyEmail, copiedEmail,
+    _lat, _lng,
   } = helpers;
 
   const out = [];
@@ -65,6 +66,8 @@ function buildSections(poi, helpers) {
             {/* Issue #70: holiday_hours top-level field removed; holidays live in hours.holidays */}
             <HoursDisplay
               hours={poi.hours}
+              lat={_lat}
+              lng={_lng}
               appointmentBookingUrl={poi.appointment_booking_url}
               appointmentRequired={poi.hours_but_appointment_required}
               hoursNotes={poi.hours?.notes}
@@ -468,7 +471,7 @@ export default function ParkDetail({ poi }) {
   ]);
   const sections = buildSections(poi, {
     displayLoc, handleDirections, handleCopyAddress, handleCopyCoords, copiedAddress, copiedCoords,
-    handleCopyPhone, copiedPhone, handleCopyEmail, copiedEmail,
+    handleCopyPhone, copiedPhone, handleCopyEmail, copiedEmail, _lat, _lng,
   }).filter((s) => !HIDDEN_ACCORDIONS.has(s.id));
 
   return (

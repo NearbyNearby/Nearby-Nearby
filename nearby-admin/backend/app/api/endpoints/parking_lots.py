@@ -312,6 +312,10 @@ def share_lot_from_poi(
     link would list the lot twice there. Idempotent: re-sharing a lot with the
     same (case-insensitive, trimmed) name within 25 metres returns the
     existing lot with 200 instead of creating a duplicate.
+
+    The lot itself is created published: the public read already hides a lot
+    whose owner is unpublished, so its visibility follows the owner (copying
+    the owner's draft status would leave it hidden after the owner publishes).
     """
     poi = db.query(PointOfInterest).filter(PointOfInterest.id == poi_id).first()
     if poi is None:
@@ -350,7 +354,7 @@ def share_lot_from_poi(
         accessible_parking_details=obj_in.accessible_parking_details or [],
         notes=obj_in.notes,
         what3words=obj_in.w3w,
-        publication_status=poi.publication_status or "draft",
+        publication_status="published",
     )
     _set_geom(lot, obj_in.lat, obj_in.lng)
 

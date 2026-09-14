@@ -523,8 +523,19 @@ def _serialize_detail_response(db: Session, db_poi, images: list):
 @router.get("/pois/counts")
 def api_get_poi_counts(db: Session = Depends(get_db)):
     """Return published POI counts by type and by amenity (pet-friendly / icon_wheelchair_accessible)."""
+    from sqlalchemy.orm import joinedload
     POI = models.poi.PointOfInterest
-    base = db.query(POI).filter(POI.publication_status == 'published')
+    base = db.query(POI).filter(
+        POI.publication_status == 'published',
+        POI.dont_display_location.isnot(True),
+    )
+    # #175: each tile links to Explore, which hides past and cancelled events,
+    # so count the same set.
+    events = base.filter(POI.poi_type == 'EVENT').options(joinedload(POI.event)).all()
+    shown = {p.id for p in _exclude_past_and_cancelled_events(events)}
+    hidden = [p.id for p in events if p.id not in shown]
+    if hidden:
+        base = base.filter(POI.id.notin_(hidden))
     by_type = {
         t: base.filter(POI.poi_type == t).count()
         for t in ['BUSINESS', 'PARK', 'TRAIL', 'EVENT']
@@ -590,7 +601,9 @@ def api_get_nearby_pois(
     ).options(
         joinedload(models.poi.PointOfInterest.event)
     ).filter(
-        models.poi.PointOfInterest.publication_status == 'published'
+        models.poi.PointOfInterest.publication_status == 'published',
+        # #130: a POI that hides its location is only findable by search.
+        models.poi.PointOfInterest.dont_display_location.isnot(True),
     ).order_by(
         # Tie-break on id so equidistant POIs keep a stable order and the
         # limit-20 cut is deterministic (#160).
@@ -759,7 +772,9 @@ def api_get_pois_by_category(
         models.poi.poi_category_association
     ).filter(
         models.poi.poi_category_association.c.category_id == category.id,
-        models.poi.PointOfInterest.publication_status == 'published'
+        models.poi.PointOfInterest.publication_status == 'published',
+        # #130: a POI that hides its location is only findable by search.
+        models.poi.PointOfInterest.dont_display_location.isnot(True),
     ).all()
 
     # Filter past/cancelled events
@@ -824,7 +839,9 @@ def api_get_pois_by_type(
         joinedload(models.poi.PointOfInterest.event)
     ).filter(
         models.poi.PointOfInterest.poi_type == poi_type.upper(),
-        models.poi.PointOfInterest.publication_status == 'published'
+        models.poi.PointOfInterest.publication_status == 'published',
+        # #130: a POI that hides its location is only findable by search.
+        models.poi.PointOfInterest.dont_display_location.isnot(True),
     ).all()
 
     # Filter past/cancelled events

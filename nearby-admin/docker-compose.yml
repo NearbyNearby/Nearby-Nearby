@@ -1,7 +1,7 @@
 services:
   # --- MINIO S3 STORAGE ---
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     container_name: nearby-minio
     ports:
       - "9000:9000"      # S3 API

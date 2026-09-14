@@ -116,28 +116,34 @@ function* ruleOccurrences(start, pattern, horizon) {
   const frequency = String(pattern?.frequency || '').trim().toLowerCase();
   const interval = Math.max(1, Number(pattern?.interval) || 1);
 
-  if (frequency === 'weekly') {
+  if (frequency === 'weekly' || frequency === 'biweekly') {
     // Mirror shared/utils/recurring_events.py: `days_of_week or days`, where a
     // present-but-EMPTY days_of_week array is falsy and falls through to days.
     // Plain `||` would not do that here, since [] is truthy in JS.
     const daysOfWeek = pattern?.days_of_week;
     const hasDays = Array.isArray(daysOfWeek) ? daysOfWeek.length > 0 : Boolean(daysOfWeek);
     const rawDays = hasDays ? daysOfWeek : (pattern?.days || []);
+    // Weeks run Monday to Sunday, like the admin's day chips and dateutil's
+    // rrule (wkst=MO), so an every-other-week Sat + Sun pair stays together.
+    const fromMonday = (dow) => (dow + 6) % 7;
     const days = [...new Set(
       (Array.isArray(rawDays) ? rawDays : [rawDays])
         .map(toWeekdayIndex)
-        .filter((d) => d !== null),
+        .filter((d) => d !== null)
+        .map(fromMonday),
     )].sort((a, b) => a - b);
-    const weekdays = days.length > 0 ? days : [start.getDay()];
+    const weekdays = days.length > 0 ? days : [fromMonday(start.getDay())];
+    // "biweekly" is the admin's "Every 2 Weeks": weekly at twice the interval.
+    const weekStep = frequency === 'biweekly' ? interval * 2 : interval;
     for (let week = 0; week < MAX_STEPS; week += 1) {
       const weekBase = new Date(
         start.getFullYear(), start.getMonth(),
-        start.getDate() - start.getDay() + week * interval * 7,
+        start.getDate() - fromMonday(start.getDay()) + week * weekStep * 7,
       );
       if (weekBase > horizon) return;
-      for (const dow of weekdays) {
+      for (const offset of weekdays) {
         const day = new Date(
-          weekBase.getFullYear(), weekBase.getMonth(), weekBase.getDate() + dow,
+          weekBase.getFullYear(), weekBase.getMonth(), weekBase.getDate() + offset,
         );
         const candidate = atTimeOf(day, start);
         if (candidate >= start) yield candidate;

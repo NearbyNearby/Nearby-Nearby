@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getNextOccurrence, getEventScheduleLine } from '../eventSchedule';
+import { getNextOccurrence, getEventScheduleLine, eventOccursOnDate } from '../eventSchedule';
 
 /**
  * Issue #141 — clicking a recurring event landed on the FIRST occurrence of the
@@ -83,6 +83,29 @@ describe('getNextOccurrence', () => {
     });
     expect(next.start.getDate()).toBe(13);
     expect(next.start.getMonth()).toBe(7);
+  });
+
+  it('treats "biweekly" (the admin\'s Every 2 Weeks) as every other week', () => {
+    // Every 2 weeks from Thursday 2026-07-02 -> 7/16, 7/30, 8/13.
+    const next = getNextOccurrence({
+      is_repeating: true,
+      start_datetime: iso(2026, 7, 2, 15),
+      repeat_pattern: { frequency: 'biweekly', interval: 1, days_of_week: ['Thu'] },
+    });
+    expect(next.start.getDate()).toBe(13);
+    expect(next.start.getMonth()).toBe(7);
+  });
+
+  it('keeps an every-other-week Sat + Sun pair in the same week', () => {
+    // Sat 8/1 + Sun 8/2, then Sat 8/15 + Sun 8/16. Sun 8/9 is an off week.
+    const event = {
+      is_repeating: true,
+      start_datetime: iso(2026, 8, 1, 9),
+      repeat_pattern: { frequency: 'biweekly', interval: 1, days_of_week: ['Sat', 'Sun'] },
+    };
+    expect(eventOccursOnDate(event, '2026-08-02')).toBe(true);
+    expect(eventOccursOnDate(event, '2026-08-09')).toBe(false);
+    expect(eventOccursOnDate(event, '2026-08-16')).toBe(true);
   });
 
   it('supports several days per week', () => {

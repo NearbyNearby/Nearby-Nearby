@@ -137,7 +137,8 @@ const NearbyCard = forwardRef(function NearbyCard({ poi, index, totalCount = 0, 
       // Future date: show day's range only, no open/closed coloring
       const refDate = new Date(selectedDate + 'T12:00:00');
       const { hours: dayHours } = getEffectiveHoursForDate(poi.hours, refDate);
-      const formatted = dayHours ? formatDayHours(dayHours) : null;
+      // #174: coords let solar ends (dawn/dusk) render as that day's clock times
+      const formatted = dayHours ? formatDayHours(dayHours, refDate, _poiLat, _poiLng) : null;
       statusLabel = (formatted && formatted !== 'Hours not set') ? formatted : null;
     } else {
       const { variant, label } = getOpenCloseStatusLabel(poi.hours, new Date(), _poiLat, _poiLng);

@@ -434,11 +434,12 @@ function NearbySection({ currentPOI }) {
         </div>
       </div>
 
-      {/* Map Section */}
+      {/* Map Section: pins for the cards on this page only, numbered to match
+          them (page 2 shows 9-16), so the map zooms to what the list shows. */}
       <Map
         currentPOI={currentPOI}
-        nearbyPOIs={filteredNearbyPOIs}
-        radiusMiles={radiusMiles}
+        nearbyPOIs={paginatedPOIs}
+        startNumber={startIndex + 1}
         onMarkerClick={handleMarkerClick}
         highlightedId={highlightedCardId}
       />

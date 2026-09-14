@@ -123,7 +123,13 @@ def ensure_categories(db: Session):
 
 
 def get_category(db: Session, name: str) -> Category | None:
-    return db.query(Category).filter(Category.name == name).first()
+    # Fall back to the unique slug: "Food & Drink" here and the "Food + Drink"
+    # that seed_categories creates are the same category (slug food-drink), and
+    # inserting a second one violates ix_categories_slug.
+    return (
+        db.query(Category).filter(Category.name == name).first()
+        or db.query(Category).filter(Category.slug == generate_slug(name)).first()
+    )
 
 
 # (name, applicable_to, parent_name, is_active)
@@ -1759,7 +1765,7 @@ def create_extra_events(db: Session):
             "url": "https://chathambank.example.com",
             "logo_url": sponsor_logo_img.storage_url if sponsor_logo_img else "",
             "logo_image_id": str(sponsor_logo_img.id) if sponsor_logo_img else None,
-            "tier": "Gold",
+            "tier": "Tier 1",
         },
         {
             "_id": "sp-hardware",
@@ -1767,7 +1773,7 @@ def create_extra_events(db: Session):
             "url": "https://pittsborohardware.example.com",
             "logo_url": "",
             "logo_image_id": None,
-            "tier": "Silver",
+            "tier": "Tier 2",
         },
     ]
 

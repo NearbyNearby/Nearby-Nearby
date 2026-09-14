@@ -64,7 +64,7 @@ def _poi_location_lat_lng(location):
         return None, None
 
 
-def _default_missing_point_coords(entries, fallback_lat, fallback_lng):
+def _default_missing_point_coords(entries, fallback_lat, fallback_lng, skip_blank=False):
     """Default a point entry's missing lat/lng to the POI's own location.
 
     Issue #117: editors very often skip re-pinning the exact GPS position of
@@ -76,12 +76,20 @@ def _default_missing_point_coords(entries, fallback_lat, fallback_lng):
 
     Issue #179: the same data loss hits ``parking_locations`` (a lot typed
     with a name and types but no pin vanished on save), so the helper is
-    applied to that field too.
+    applied to that field too. Parking passes ``skip_blank`` so an "Add
+    Another" row left completely empty is dropped instead of becoming an
+    empty pin at the POI.
     """
     if not isinstance(entries, list) or fallback_lat is None or fallback_lng is None:
         return
     for entry in entries:
         if not isinstance(entry, dict):
+            continue
+        if skip_blank and not any(
+            value not in (None, '', [], {})
+            for key, value in entry.items()
+            if key not in ('lat', 'lng', '_pos')
+        ):
             continue
         if entry.get('lat') in (None, ''):
             entry['lat'] = fallback_lat
@@ -501,6 +509,7 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
     _default_missing_point_coords(
         _point_values.get('parking_locations'),
         poi.location.coordinates[1], poi.location.coordinates[0],
+        skip_blank=True,
     )
 
     # Sanitize HTML content in the POI data
@@ -766,7 +775,7 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
     if 'toilet_locations' in _point_values or 'parking_locations' in _point_values:
         _fallback_lat, _fallback_lng = _poi_location_lat_lng(db_obj.location)
         _default_missing_point_coords(_point_values.get('toilet_locations'), _fallback_lat, _fallback_lng)
-        _default_missing_point_coords(_point_values.get('parking_locations'), _fallback_lat, _fallback_lng)
+        _default_missing_point_coords(_point_values.get('parking_locations'), _fallback_lat, _fallback_lng, skip_blank=True)
 
     # Task 2.4: line/area geometry update (partial-update safe). A key present in
     # update_data means the client sent it: a GeoJSON dict is validated -> WKT

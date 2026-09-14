@@ -113,6 +113,14 @@ def multi_signal_search(
     exact_scores = _signal_exact_name(db, parsed.original_query, explicit_type)
     _merge_scores(candidates, "exact_name", exact_scores)
 
+    # Issue #166 follow-up: typeahead. A name that starts with the query
+    # (ignoring a leading "The", which so many listings share) scores like an
+    # exact name, so "The Liv" already suggests "The Livestock Conservancy".
+    prefix_scores = _signal_name_prefix(db, parsed.original_query, explicit_type)
+    for poi_id in prefix_scores:
+        candidates.setdefault(poi_id, {})["exact_name"] = 1.0
+    name_hits = set(exact_scores) | set(prefix_scores)
+
     keyword_scores = _signal_keyword_name(db, parsed.original_query, explicit_type)
     _merge_scores(candidates, "keyword_name", keyword_scores)
 
@@ -147,14 +155,16 @@ def multi_signal_search(
             total += signals.get(signal_name, 0.0) * weight
         scored.append((poi_id, total))
 
-    # Sort by score descending
-    scored.sort(key=lambda x: x[1], reverse=True)
+    # Sort by score descending, exact names first: a listing's actual name
+    # always wins (#166).
+    scored.sort(key=lambda x: (x[0] in exact_scores, x[1]), reverse=True)
 
-    # Dynamic threshold: drop below 20% of top score, minimum 0.05
+    # Dynamic threshold: drop below 20% of top score, minimum 0.05. Name hits
+    # (exact or prefix) always stay.
     if scored:
-        top_score = scored[0][1]
+        top_score = max(s for _, s in scored)
         threshold = max(top_score * RELATIVE_SCORE_THRESHOLD, MIN_ABSOLUTE_SCORE)
-        scored = [(pid, s) for pid, s in scored if s >= threshold]
+        scored = [(pid, s) for pid, s in scored if s >= threshold or pid in name_hits]
 
     # Limit
     scored = scored[:limit]
@@ -225,17 +235,27 @@ def _amenity_flag_results(
 # Signal functions
 # ---------------------------------------------------------------------------
 
+# A leading "The" is optional when matching names (#166): "Livestock
+# Conservancy" is the exact name of "The Livestock Conservancy".
+_LEADING_THE = r"^the\s+"
+
+
+def _bare_name(value: str) -> str:
+    return re.sub(_LEADING_THE, "", value.strip().lower())
+
+
 def _signal_exact_name(db: Session, query: str, poi_type: Optional[str]) -> dict:
-    """Exact (case-insensitive) name match. Returns score 1.0 for matches."""
+    """Exact (case-insensitive, leading "The" optional) name match. Returns
+    score 1.0 for matches."""
     type_filter = "AND poi_type = :poi_type" if poi_type else ""
     sql = text(f"""
         SELECT id::text FROM points_of_interest
         WHERE publication_status = 'published'
-        AND LOWER(name) = LOWER(:query)
+        AND regexp_replace(LOWER(name), :the_re, '') = :bare
         {type_filter}
         LIMIT 5
     """)
-    params = {"query": query}
+    params = {"bare": _bare_name(query), "the_re": _LEADING_THE}
     if poi_type:
         params["poi_type"] = poi_type
     try:
@@ -243,6 +263,32 @@ def _signal_exact_name(db: Session, query: str, poi_type: Optional[str]) -> dict
         return {row[0]: 1.0 for row in rows}
     except Exception as e:
         print(f"[SEARCH] Exact name signal error: {e}")
+        db.rollback()
+        return {}
+
+
+def _signal_name_prefix(db: Session, query: str, poi_type: Optional[str]) -> dict:
+    """Names that start with the query, both with any leading "The" dropped.
+    Needs two letters, so "The L" alone does not match every "The L..."."""
+    bare = _bare_name(query)
+    if len(bare) < 2:
+        return {}
+    type_filter = "AND poi_type = :poi_type" if poi_type else ""
+    sql = text(f"""
+        SELECT id::text FROM points_of_interest
+        WHERE publication_status = 'published'
+        AND starts_with(regexp_replace(LOWER(name), :the_re, ''), :bare)
+        {type_filter}
+        LIMIT 20
+    """)
+    params = {"bare": bare, "the_re": _LEADING_THE}
+    if poi_type:
+        params["poi_type"] = poi_type
+    try:
+        rows = db.execute(sql, params).fetchall()
+        return {row[0]: 1.0 for row in rows}
+    except Exception as e:
+        print(f"[SEARCH] Name prefix signal error: {e}")
         db.rollback()
         return {}
 

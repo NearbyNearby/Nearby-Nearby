@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // react-leaflet is stubbed so the assertions are about OUR logic (which POI gets
@@ -25,11 +25,13 @@ vi.mock('react-leaflet', () => ({
   AttributionControl: ({ prefix }) => (
     <div data-testid="attribution" data-prefix={String(prefix)} />
   ),
-  Marker: ({ icon, eventHandlers, children }) => (
+  Marker: ({ icon, eventHandlers, number, zIndexOffset, children }) => (
     <div
       data-testid="marker"
       data-icon={decodeURIComponent(icon?.options?.iconUrl || '')}
       data-icon-class={icon?.options?.className || ''}
+      data-number={String(number)}
+      data-z-index-offset={String(zIndexOffset)}
       onClick={() => eventHandlers?.click?.()}
     >
       {children}
@@ -38,6 +40,15 @@ vi.mock('react-leaflet', () => ({
   Popup: ({ children }) => <div data-testid="popup">{children}</div>,
   useMap: () => ({ fitBounds: () => {}, setView: () => {} }),
   useMapEvents: () => ({ scrollWheelZoom: { enable: () => {}, disable: () => {} } }),
+}));
+// The cluster group needs a live Leaflet map; the stub keeps its props so the
+// label function can be driven directly.
+const cluster = vi.hoisted(() => ({ props: null }));
+vi.mock('react-leaflet-cluster', () => ({
+  default: (props) => {
+    cluster.props = props;
+    return <div data-testid="marker-cluster">{props.children}</div>;
+  },
 }));
 
 import Map from '../Map.jsx';
@@ -110,6 +121,55 @@ describe('Map marker numbering (#133 / #101)', () => {
     render(<Map currentPOI={null} nearbyPOIs={[{ id: 'a', name: 'Alpha' }]} />);
     expect(screen.queryByTestId('map')).toBeNull();
     expect(screen.getByText('No location data available')).toBeInTheDocument();
+  });
+});
+
+describe('Map page numbering and overlapping pins', () => {
+  // A cluster's child markers as markercluster hands them to iconCreateFunction.
+  const fakeCluster = (numbers) => ({
+    getAllChildMarkers: () => numbers.map((number) => ({ options: { number } })),
+  });
+  const iconFor = (numbers) => cluster.props.iconCreateFunction(fakeCluster(numbers)).options;
+
+  it('numbers a later page from its first card (page 2 shows 9-12)', () => {
+    render(<Map currentPOI={null} nearbyPOIs={POIS} startNumber={9} />);
+    const markers = screen.getAllByTestId('marker');
+    expect(markers.map(markerNumber)).toEqual([9, 10, 11, 12]);
+    // The cluster label reads the same number off each marker.
+    expect(markers.map((m) => Number(m.getAttribute('data-number')))).toEqual([9, 10, 11, 12]);
+  });
+
+  it('still numbers a lone pin on a later page', () => {
+    render(<Map currentPOI={null} nearbyPOIs={[POIS[0]]} startNumber={9} />);
+    expect(markerNumber(screen.getByTestId('marker'))).toBe(9);
+  });
+
+  it('labels merged pins with the numbers inside them', () => {
+    render(<Map currentPOI={null} nearbyPOIs={POIS} />);
+    expect(iconFor([16, 14, 15, 17]).html).toBe('<span>14-17</span>');
+    expect(iconFor([3, 7]).html).toBe('<span>3, 7</span>');
+  });
+
+  it('shows a count, styled unlike a pin, when the numbers are too scattered to list', () => {
+    render(<Map currentPOI={null} nearbyPOIs={POIS} />);
+    const icon = iconFor([2, 5, 9, 12, 20]);
+    expect(icon.html).toBe('<span>5</span><small>places</small>');
+    expect(icon.className).toContain('map-marker-cluster--count');
+  });
+
+  it('keeps the current POI pin out of the cluster group', () => {
+    const current = { id: 'x', name: 'Current', location: at(-79.17, 35.72) };
+    render(<Map currentPOI={current} nearbyPOIs={POIS} />);
+    const clustered = within(screen.getByTestId('marker-cluster')).getAllByTestId('marker');
+    expect(clustered.map(markerNumber)).toEqual([1, 2, 3, 4]);
+    expect(clustered.some(isCurrentPin)).toBe(false);
+    expect(screen.getAllByTestId('marker').filter(isCurrentPin)).toHaveLength(1);
+  });
+
+  it('lifts the highlighted pin above its neighbours', () => {
+    render(<Map currentPOI={null} nearbyPOIs={POIS} highlightedId="c" />);
+    const offsets = screen.getAllByTestId('marker').map((m) => m.getAttribute('data-z-index-offset'));
+    expect(offsets).toEqual(['0', '0', '1000', '0']);
   });
 });
 

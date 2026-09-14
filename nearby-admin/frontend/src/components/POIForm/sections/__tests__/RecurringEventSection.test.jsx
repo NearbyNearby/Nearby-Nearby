@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import RecurringEventSection from '../RecurringEventSection';
@@ -50,6 +50,14 @@ function TestWrapper({ initialValues = {} }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The preview lists upcoming dates only, so pin "today" before the fixtures'
+  // March 2026 start dates. Only Date is faked; Mantine's timers stay real.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-02-15T12:00:00'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('RecurringEventSection', () => {
@@ -276,5 +284,112 @@ describe('RecurringEventSection', () => {
     // At least one occurrence date text should be rendered
     const occurrenceTexts = screen.getAllByText(/2026/);
     expect(occurrenceTexts.length).toBeGreaterThan(0);
+  });
+
+  it('previews "Every 2 Weeks" as every other week', () => {
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'biweekly', interval: 1, days_of_week: ['Tue'] },
+          start_datetime: new Date('2026-03-03T10:00:00'), // a Tuesday
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Mar 17, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Mar 31, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 10, 2026/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mar 24, 2026/)).not.toBeInTheDocument();
+  });
+
+  it('previews weekly with no days picked on the start weekday, honoring the interval', () => {
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'weekly', interval: 2, days_of_week: [] },
+          start_datetime: new Date('2026-03-03T10:00:00'), // a Tuesday
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Mar 17, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 4, 2026/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mar 10, 2026/)).not.toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // 7. Upcoming dates (#186): all of them reachable, none from the past
+  // -------------------------------------------------------------------------
+
+  it('starts the preview at today for a series that began earlier', () => {
+    vi.setSystemTime(new Date('2026-09-14T12:00:00')); // a Monday
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'weekly', interval: 1, days_of_week: ['Thu'] },
+          start_datetime: new Date('2026-05-07T17:00:00'), // a Thursday
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Sep 17, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/May 14, 2026/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sep 10, 2026/)).not.toBeInTheDocument();
+  });
+
+  it('still previews upcoming dates for a series that began over 5 years ago', () => {
+    vi.setSystemTime(new Date('2026-09-14T12:00:00')); // a Monday
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'weekly', interval: 1, days_of_week: ['Thu'] },
+          start_datetime: new Date('2019-03-07T17:00:00'), // a Thursday
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Sep 17, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/no occurrences/i)).not.toBeInTheDocument();
+  });
+
+  it('shows 10 dates of an open-ended series, and "Show more dates" adds 10 more', () => {
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'daily', interval: 1 },
+          start_datetime: new Date('2026-03-01T10:00:00'),
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Mar 10, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 11, 2026/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /show more dates/i }));
+
+    expect(screen.getByText(/Mar 20, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 21, 2026/)).not.toBeInTheDocument();
+  });
+
+  it('stops at the recurrence end date', () => {
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'daily', interval: 1 },
+          start_datetime: new Date('2026-03-01T10:00:00'),
+          recurrence_end_date: '2026-03-04',
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Mar 4, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 5, 2026/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /show more dates/i })).not.toBeInTheDocument();
   });
 });

@@ -20,6 +20,9 @@ vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }) => <div data-testid="map-container">{children}</div>,
   TileLayer: () => null,
   Marker: () => null,
+  AttributionControl: ({ prefix }) => (
+    <div data-testid="attribution" data-prefix={String(prefix)} />
+  ),
   useMap: () => mockMap,
   useMapEvents: (handlers) => {
     // expose handlers for tests that need them; return mock map
@@ -55,6 +58,13 @@ function renderMap(props = {}) {
     </MantineProvider>
   );
 }
+
+describe('LocationMap attribution', () => {
+  it('credits Leaflet without the default flag prefix (#102)', () => {
+    const { getByTestId } = renderMap();
+    expect(getByTestId('attribution').getAttribute('data-prefix')).toBe('Leaflet');
+  });
+});
 
 describe('LocationMap — MapResizeHandler', () => {
   beforeEach(() => {

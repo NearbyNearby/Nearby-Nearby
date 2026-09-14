@@ -530,3 +530,61 @@ class TestIssue166ExactNameOverridesInferredType:
 
         names = _names(_search(app_client, "riverside market", poi_type="EVENT"))
         assert "Riverside Market" not in names
+
+
+# ---------------------------------------------------------------------------
+# #166 follow-up (Rhonda, 2026-09-08): "If someone types a listing's actual
+# name, that should always win", and suggestions should kick in within the
+# first few letters, "especially since so many of our listings start with The".
+# ---------------------------------------------------------------------------
+
+class TestIssue166NameAlwaysWinsAndTypeahead:
+    def _seed(self, db):
+        target = orm_create_business(
+            db, name="The Livestock Conservancy", published=True,
+            description_long="Protecting heritage breeds of livestock and poultry.",
+        )
+        rival = orm_create_business(
+            db, name="Heritage Breeds Barn", published=True,
+            description_long="Rare breed farm tours and a petting barn.",
+        )
+        other_the = orm_create_business(db, name="The Leaf Tea House", published=True)
+        db.commit()
+        # The rival is a strong semantic match for anything; the exact-name
+        # listing is not a semantic match at all.
+        _set_embedding(db, rival.id, _vector_with_cosine(0.95, 1))
+        _set_embedding(db, target.id, _vector_with_cosine(0.20, 2))
+        _set_embedding(db, other_the.id, _vector_with_cosine(0.20, 3))
+        return target, rival
+
+    def test_exact_name_ranks_first_over_a_strong_semantic_match(
+        self, db_session, app_client
+    ):
+        self._seed(db_session)
+        app_client.app.state.embedding_client = _FixedVectorClient()
+
+        names = _names(_search(app_client, "The Livestock Conservancy"))
+        assert names[0] == "The Livestock Conservancy"
+
+    def test_leading_the_is_optional_for_an_exact_name(self, db_session, app_client):
+        self._seed(db_session)
+        app_client.app.state.embedding_client = _FixedVectorClient()
+
+        names = _names(_search(app_client, "livestock conservancy"))
+        assert names[0] == "The Livestock Conservancy"
+
+    @pytest.mark.parametrize("q", ["The Liv", "the li", "Lives"])
+    def test_a_few_letters_suggest_the_name(self, db_session, app_client, q):
+        self._seed(db_session)
+        app_client.app.state.embedding_client = _FixedVectorClient()
+
+        names = _names(_search(app_client, q))
+        assert "The Livestock Conservancy" in names
+        assert "The Leaf Tea House" not in names
+
+    def test_prefix_still_honors_an_explicit_type_filter(self, db_session, app_client):
+        self._seed(db_session)
+        app_client.app.state.embedding_client = _FixedVectorClient()
+
+        names = _names(_search(app_client, "The Liv", poi_type="EVENT"))
+        assert "The Livestock Conservancy" not in names

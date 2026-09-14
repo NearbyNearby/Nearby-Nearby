@@ -29,6 +29,7 @@ from sqlalchemy import text
 
 from conftest import (
     admin_app, create_business, create_park, orm_create_business, orm_publish_poi,
+    publish_poi,
 )
 from shared.models.image import Image
 from shared.models.parking_lot import ParkingLot, POIParkingLink
@@ -545,6 +546,10 @@ NO_PIN_ROW = {
     "accessible_parking_details": [],
     "notes": "Gravel lot behind the cafe",
 }
+BLANK_ROW = {
+    "name": "", "lat": None, "lng": None, "w3w": "",
+    "parking_types": [], "accessible_parking_details": [], "notes": "",
+}
 
 
 class TestParkingWithoutPinIsNotDropped:
@@ -593,6 +598,34 @@ class TestParkingWithoutPinIsNotDropped:
         got = admin_client.get(f"/api/pois/{biz['id']}").json()
         assert len(got["parking_locations"]) == 1
         assert got["parking_locations"][0]["name"] == "Quiltmaker Lot"
+
+    def test_blank_row_is_dropped_not_pinned(self, admin_client):
+        # An "Add Another" row left empty must not become a pin at the POI.
+        biz = create_business(
+            admin_client, name="Blank Row Biz",
+            parking_locations=[NO_PIN_ROW, BLANK_ROW],
+        )
+        assert [r["name"] for r in biz["parking_locations"]] == ["Quiltmaker Lot"]
+
+        resp = admin_client.patch(
+            f"/api/pois/{biz['id']}/autosave",
+            json={"parking_locations": [BLANK_ROW]},
+        )
+        assert resp.status_code == 200, resp.text
+        got = admin_client.get(f"/api/pois/{biz['id']}").json()
+        assert not got["parking_locations"]
+
+    def test_w3w_only_row_is_kept(self, admin_client):
+        # A what3words address is real content even when the pin never resolved.
+        row = {**BLANK_ROW, "w3w": "filled.count.soap"}
+        biz = create_business(
+            admin_client, name="W3W Row Biz", parking_locations=[row],
+        )
+        assert len(biz["parking_locations"]) == 1
+        kept = biz["parking_locations"][0]
+        assert kept["w3w"] == "filled.count.soap"
+        assert kept["lat"] == pytest.approx(35.8)
+        assert kept["lng"] == pytest.approx(-79.0)
 
 
 # --------------------------------------------------------------------------- #
@@ -699,13 +732,28 @@ class TestShareFromPoi:
         assert [e["name"] for e in public] == ["Shared Cafe Lot"]
         assert public[0]["origin"] == "linked"
 
-    def test_share_inherits_the_owner_poi_publication_status(self, admin_client):
-        poi = create_business(admin_client, name="Draft Owner Cafe")
+    def test_lot_shared_from_a_draft_goes_public_when_the_owner_publishes(
+        self, admin_client, db_session
+    ):
+        owner = create_business(admin_client, name="Draft Owner Cafe")
         lot = admin_client.post(
-            f"/api/parking-lots/share-from-poi/{poi['id']}",
+            f"/api/parking-lots/share-from-poi/{owner['id']}",
             json={"name": "Draft Lot", "lat": 35.8, "lng": -79.0},
         ).json()
-        assert lot["publication_status"] == "draft"
+        neighbor = create_business(
+            admin_client, name="Draft Lot Neighbor", published=True,
+            parking_lot_links=[lot["id"]],
+        )
+
+        # Hidden while the owner is a draft, visible once it publishes.
+        assert read_parking_lots(
+            db_session, uuid.UUID(neighbor["id"]), audience="public"
+        ) == []
+        publish_poi(admin_client, owner["id"])
+        public = read_parking_lots(
+            db_session, uuid.UUID(neighbor["id"]), audience="public"
+        )
+        assert [e["name"] for e in public] == ["Draft Lot"]
 
 
 # --------------------------------------------------------------------------- #

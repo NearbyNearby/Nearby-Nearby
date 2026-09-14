@@ -264,7 +264,7 @@ def autosave_poi(
         from app.crud.crud_poi import _poi_location_lat_lng, _default_missing_point_coords
         _fallback_lat, _fallback_lng = _poi_location_lat_lng(poi.location)
         _default_missing_point_coords(_point_values.get('toilet_locations'), _fallback_lat, _fallback_lng)
-        _default_missing_point_coords(_point_values.get('parking_locations'), _fallback_lat, _fallback_lng)
+        _default_missing_point_coords(_point_values.get('parking_locations'), _fallback_lat, _fallback_lng, skip_blank=True)
 
     # Parking lots (#90/#161): links to SHAREABLE lots persist as
     # poi_parking_links edges, not a column. Pull them out of the autosave

@@ -37,8 +37,12 @@ function resolveTime(timeObj, date, lat, lng) {
     // Guard against polar edge cases where the value may be Invalid Date
     if (!solar || isNaN(solar.getTime())) return null;
 
-    const hh = String(solar.getHours()).padStart(2, '0');
-    const mm = String(solar.getMinutes()).padStart(2, '0');
+    // #174 - fold the admin-set offset (minutes) into the solar time.
+    // Negative = before the event (e.g. -20 = 20 min before dusk).
+    const effective = new Date(solar.getTime() + (timeObj.offset || 0) * 60 * 1000);
+
+    const hh = String(effective.getHours()).padStart(2, '0');
+    const mm = String(effective.getMinutes()).padStart(2, '0');
     return `${hh}:${mm}`;
   }
 
@@ -397,15 +401,32 @@ function calculateEaster(year) {
 }
 
 // Format time from 24hr to 12hr
-export function formatTime(timeObj) {
+//
+// #174: with `date` + coordinates, a solar end (dawn/dusk) renders with the real
+// clock time for that date: "Dusk (7:45 PM)", or with the offset folded in,
+// "7:25 PM (20 min before dusk)". Without them the bare word is kept so no
+// wrong time is ever shown.
+export function formatTime(timeObj, date = null, lat = null, lng = null) {
   if (!timeObj) return '';
 
   if (timeObj.type === 'fixed' && timeObj.time) {
-    const [hours, minutes] = timeObj.time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    return `${displayHour}:${minutes} ${ampm}`;
+    return formatClock(timeObj.time);
+  }
+
+  if ((timeObj.type === 'dawn' || timeObj.type === 'dusk') && date) {
+    const word = timeObj.type === 'dawn' ? 'Dawn' : 'Dusk';
+    const resolved = resolveTime(timeObj, date, lat, lng);
+    if (resolved) {
+      const clock = formatClock(resolved);
+      const offset = Number(timeObj.offset) || 0;
+      if (offset !== 0) {
+        const mins = Math.abs(offset);
+        const relation = offset < 0 ? 'before' : 'after';
+        return `${clock} (${mins} min ${relation} ${word.toLowerCase()})`;
+      }
+      return `${word} (${clock})`;
+    }
+    return word;
   }
 
   if (timeObj.type === 'dawn') return 'Dawn';
@@ -416,8 +437,19 @@ export function formatTime(timeObj) {
   return '';
 }
 
+// Format "HH:MM" as "h:MM AM/PM" (the style the open/opens labels already use)
+function formatClock(hhmm) {
+  const [hours, minutes] = hhmm.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${displayHour}:${minutes} ${ampm}`;
+}
+
 // Format a single day's hours. Returns null when there is nothing to say.
-export function formatDayHours(hours) {
+// #174: `date` + coordinates make solar period ends render as "Dawn (6:52 AM)"
+// so the weekly grid shows that day's computed times; fixed ends stay plain.
+export function formatDayHours(hours, date = null, lat = null, lng = null) {
   if (!hours) return 'Closed';
 
   // #118 - a location with no weekly schedule never renders a day line, and
@@ -432,8 +464,16 @@ export function formatDayHours(hours) {
 
   if (hours.status === 'open' && hours.periods) {
     return hours.periods.map(period => {
-      const open = formatTime(period.open);
-      const close = formatTime(period.close);
+      const gridTime = (end) => {
+        if (end?.type === 'dawn' || end?.type === 'dusk') {
+          const word = end.type === 'dawn' ? 'Dawn' : 'Dusk';
+          const resolved = date ? resolveTime(end, date, lat, lng) : null;
+          return resolved ? `${word} (${formatClock(resolved)})` : word;
+        }
+        return formatTime(end, date, lat, lng);
+      };
+      const open = gridTime(period.open);
+      const close = gridTime(period.close);
       return `${open} - ${close}`;
     }).join(', ');
   }
@@ -640,6 +680,8 @@ function normalizeHoursData(hoursData) {
   const hasDayKey = dayKeys.some((d) => d in hoursData);
   if (!hasDayKey) return hoursData;
 
+  // "dawn"/"dusk" strings are solar ends, not clock times.
+  const toEnd = (t) => (t === 'dawn' || t === 'dusk' ? { type: t } : { type: 'fixed', time: t });
   const regular = {};
   for (const day of dayKeys) {
     const v = hoursData[day];
@@ -647,10 +689,7 @@ function normalizeHoursData(hoursData) {
     if (Array.isArray(v)) {
       const periods = v
         .filter((p) => p && p.open && p.close)
-        .map((p) => ({
-          open: { type: 'fixed', time: p.open },
-          close: { type: 'fixed', time: p.close },
-        }));
+        .map((p) => ({ open: toEnd(p.open), close: toEnd(p.close) }));
       regular[day] = periods.length ? { status: 'open', periods } : { status: 'closed' };
     } else if (typeof v === 'object') {
       if (v.closed === true || v.status === 'closed') regular[day] = { status: 'closed' };
@@ -806,8 +845,10 @@ export function getEffectiveHoursForDate(hoursData, date) {
 /**
  * Get hours for a week starting from a given date
  * Returns array of { date, dayName, hours, source, label, isToday }
+ *
+ * #174: lat/lng let each day's solar ends resolve to that day's clock times.
  */
-export function getWeekHours(hoursData, startDate = new Date()) {
+export function getWeekHours(hoursData, startDate = new Date(), lat = null, lng = null) {
   // #118 - no weekly schedule means no day grid at all.
   if (hoursData?.no_regular_hours === true) return [];
 
@@ -833,7 +874,7 @@ export function getWeekHours(hoursData, startDate = new Date()) {
       hours: effective.hours,
       formattedHours: effective.source === 'holiday_unconfirmed'
         ? HOLIDAY_UNCONFIRMED_TEXT
-        : formatDayHours(effective.hours),
+        : formatDayHours(effective.hours, date, lat, lng),
       source: effective.source,
       label: effective.label,
       note: effective.note || null,
@@ -929,7 +970,7 @@ export function isCurrentlyOpen(hoursData, lat = null, lng = null) {
         if (currentTime >= openTime || currentTime < closeTime) {
           return {
             isOpen: true,
-            status: `Open until ${formatTime(period.close)}`,
+            status: `Open until ${formatTime(period.close, now, lat, lng)}`,
             source,
             label
           };
@@ -938,7 +979,7 @@ export function isCurrentlyOpen(hoursData, lat = null, lng = null) {
         if (currentTime >= openTime && currentTime < closeTime) {
           return {
             isOpen: true,
-            status: `Open until ${formatTime(period.close)}`,
+            status: `Open until ${formatTime(period.close, now, lat, lng)}`,
             source,
             label
           };
@@ -953,7 +994,7 @@ export function isCurrentlyOpen(hoursData, lat = null, lng = null) {
       if (firstOpenTime && currentTime < firstOpenTime) {
         return {
           isOpen: false,
-          status: `Opens at ${formatTime(firstPeriod.open)}`,
+          status: `Opens at ${formatTime(firstPeriod.open, now, lat, lng)}`,
           source,
           label
         };
@@ -1017,7 +1058,7 @@ export function getNextOpenTransition(hoursData, fromDate = new Date(), lat = nu
         // On day 0 (today), skip periods whose open time is already past
         if (i === 0 && openMins != null && openMins <= currentMins) continue;
 
-        const openFormatted = formatTime(period.open);
+        const openFormatted = formatTime(period.open, checkDate, lat, lng);
         const dayNames7 = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
         const dayKey = dayNames7[checkDate.getDay()];
         const label = i === 0 ? 'Today' : (i === 1 ? 'Tomorrow' : (DAYS_FULL[dayKey] || checkDate.toLocaleDateString('en-US', { weekday: 'long' })));
@@ -1102,7 +1143,7 @@ export function getOpenCloseStatusLabel(hoursData, now = new Date(), lat = null,
         : (currentTime >= openTime && currentTime < closeTime);
 
       if (isOpen) {
-        return { variant: 'open', label: `Open until ${formatTime(period.close)}` };
+        return { variant: 'open', label: `Open until ${formatTime(period.close, now, lat, lng)}` };
       }
     }
 
@@ -1111,7 +1152,7 @@ export function getOpenCloseStatusLabel(hoursData, now = new Date(), lat = null,
     if (firstPeriod?.open) {
       const firstOpenTime = resolveTime(firstPeriod.open, now, lat, lng);
       if (firstOpenTime && currentTime < firstOpenTime) {
-        return { variant: 'opensoon', label: `Opens at ${formatTime(firstPeriod.open)}` };
+        return { variant: 'opensoon', label: `Opens at ${formatTime(firstPeriod.open, now, lat, lng)}` };
       }
     }
 

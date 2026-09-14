@@ -1,5 +1,5 @@
 import { memo, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents, AttributionControl } from 'react-leaflet';
 import { Box, Skeleton, Paper, Text, Group } from '@mantine/core';
 
 // Invalidates Leaflet's cached 0×0 dimensions when the map mounts inside a
@@ -104,7 +104,10 @@ const LocationMap = memo(({ latitude, longitude, onLocationChange }) => {
           scrollWheelZoom={false}
           zoomControl={true}
           preferCanvas={true}
+          attributionControl={false}
         >
+          {/* #102: Leaflet's default prefix is "🇺🇦 Leaflet"; drop the flag, keep the credit. */}
+          <AttributionControl position="bottomright" prefix="Leaflet" />
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

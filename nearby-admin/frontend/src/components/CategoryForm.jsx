@@ -99,8 +99,8 @@ function CategoryForm({
       parent_id: values.parent_id || null, // Ensure null is sent if empty
       applicable_to: values.poi_types,  // Map poi_types to applicable_to
     };
-    // The create endpoint ignores is_active (new categories are always active),
-    // so only send it on update where the API honours it.
+    // New categories start active (the API default), so the flag is only sent
+    // on update.
     if (isEditing) {
       payload.is_active = values.is_active;
     }

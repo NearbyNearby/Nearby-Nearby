@@ -1,12 +1,13 @@
-"""Issue #130: "Don't display location" must reach every map-bearing payload.
+"""Issue #130: "Don't display location" POIs are found by search only.
 
 A POI marked ``dont_display_location`` (service-based businesses that want to be
-found in search but not pinned on a map) still showed a marker on the Explore
-map and on the Nearby map under a POI. The frontend map already skips such POIs,
-but the flag was never emitted on the card / browse payloads those maps consume,
-so the guard could never fire.
+found in search but not pinned on a map) first leaked a marker onto the Explore
+and Nearby maps, then (once the pin was hidden) still sat in the Explore list as
+a numbered card with no pin. Rhonda: it "shouldn't show up on Explore at all. For
+now it should only show up when directly searched for."
 
-These tests pin the flag onto the browse + nearby responses.
+These tests keep such POIs out of the browse and nearby lists, and keep the flag
+on the detail and search payloads, where they still appear.
 """
 
 import pytest
@@ -49,15 +50,19 @@ def _by_name(rows, name):
     raise AssertionError(f"{name!r} not in {[r['name'] for r in rows]}")
 
 
-class TestBrowseEndpointsCarryTheFlag:
-    def test_by_type_includes_dont_display_location(self, hidden_and_visible, app_client):
+def _names(rows):
+    return {row["name"] for row in rows}
+
+
+class TestBrowseEndpointsLeaveItOut:
+    def test_by_type_excludes_dont_display_location(self, hidden_and_visible, app_client):
         resp = app_client.get("/api/pois/by-type/BUSINESS")
         assert resp.status_code == 200
         rows = resp.json()
-        assert _by_name(rows, "Hidden Location Market")["dont_display_location"] is True
+        assert "Hidden Location Market" not in _names(rows)
         assert _by_name(rows, "Visible Location Shop")["dont_display_location"] is False
 
-    def test_by_category_includes_dont_display_location(self, db_session, app_client):
+    def test_by_category_excludes_dont_display_location(self, db_session, app_client):
         cat = orm_create_category(db_session, name="Farm Services")
         hidden = orm_create_business(
             db_session, name="Category Hidden Co", published=True,
@@ -74,12 +79,12 @@ class TestBrowseEndpointsCarryTheFlag:
         resp = app_client.get(f"/api/pois/by-category/{cat.slug}")
         assert resp.status_code == 200
         rows = resp.json()["pois"]
-        assert _by_name(rows, "Category Hidden Co")["dont_display_location"] is True
+        assert "Category Hidden Co" not in _names(rows)
         assert _by_name(rows, "Category Shown Co")["dont_display_location"] is False
 
 
-class TestNearbyEndpointsCarryTheFlag:
-    def test_nearby_by_id_includes_dont_display_location(self, hidden_and_visible, db_session, app_client):
+class TestNearbyEndpointsLeaveItOut:
+    def test_nearby_by_id_excludes_dont_display_location(self, hidden_and_visible, db_session, app_client):
         origin = orm_create_park(
             db_session, name="Origin Park", published=True, slug="origin-park",
             location="POINT(-79.177500 35.720400)",
@@ -89,14 +94,14 @@ class TestNearbyEndpointsCarryTheFlag:
         resp = app_client.get(f"/api/pois/{origin.id}/nearby?radius_miles=5")
         assert resp.status_code == 200
         rows = resp.json()
-        assert _by_name(rows, "Hidden Location Market")["dont_display_location"] is True
+        assert "Hidden Location Market" not in _names(rows)
         assert _by_name(rows, "Visible Location Shop")["dont_display_location"] is False
 
-    def test_latlng_nearby_includes_dont_display_location(self, hidden_and_visible, app_client):
+    def test_latlng_nearby_excludes_dont_display_location(self, hidden_and_visible, app_client):
         resp = app_client.get("/api/nearby?latitude=35.720303&longitude=-79.177397")
         assert resp.status_code == 200
         rows = resp.json()
-        assert _by_name(rows, "Hidden Location Market")["dont_display_location"] is True
+        assert "Hidden Location Market" not in _names(rows)
         assert _by_name(rows, "Visible Location Shop")["dont_display_location"] is False
 
 
@@ -110,14 +115,17 @@ class TestDetailStillCarriesTheFlag:
 
 
 class TestSearchResultsCarryTheFlag:
-    """#130: Explore's search mode draws map pins from hybrid-search results.
+    """#130: search still finds the POI, and Explore's search mode draws map pins
+    from hybrid-search results, so the flag must ride along.
 
     The query avoids the word "market": TYPE_KEYWORDS infers poi_type EVENT
-    from it and would filter these BUSINESS fixtures out entirely.
+    from it and would filter these BUSINESS fixtures out entirely. It is also
+    not the start of either name, so neither is boosted as a name hit and both
+    come back.
     """
 
     def test_hybrid_search_results_carry_dont_display_location(self, hidden_and_visible, app_client):
-        resp = app_client.get("/api/pois/hybrid-search", params={"q": "Hidden Location"})
+        resp = app_client.get("/api/pois/hybrid-search", params={"q": "Location"})
         assert resp.status_code == 200
         rows = resp.json()
         assert _by_name(rows, "Hidden Location Market")["dont_display_location"] is True

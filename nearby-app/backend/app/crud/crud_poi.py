@@ -131,6 +131,8 @@ def get_nearby_pois(db: Session, poi_id: str, radius_miles: float = 5.0,
     ).filter(
         models.poi.PointOfInterest.id != poi_id,
         models.poi.PointOfInterest.publication_status == 'published',
+        # #130: a POI that hides its location is only findable by search.
+        models.poi.PointOfInterest.dont_display_location.isnot(True),
         distance_expr <= radius_meters
     )
     query = _apply_nearby_facets(query, facets, payment)

@@ -57,7 +57,9 @@ export default function BusinessDetail({ poi }) {
     IDEAL_FOR_GROUPS.forEach(({ key }) => { const arr = ideal[key]; if (Array.isArray(arr) && arr.length) parts.push(...arr); });
     return parts.length ? parts.join(', ') : null;
   })();
-  const costLabel = poi?.business?.price_range || poi?.price_range_per_person || poi?.pricing || null;
+  // #183: not business.price_range. The admin form never shows it, and new
+  // drafts are seeded with "$", so it surfaced as a mystery "Average Price".
+  const costLabel = poi?.price_range_per_person || poi?.pricing || null;
   const parkingLabel = Array.isArray(poi?.parking_types) && poi.parking_types.length > 0 ? poi.parking_types.join(', ') : null;
 
   const amenitiesFlat = useMemo(() => {
@@ -99,8 +101,8 @@ export default function BusinessDetail({ poi }) {
   };
 
   /* ── Accordion sections ──────────────────────────────────────── */
+  // #183: the teaser belongs on the quick card, not in About.
   const aboutCol1 = [
-    hasVal(poi?.teaser_paragraph) && <ContentGroup key="teaser"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.teaser_paragraph) }} /></ContentGroup>,
     hasVal(poi?.description_long) && <ContentGroup key="desc"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.description_long) }} /></ContentGroup>,
     goodForLabel && (
       <ContentGroup key="ideal" title="Ideal For">
@@ -117,7 +119,7 @@ export default function BusinessDetail({ poi }) {
       <ContentGroup key="hours" title="Hours">
         <div className="acc_content_text">
           {/* Issue #70: holiday_hours top-level field removed; holidays live in hours.holidays */}
-          <HoursDisplay hours={poi.hours} appointmentBookingUrl={poi.appointment_booking_url} appointmentRequired={poi.hours_but_appointment_required} hoursNotes={poi.hours?.notes} />
+          <HoursDisplay hours={poi.hours} lat={_lat} lng={_lng} appointmentBookingUrl={poi.appointment_booking_url} appointmentRequired={poi.hours_but_appointment_required} hoursNotes={poi.hours?.notes} />
         </div>
       </ContentGroup>
     ),
@@ -191,7 +193,9 @@ export default function BusinessDetail({ poi }) {
   ].filter(Boolean);
 
   const pricingCol1 = [
-    hasVal(costLabel) && <ContentGroup key="price" title="Average Price"><div className="acc_content_text">{costLabel}</div></ContentGroup>,
+    // #183: each field under its admin label, not a catch-all "Average Price".
+    hasVal(poi?.price_range_per_person) && <ContentGroup key="range" title="Price Range Per Person"><div className="acc_content_text">{poi.price_range_per_person}</div></ContentGroup>,
+    hasVal(poi?.pricing) && <ContentGroup key="general" title="General Pricing"><div className="acc_content_text">{poi.pricing}</div></ContentGroup>,
     // NOTE: the API field is pricing_details (description_pricing never existed
     // on the wire — it silently rendered nothing).
     hasVal(poi?.pricing_details) && <ContentGroup key="pricing" title="Pricing Details"><div className="acc_content_text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(poi.pricing_details) }} /></ContentGroup>,

@@ -194,7 +194,8 @@ def main() -> int:
         db.close()
 
     changed = sum(1 for _r, changes in results if changes)
-    print(f"\n[DONE] {len(results)} event(s) examined, {changed} would change")
+    verb = "changed" if args.apply else "would change"
+    print(f"\n[DONE] {len(results)} event(s) examined, {changed} {verb}")
     if not args.apply and changed:
         print("Re-run with --apply --ids <poi_id> [...] to correct listed events.")
     return 0
