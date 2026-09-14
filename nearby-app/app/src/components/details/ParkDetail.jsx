@@ -65,6 +65,8 @@ function buildSections(poi, helpers) {
             {/* Issue #70: holiday_hours top-level field removed; holidays live in hours.holidays */}
             <HoursDisplay
               hours={poi.hours}
+              lat={_lat}
+              lng={_lng}
               appointmentBookingUrl={poi.appointment_booking_url}
               appointmentRequired={poi.hours_but_appointment_required}
               hoursNotes={poi.hours?.notes}
