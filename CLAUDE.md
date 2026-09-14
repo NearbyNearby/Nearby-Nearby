@@ -293,9 +293,7 @@ Internet → Cloudflare (HTTPS) → ALB (HTTP port 80) → ECS Fargate
 
 ### How to Deploy
 
-> **⚠️ CI auto-deploy is BROKEN (repo moved to `NearbyNearby/Nearby-Nearby` on 2026-07-01); deploy manually until you update Terraform `github_repo`→new org + `terraform apply` + re-add the `AWS_ROLE_TO_ASSUME` secret. AWS unaffected.**
-
-**Automatic** (once CI OIDC is re-enabled): Push code changes to `main` branch. GitHub Actions builds, tests, and deploys.
+**Automatic**: Push code changes to `main` branch. GitHub Actions builds, tests, and deploys. (CI OIDC trusts the `NearbyNearby/Nearby-Nearby` repo since the 2026-07 org move.)
 - `nearby-app/**` or `shared/**` changes → triggers app workflow
 - `nearby-admin/**` or `shared/**` changes → triggers admin workflow
 
