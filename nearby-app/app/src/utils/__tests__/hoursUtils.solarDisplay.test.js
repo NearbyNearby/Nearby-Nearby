@@ -192,6 +192,14 @@ describe('getWeekHours / formatDayHours  -  grid rows with computed times (#174)
     expect(formatDayHours(hours, NOON, LAT, LNG)).toBe('Dawn (6:30 AM) - Dusk (7:45 PM)');
     expect(formatDayHours(hours)).toBe('Dawn - Dusk');
   });
+
+  it('reads the flat legacy shape with "dawn"/"dusk" strings as solar ends', () => {
+    const flat = Object.fromEntries(ALL_DAYS.map((day) => [day, [{ open: 'dawn', close: 'dusk' }]]));
+    getWeekHours(flat, NOON, LAT, LNG).forEach((day) => {
+      expect(day.formattedHours).toBe('Dawn (6:30 AM) - Dusk (7:45 PM)');
+    });
+    expect(getOpenCloseStatusLabel(flat, NOON, LAT, LNG).label).toBe('Open until Dusk (7:45 PM)');
+  });
 });
 
 // ── isCurrentlyOpen decision honors the offset ────────────────────────────

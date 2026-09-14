@@ -680,6 +680,8 @@ function normalizeHoursData(hoursData) {
   const hasDayKey = dayKeys.some((d) => d in hoursData);
   if (!hasDayKey) return hoursData;
 
+  // "dawn"/"dusk" strings are solar ends, not clock times.
+  const toEnd = (t) => (t === 'dawn' || t === 'dusk' ? { type: t } : { type: 'fixed', time: t });
   const regular = {};
   for (const day of dayKeys) {
     const v = hoursData[day];
@@ -687,10 +689,7 @@ function normalizeHoursData(hoursData) {
     if (Array.isArray(v)) {
       const periods = v
         .filter((p) => p && p.open && p.close)
-        .map((p) => ({
-          open: { type: 'fixed', time: p.open },
-          close: { type: 'fixed', time: p.close },
-        }));
+        .map((p) => ({ open: toEnd(p.open), close: toEnd(p.close) }));
       regular[day] = periods.length ? { status: 'open', periods } : { status: 'closed' };
     } else if (typeof v === 'object') {
       if (v.closed === true || v.status === 'closed') regular[day] = { status: 'closed' };
