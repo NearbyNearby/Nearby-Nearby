@@ -88,7 +88,7 @@ def _default_missing_point_coords(entries, fallback_lat, fallback_lng, skip_blan
         if skip_blank and not any(
             value not in (None, '', [], {})
             for key, value in entry.items()
-            if key not in ('lat', 'lng', 'w3w', '_pos')
+            if key not in ('lat', 'lng', '_pos')
         ):
             continue
         if entry.get('lat') in (None, ''):

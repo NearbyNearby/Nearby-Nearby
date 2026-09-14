@@ -340,6 +340,22 @@ describe('RecurringEventSection', () => {
     expect(screen.queryByText(/Sep 10, 2026/)).not.toBeInTheDocument();
   });
 
+  it('still previews upcoming dates for a series that began over 5 years ago', () => {
+    vi.setSystemTime(new Date('2026-09-14T12:00:00')); // a Monday
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'weekly', interval: 1, days_of_week: ['Thu'] },
+          start_datetime: new Date('2019-03-07T17:00:00'), // a Thursday
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Sep 17, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/no occurrences/i)).not.toBeInTheDocument();
+  });
+
   it('shows 10 dates of an open-ended series, and "Show more dates" adds 10 more', () => {
     render(
       <TestWrapper

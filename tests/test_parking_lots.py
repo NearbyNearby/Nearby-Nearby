@@ -615,6 +615,18 @@ class TestParkingWithoutPinIsNotDropped:
         got = admin_client.get(f"/api/pois/{biz['id']}").json()
         assert not got["parking_locations"]
 
+    def test_w3w_only_row_is_kept(self, admin_client):
+        # A what3words address is real content even when the pin never resolved.
+        row = {**BLANK_ROW, "w3w": "filled.count.soap"}
+        biz = create_business(
+            admin_client, name="W3W Row Biz", parking_locations=[row],
+        )
+        assert len(biz["parking_locations"]) == 1
+        kept = biz["parking_locations"][0]
+        assert kept["w3w"] == "filled.count.soap"
+        assert kept["lat"] == pytest.approx(35.8)
+        assert kept["lng"] == pytest.approx(-79.0)
+
 
 # --------------------------------------------------------------------------- #
 # 14. Issue #171 / #161: "Share this lot" promotes an own pin to a lot

@@ -124,9 +124,10 @@ function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit 
   // Ensure we start from the next valid occurrence after startDate
   cursor.setHours(startDate.getHours ? startDate.getHours() : 0);
 
-  // Stop at the series end, and never look past 60 months (the server's
-  // expansion cap), so an open-ended series ends the loop too.
-  const horizon = new Date(startDate);
+  // Stop at the series end, and never look more than 60 months (the server's
+  // expansion cap) past today, or the start if later, so an open-ended series
+  // ends the loop too, however long ago it began.
+  const horizon = new Date(from && from > startDate ? from : startDate);
   horizon.setMonth(horizon.getMonth() + 60);
   const stopAt = until && until < horizon ? until : horizon;
 
