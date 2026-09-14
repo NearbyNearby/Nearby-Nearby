@@ -15,6 +15,7 @@ from .category import Category
 from .primary_type import PrimaryType
 from .parking_lot import ParkingLotLink
 from ._coercers import EmptyStringToNoneMixin
+from shared.utils import event_time
 
 
 def normalize_parking_lot_links(links: Optional[List[Any]]) -> Optional[List[Dict[str, Any]]]:
@@ -193,7 +194,19 @@ class Trail(TrailBase):
     model_config = ConfigDict(from_attributes=True)
 
 # Event Schemas
-class EventBase(EmptyStringToNoneMixin, BaseModel):
+class EventNaiveDatetimeMixin(BaseModel):
+    """Issue #180: a naive event datetime is an America/New_York wall clock
+    (the admin form sends "YYYY-MM-DD HH:mm:ss" with no zone). Aware values
+    (Z / offset) pass through unchanged. Applied to both the create and update
+    schemas so PUT and POST are covered; autosave and reschedule are wired
+    separately because they bypass the schemas."""
+
+    @field_validator(*event_time.EVENT_DATETIME_FIELDS, mode='before', check_fields=False)
+    @classmethod
+    def localize_naive_event_datetimes(cls, v):
+        return event_time.localize_event_datetime(v)
+
+class EventBase(EmptyStringToNoneMixin, EventNaiveDatetimeMixin, BaseModel):
     start_datetime: datetime
     end_datetime: Optional[datetime] = None
     is_repeating: bool = False
@@ -276,7 +289,7 @@ class EventBase(EmptyStringToNoneMixin, BaseModel):
         return v
 
 class EventCreate(EventBase): pass
-class EventUpdate(EmptyStringToNoneMixin, BaseModel):
+class EventUpdate(EmptyStringToNoneMixin, EventNaiveDatetimeMixin, BaseModel):
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
     is_repeating: Optional[bool] = None

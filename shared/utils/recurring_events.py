@@ -6,8 +6,11 @@ respecting excluded_dates, manual_dates, and recurrence_end_date.
 
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
+from zoneinfo import ZoneInfo
 from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY, YEARLY, MO, TU, WE, TH, FR, SA, SU
 from dateutil.parser import isoparse
+
+from shared.utils.event_time import EVENT_TZ, localize_event_datetime
 
 _FREQ_MAP = {
     "daily": DAILY,
@@ -83,18 +86,37 @@ def expand_recurring_dates(
 
     interval = repeat_pattern.get("interval", 1)
 
+    # Issue #180: run the rule on the America/New_York wall clock, not on the
+    # stored UTC instant. A weekly 7 PM Eastern event is 23:00Z in summer but
+    # 00:00Z in winter, so an rrule over the aware UTC value drifts an hour at
+    # the DST change; and for evening events byweekday fires on the UTC day
+    # (7 PM Tuesday is Wednesday 00:00Z), landing occurrences on the wrong
+    # local day. Convert start and window bounds to Eastern, expand on the
+    # naive local wall clock, then re-attach Eastern to each occurrence so the
+    # returned aware datetimes stay comparable with the callers' bounds.
+    local_start = start_datetime.astimezone(EVENT_TZ).replace(tzinfo=None)
+    local_from = date_from.astimezone(EVENT_TZ).replace(tzinfo=None)
+    local_to = date_to.astimezone(EVENT_TZ).replace(tzinfo=None)
+    local_recurrence_end = (
+        recurrence_end_date.astimezone(EVENT_TZ).replace(tzinfo=None)
+        if recurrence_end_date else None
+    )
+
+    def _aware(dt):
+        return dt.replace(tzinfo=EVENT_TZ)
+
     # Compute effective end: min of date_to, recurrence_end_date, and 60-month cap
-    max_end = start_datetime + timedelta(days=_MAX_MONTHS * 30)
-    effective_end = date_to
-    if recurrence_end_date and recurrence_end_date < effective_end:
-        effective_end = recurrence_end_date
+    max_end = local_start + timedelta(days=_MAX_MONTHS * 30)
+    effective_end = local_to
+    if local_recurrence_end and local_recurrence_end < effective_end:
+        effective_end = local_recurrence_end
     if max_end < effective_end:
         effective_end = max_end
 
     # Build rrule kwargs
     kwargs = {
         "freq": freq,
-        "dtstart": start_datetime,
+        "dtstart": local_start,
         "interval": interval,
         "until": effective_end,
     }
@@ -117,8 +139,8 @@ def expand_recurring_dates(
     for dt in rule:
         if dt > effective_end:
             break
-        if date_from <= dt <= date_to:
-            occurrences.add(dt)
+        if local_from <= dt <= local_to:
+            occurrences.add(_aware(dt))
 
     # Remove excluded dates
     if excluded_dates:
@@ -134,6 +156,9 @@ def expand_recurring_dates(
     # or a full ISO datetime) or an object {date, start_time, end_time} carrying
     # a per-date time override. Object form applies start_time ("HH:MM") to the
     # occurrence datetime; missing time falls back to midnight (the ISO default).
+    # Issue #180: a naive manual date/time is an Eastern wall clock (label it
+    # via the shared policy) instead of UTC, so a "19:00" override stays 7 PM
+    # local. Aware values pass through unchanged.
     if manual_dates:
         for m in manual_dates:
             try:
@@ -150,8 +175,7 @@ def expand_recurring_dates(
                         )
                 else:
                     manual_dt = isoparse(m)
-                if manual_dt.tzinfo is None:
-                    manual_dt = manual_dt.replace(tzinfo=timezone.utc)
+                manual_dt = localize_event_datetime(manual_dt)
                 if date_from <= manual_dt <= date_to:
                     occurrences.add(manual_dt)
             except (ValueError, TypeError, KeyError):
