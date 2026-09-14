@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, AttributionControl, useMap, useMapEvents } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'react-leaflet-cluster/dist/assets/MarkerCluster.css';
 
 // Fix for default marker icons in React-Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -56,8 +58,38 @@ const createNumberedIcon = (number, isHighlighted = false) => {
   });
 };
 
+// Downtown Pittsboro POIs sit within a few metres of each other (some share one
+// address), so their pins stacked and hid each other's numbers. Pins that would
+// overlap merge into one bubble: a pill naming them ("14-17", or "3, 7") when that
+// stays short, otherwise a round count ("12 places"). Clicking it zooms in, or
+// fans the pins out when they sit on the same spot.
+const clusterLabel = (numbers) => {
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const isRun = sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1);
+  if (isRun) return `${sorted[0]}-${sorted[sorted.length - 1]}`;
+  if (sorted.length === 2) return sorted.join(', ');
+  return null;
+};
+
+const createClusterIcon = (cluster) => {
+  const markers = cluster.getAllChildMarkers();
+  const label = clusterLabel(markers.map((m) => m.options.number));
+  if (!label) {
+    return L.divIcon({
+      html: `<span>${markers.length}</span><small>places</small>`,
+      className: 'map-marker-cluster map-marker-cluster--count',
+      iconSize: L.point(46, 46),
+    });
+  }
+  return L.divIcon({
+    html: `<span>${label}</span>`,
+    className: 'map-marker-cluster',
+    iconSize: L.point(Math.max(40, Math.round(label.length * 9 + 22)), 36),
+  });
+};
+
 // Component to auto-fit bounds so all markers are visible
-function AutoFitBounds({ bounds, radiusMiles }) {
+function AutoFitBounds({ bounds }) {
   const map = useMap();
   const prevBoundsKeyRef = useRef(null);
 
@@ -71,15 +103,10 @@ function AutoFitBounds({ bounds, radiusMiles }) {
       if (boundsKey === prevBoundsKeyRef.current) return;
       prevBoundsKeyRef.current = boundsKey;
 
-      // Calculate maxZoom based on radius (for NearbySection) or default 15 (for Explore)
-      let maxZoom = 15;
-      if (radiusMiles) {
-        if (radiusMiles <= 1) maxZoom = 18;
-        else if (radiusMiles <= 3) maxZoom = 17;
-        else if (radiusMiles <= 5) maxZoom = 16;
-        else if (radiusMiles <= 10) maxZoom = 15;
-        else maxZoom = 14;
-      }
+      // Street level at most. The pins shown are one page of cards, so the search
+      // radius says nothing about how spread out they are; a page of downtown
+      // results needs this close a view to separate (overlaps cluster anyway).
+      const maxZoom = 17;
 
       try {
         if (bounds.length === 1) {
@@ -92,7 +119,7 @@ function AutoFitBounds({ bounds, radiusMiles }) {
         console.warn('Map fitBounds failed:', e.message);
       }
     }
-  }, [bounds, radiusMiles, map]);
+  }, [bounds, map]);
 
   return null;
 }
@@ -151,10 +178,11 @@ function ScrollWheelToggle() {
   );
 }
 
-function Map({ currentPOI = null, nearbyPOIs = [], radiusMiles, onMarkerClick, highlightedId }) {
+function Map({ currentPOI = null, nearbyPOIs = [], startNumber = 1, onMarkerClick, highlightedId }) {
   // `currentPOI` is optional: Explore (#133) has no "current" POI and passes its
   // FULL result list as nearbyPOIs so marker numbers equal the card numbers.
-  // NearbySection still passes a real currentPOI and gets the gold pin.
+  // NearbySection still passes a real currentPOI and gets the gold pin, plus only
+  // the current page's POIs with `startNumber` set to the page's first card number.
   const currentCoords = currentPOI?.location?.coordinates
     ? [
         currentPOI.location.coordinates[1], // latitude
@@ -223,12 +251,14 @@ function Map({ currentPOI = null, nearbyPOIs = [], radiusMiles, onMarkerClick, h
           maxNativeZoom={19}
         />
 
-        <AutoFitBounds bounds={allCoords} radiusMiles={radiusMiles} />
+        <AutoFitBounds bounds={allCoords} />
         <ScrollWheelToggle />
 
-        {/* Current POI marker - hidden when POI opts out of showing exact location */}
+        {/* Current POI marker - hidden when POI opts out of showing exact location.
+            Drawn under the numbered pins: nearby POIs often share its address and
+            must not have their numbers covered. */}
         {currentCoords && !hideCurrentExact && (
-        <Marker position={currentCoords} icon={createCurrentIcon()}>
+        <Marker position={currentCoords} icon={createCurrentIcon()} zIndexOffset={-1000}>
           <Popup className="custom-popup">
             <div className="popup-content">
               <strong>{currentPOI.name}</strong>
@@ -240,7 +270,14 @@ function Map({ currentPOI = null, nearbyPOIs = [], radiusMiles, onMarkerClick, h
 
         {/* Nearby POI markers - PURPLE NUMBERED CIRCLES. The number is the POI's position in the list the
             caller renders as cards, so an unmapped POI leaves a gap rather than
-            shifting every later marker (#133). */}
+            shifting every later marker (#133). The current POI stays outside
+            the cluster group so it is never merged away. */}
+        <MarkerClusterGroup
+          iconCreateFunction={createClusterIcon}
+          maxClusterRadius={46}
+          showCoverageOnHover={false}
+          spiderfyOnMaxZoom={true}
+        >
         {nearbyPOIs.map((poi, index) => {
           if (!poi.location) return null;
           // Hide pin for POIs that opted out of exact-location display
@@ -251,15 +288,20 @@ function Map({ currentPOI = null, nearbyPOIs = [], radiusMiles, onMarkerClick, h
             poi.location.coordinates[0]
           ];
 
-          const number = index + 1;
+          const number = startNumber + index;
           const isHighlighted = highlightedId === poi.id;
-          const showNumber = nearbyPOIs.length > 1;
+          // A lone card on a later page (e.g. card 9 of 9) still shows its number.
+          const showNumber = nearbyPOIs.length > 1 || startNumber > 1;
 
           return (
             <Marker
-              key={poi.id}
+              // Keyed by number too: `number` is read by the cluster label and
+              // Leaflet only takes it at creation.
+              key={`${poi.id}-${number}`}
+              number={number}
               position={coords}
               icon={createNumberedIcon(showNumber ? number : null, isHighlighted)}
+              zIndexOffset={isHighlighted ? 1000 : 0}
               riseOnHover={true}
               eventHandlers={{
                 click: () => {
@@ -277,6 +319,7 @@ function Map({ currentPOI = null, nearbyPOIs = [], radiusMiles, onMarkerClick, h
             </Marker>
           );
         })}
+        </MarkerClusterGroup>
       </MapContainer>
     </div>
   );

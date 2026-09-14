@@ -26,6 +26,7 @@ vi.mock('react-leaflet', () => ({
   useMap: () => ({ fitBounds: () => {}, setView: () => {} }),
   useMapEvents: () => ({ scrollWheelZoom: { enable: () => {}, disable: () => {} } }),
 }));
+vi.mock('react-leaflet-cluster', () => ({ default: ({ children }) => <div>{children}</div> }));
 vi.mock('../../../config', () => ({ getApiUrl: (p) => p }));
 vi.mock('../../SearchBar', () => ({ default: () => null }));
 
@@ -103,5 +104,39 @@ describe('NearbySection marker/card alignment (#160)', () => {
       expect(within(highlighted[0]).getByText("Doherty's Irish Pub")).toBeInTheDocument();
       expect(highlighted[0].querySelector('.one_search_map_result_number').textContent).toBe('3');
     }, { timeout: 3000 });
+  });
+});
+
+describe('NearbySection map follows the page of cards', () => {
+  // Rhonda: "number 16 is not number 16". The map drew every result (69 in
+  // downtown Pittsboro) in one blob, so a page's numbers were buried among the
+  // other pages' pins. Now it draws only the page's cards, numbered to match.
+  const TWELVE = Array.from({ length: 12 }, (_, i) => ({
+    id: `p${i + 1}`,
+    name: `Place ${i + 1}`,
+    poi_type: 'BUSINESS',
+    distance_meters: 100 * (i + 1),
+    location: at(-79.17 - i * 0.001, 35.72),
+  }));
+
+  beforeEach(() => {
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve(TWELVE) }));
+  });
+
+  it('shows only the current page\'s pins, numbered like their cards', async () => {
+    render(<MemoryRouter><NearbySection currentPOI={CURRENT} /></MemoryRouter>);
+    await screen.findAllByText('Place 8');
+    expect(markerEntries()).toEqual(cardEntries());
+    expect(markerEntries().map(([n]) => n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+
+    const page2 = Array.from(document.querySelectorAll('.nearby_pagination__num'))
+      .find((b) => b.textContent === '2');
+    fireEvent.click(page2);
+    await screen.findAllByText('Place 12');
+
+    expect(markerEntries()).toEqual(cardEntries());
+    expect(markerEntries()).toEqual([
+      [9, 'Place 9'], [10, 'Place 10'], [11, 'Place 11'], [12, 'Place 12'],
+    ]);
   });
 });
