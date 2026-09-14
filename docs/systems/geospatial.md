@@ -8,7 +8,7 @@ The Geospatial System handles location-based features using PostgreSQL with Post
 - `nearby-app/backend/app/crud/crud_poi.py` - Geospatial queries
 - `nearby-app/backend/app/api/endpoints/pois.py` - Nearby endpoints
 - `nearby-app/backend/app/models/poi.py` - Location fields
-- `nearby-app/app/src/components/Map.jsx` - Map visualization (Carto Voyager tiles)
+- `nearby-app/app/src/components/Map.jsx` - Map visualization (OpenStreetMap tiles)
 - `nearby-app/app/src/components/nearby-feature/` - Nearby Nearby Feature components
 
 ---
@@ -20,7 +20,7 @@ The platform's namesake and flagship feature. When viewing any POI detail page, 
 ### What It Does
 
 1. **Shows nearby POIs** - Fetches and displays businesses, parks, trails, and events near the current POI
-2. **Interactive map** - Leaflet map with Carto Voyager tiles and numbered markers that link to result cards
+2. **Interactive map** - Leaflet map with OpenStreetMap tiles and numbered markers that link to result cards
 3. **Smart filtering** - Filter by type (All, Businesses, Events, Parks, Trails) and by date
 4. **Hybrid AI search** - Search within nearby results using keyword + semantic understanding
 5. **Directions** - One-click navigation to Google Maps, Apple Maps, or Waze
@@ -33,7 +33,7 @@ The platform's namesake and flagship feature. When viewing any POI detail page, 
 | `NearbySection.jsx` | Main container with map, filters, search, pagination, and directions modal |
 | `NearbyCard.jsx` | Individual POI cards with distance, hours, amenities, and action buttons |
 | `NearbyFilters.jsx` | Horizontal scrolling filter pills with icons (lucide-react) |
-| `Map.jsx` | Leaflet map with Carto Voyager tiles and numbered markers |
+| `Map.jsx` | Leaflet map with OpenStreetMap tiles and numbered markers |
 
 ### Key Features
 
@@ -51,7 +51,7 @@ The platform's namesake and flagship feature. When viewing any POI detail page, 
 - Past event exclusion - automatically hides ended events
 
 **Map Features:**
-- **Carto Voyager tiles** - Warm, MapQuest-like colors
+- **OpenStreetMap tiles** - Keyless standard OSM raster tiles
 - **Numbered markers** - Purple circles with numbers matching card positions
 - **Current location** - Gold/yellow circle for the current POI
 - **Auto-fit bounds** - Map zooms to show all markers
@@ -366,7 +366,7 @@ async def get_poi_nearby(
 
 ### Map Component
 
-Uses Carto Voyager tiles for warm, MapQuest-like colors:
+Uses keyless OpenStreetMap standard tiles:
 
 ```jsx
 // nearby-app/app/src/components/Map.jsx
@@ -376,11 +376,12 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 function Map({ currentPOI, nearbyPOIs, radiusMiles, onMarkerClick, highlightedId }) {
   return (
     <MapContainer center={currentCoords} zoom={14} className="leaflet-map">
-      {/* Carto Voyager - MapQuest-like warm colors */}
+      {/* OpenStreetMap - keyless; OSM serves up to z19, Leaflet upscales past it */}
       <TileLayer
-        attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={20}
+        maxNativeZoom={19}
       />
 
       {/* Current POI - Gold circle */}

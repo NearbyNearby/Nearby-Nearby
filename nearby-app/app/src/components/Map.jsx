@@ -211,14 +211,16 @@ function Map({ currentPOI = null, nearbyPOIs = [], radiusMiles, onMarkerClick, h
         attributionControl={false}
       >
         {/* #102: Leaflet's default prefix is "🇺🇦 Leaflet"; drop the flag but keep
-            the library credit and the OSM/CARTO attributions below. */}
+            the library credit and the OSM attribution below. */}
         <AttributionControl position="bottomright" prefix="Leaflet" />
 
-        {/* Carto Voyager - MapQuest-like warm colors */}
+        {/* OpenStreetMap standard tiles - keyless (CARTO stamps "API KEY REQUIRED" on keyless tiles).
+            OSM serves up to z19 and 400s at z20, so Leaflet upscales z19 tiles beyond that. */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           maxZoom={20}
+          maxNativeZoom={19}
         />
 
         <AutoFitBounds bounds={allCoords} radiusMiles={radiusMiles} />

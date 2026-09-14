@@ -13,7 +13,15 @@ vi.mock('react-leaflet', () => ({
   MapContainer: ({ children, center }) => (
     <div data-testid="map" data-center={JSON.stringify(center)}>{children}</div>
   ),
-  TileLayer: () => null,
+  TileLayer: ({ url, attribution, maxZoom, maxNativeZoom }) => (
+    <div
+      data-testid="tile-layer"
+      data-url={String(url)}
+      data-attribution={String(attribution)}
+      data-max-zoom={String(maxZoom)}
+      data-max-native-zoom={String(maxNativeZoom)}
+    />
+  ),
   AttributionControl: ({ prefix }) => (
     <div data-testid="attribution" data-prefix={String(prefix)} />
   ),
@@ -141,6 +149,26 @@ describe('Map attribution (#102)', () => {
     const prefix = screen.getByTestId('attribution').getAttribute('data-prefix');
     expect(prefix).toBe('Leaflet');
     expect(prefix).not.toMatch(/\u{1F1FA}\u{1F1E6}/u);
+  });
+});
+
+describe('Map tile layer (#172)', () => {
+  // CARTO now stamps "API KEY REQUIRED" across every keyless tile, so the public
+  // app must use OSM standard tiles (keyless, single host) instead.
+  it('loads OpenStreetMap tiles, not CARTO', () => {
+    render(<Map currentPOI={null} nearbyPOIs={POIS} />);
+    const layer = screen.getByTestId('tile-layer');
+    expect(layer.getAttribute('data-url')).toBe('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+    expect(layer.getAttribute('data-url')).not.toContain('cartocdn');
+    expect(layer.getAttribute('data-attribution')).toContain('OpenStreetMap');
+    expect(layer.getAttribute('data-attribution')).not.toContain('CARTO');
+  });
+
+  it('clamps native zoom to what OSM serves and lets Leaflet upscale past it', () => {
+    render(<Map currentPOI={null} nearbyPOIs={POIS} />);
+    const layer = screen.getByTestId('tile-layer');
+    expect(layer.getAttribute('data-max-native-zoom')).toBe('19');
+    expect(layer.getAttribute('data-max-zoom')).toBe('20');
   });
 });
 
