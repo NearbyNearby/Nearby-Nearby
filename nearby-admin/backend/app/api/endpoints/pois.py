@@ -14,6 +14,7 @@ from app.utils.autosave_whitelist import AUTOSAVE_ALLOWED_FIELDS, AUTOSAVE_DENIE
 from app.utils.poi_revision import record_poi_revision
 from app.crud.crud_poi import apply_phase1_computed
 from app.schemas._coercers import coerce_empty_literals
+from shared.utils import event_time
 
 router = APIRouter()
 
@@ -236,6 +237,14 @@ def autosave_poi(
 
     coerce_empty_literals(filtered, schemas.PointOfInterestUpdate)
 
+    # Issue #180: autosave bypasses the pydantic schemas, so naive event
+    # datetimes (the admin form's "YYYY-MM-DD HH:mm:ss") would reach the
+    # timestamptz columns unlabeled and be stored as UTC. Label them Eastern
+    # here; aware values pass through unchanged.
+    for _f in event_time.EVENT_DATETIME_FIELDS:
+        if _f in filtered:
+            filtered[_f] = event_time.localize_event_datetime(filtered[_f])
+
     # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, not
     # JSONB. Pull any provided link fields out of the autosave payload so they are
     # never setattr'd onto their JSONB columns; sync them as edges before commit.
@@ -250,10 +259,12 @@ def autosave_poi(
     # Issue #117: default missing restroom lat/lng to the POI's own coordinates
     # (location isn't autosave-editable, so `poi.location` is always current) so
     # a row with no pin doesn't get silently dropped in its entirety.
-    if 'toilet_locations' in _point_values:
-        from app.crud.crud_poi import _poi_location_lat_lng, _default_missing_restroom_coords
+    # Issue #179: same for the POI's own parking rows.
+    if 'toilet_locations' in _point_values or 'parking_locations' in _point_values:
+        from app.crud.crud_poi import _poi_location_lat_lng, _default_missing_point_coords
         _fallback_lat, _fallback_lng = _poi_location_lat_lng(poi.location)
-        _default_missing_restroom_coords(_point_values['toilet_locations'], _fallback_lat, _fallback_lng)
+        _default_missing_point_coords(_point_values.get('toilet_locations'), _fallback_lat, _fallback_lng)
+        _default_missing_point_coords(_point_values.get('parking_locations'), _fallback_lat, _fallback_lng)
 
     # Parking lots (#90/#161): links to SHAREABLE lots persist as
     # poi_parking_links edges, not a column. Pull them out of the autosave
@@ -610,8 +621,8 @@ def reschedule_event(
     }
 
     # Override with new dates and status
-    event_data['start_datetime'] = body.new_start_datetime
-    event_data['end_datetime'] = body.new_end_datetime
+    event_data['start_datetime'] = event_time.localize_event_datetime(body.new_start_datetime)
+    event_data['end_datetime'] = event_time.localize_event_datetime(body.new_end_datetime)
     event_data['event_status'] = 'Scheduled'
     event_data['rescheduled_from_event_id'] = poi_id
     event_data['new_event_link'] = None

@@ -242,17 +242,28 @@ class TestPointWriteCreatesRows:
 
     def test_coordinate_less_entry_not_persisted(self, db_session, admin_client):
         """geom is NOT NULL: an entry with no parseable coordinate pair has no
-        point and is skipped by the write path (documented Task 2.3 semantic)."""
+        point and is skipped by the write path (documented Task 2.3 semantic).
+
+        #117/#179 carve out the two fields the admin defaults to the POI's own
+        coordinates (restrooms, parking), so the skip semantic is asserted on
+        playgrounds, which have no such default. A coordinate-less parking row
+        is kept, pinned at the POI."""
         park = create_park(
             admin_client, name="NoCoord Park", published=True,
-            parking_locations=[
+            playground_locations=[
                 {"lat": None, "lng": None, "name": "Not geolocated yet"},
+            ],
+            parking_locations=[
+                {"lat": None, "lng": None, "name": "No Pin Lot"},
                 {"lat": 35.8, "lng": -79.0, "name": "Real Lot"},
             ],
         )
+        rows = _rows(db_session, park["id"], "playground")
+        assert len(rows) == 0
+
         rows = _rows(db_session, park["id"], "parking")
-        assert len(rows) == 1
-        assert rows[0].meta["name"] == "Real Lot"
+        assert len(rows) == 2
+        assert {r.meta["name"] for r in rows} == {"No Pin Lot", "Real Lot"}
 
 
 class TestPublicRendersFromPoints:
