@@ -90,6 +90,28 @@ export async function saveLot(values, { lotId = null, ownerPoiId = null } = {}) 
 }
 
 /**
+ * "Share this lot" (#171): copy one of the POI's own parking rows into a
+ * shareable lot owned by that POI. Resolves to `{ alreadyShared: true, lot }`
+ * on the 200 the backend returns for an already-shared lot, and to
+ * `{ alreadyShared: false, lot }` when a new lot was created (201).
+ */
+export async function shareLotFromPoi(poiId, row) {
+  const response = await api.post(`/parking-lots/share-from-poi/${poiId}`, {
+    name: row.name,
+    lat: row.lat,
+    lng: row.lng,
+    parking_types: row.parking_types || [],
+    accessible_parking_details: row.accessible_parking_details || [],
+    notes: row.notes || null,
+    w3w: row.w3w || null,
+  });
+  if (!response || !response.ok) {
+    throw new Error(await errorFrom(response, 'Failed to share parking lot'));
+  }
+  return { alreadyShared: response.status === 200, lot: await response.json() };
+}
+
+/**
  * Delete a lot. Resolves to `{ conflict: true, linkedPoiCount }` on the 409 the
  * backend raises while POIs still link it, so the caller can re-confirm and
  * retry with `force`.

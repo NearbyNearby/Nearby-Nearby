@@ -1,8 +1,11 @@
-import React from 'react';
-import { Checkbox, SimpleGrid, Stack, Text, TextInput, Textarea } from '@mantine/core';
+import React, { useState } from 'react';
+import { Button, Checkbox, SimpleGrid, Stack, Text, TextInput, Textarea, Tooltip } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { IconShare2 } from '@tabler/icons-react';
 import { RepeatableLocationGroup } from './RepeatableLocationGroup';
 import CoordinateInput from './CoordinateInput';
 import { ParkingPhotosUpload } from '../ImageIntegration';
+import { shareLotFromPoi } from '../../parking-lots/lotApi';
 import { PARKING_OPTIONS, PARKING_ADA_CHECKLIST } from '../../../utils/constants';
 
 // The first PARKING_OPTIONS entry is the "Accessible Parking" option. Selecting
@@ -34,6 +37,35 @@ export const ParkingLocationGroup = React.memo(function ParkingLocationGroup({
       : isEvent
         ? 'e.g., Main Lot, Event Parking'
         : 'e.g., Main Lot';
+
+  const [sharingIndex, setSharingIndex] = useState(null);
+
+  // "Share this lot" (#171): copy this row into a shareable lot owned by this
+  // POI, so it shows up in Manage Parking Lots and other listings' pickers.
+  const handleShare = async (row, index) => {
+    setSharingIndex(index);
+    try {
+      const { alreadyShared } = await shareLotFromPoi(id, row);
+      notifications.show(
+        alreadyShared
+          ? { message: 'Already shared', color: 'blue' }
+          : {
+              title: 'Shared',
+              message:
+                'It now appears in Manage Parking Lots and other listings can link to it',
+              color: 'green',
+            },
+      );
+    } catch (error) {
+      notifications.show({
+        title: 'Sharing failed',
+        message: error.message || 'Could not share this parking lot',
+        color: 'red',
+      });
+    } finally {
+      setSharingIndex(null);
+    }
+  };
 
   return (
     <RepeatableLocationGroup
@@ -125,6 +157,29 @@ export const ParkingLocationGroup = React.memo(function ParkingLocationGroup({
               minRows={2}
               {...form.getInputProps(`${fieldName}.${index}.notes`)}
             />
+
+            {id && (
+              <Tooltip
+                label={
+                  row?.name && row?.lat != null && row?.lng != null
+                    ? 'Copy this lot into Manage Parking Lots so other listings can link to it'
+                    : 'Add a name and a pin first, then share'
+                }
+              >
+                <span>
+                  <Button
+                    variant="light"
+                    size="xs"
+                    leftSection={<IconShare2 size={14} />}
+                    disabled={!(row?.name && row?.lat != null && row?.lng != null)}
+                    loading={sharingIndex === index}
+                    onClick={() => handleShare(row, index)}
+                  >
+                    Share this lot
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
 
             {enablePhotos && (id ? (
               <ParkingPhotosUpload
