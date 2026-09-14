@@ -4,8 +4,8 @@
 The admin event form once sent timezone-naive times ("2026-09-17 19:00:00")
 that Postgres stored as UTC, so an event typed as 7 PM Eastern is stored as
 19:00Z (3 PM Eastern). This script reinterprets the stored UTC wall clock as
-America/New_York wall time — in SQL terms
-``(col AT TIME ZONE 'UTC') AT TIME ZONE 'America/New_York'`` — which is
+America/New_York wall time (in SQL terms
+``(col AT TIME ZONE 'UTC') AT TIME ZONE 'America/New_York'``), which is
 correct for both summer (EDT, UTC-4) and winter (EST, UTC-5) rows.
 
 Events written through the reschedule modal carry real offsets and are
@@ -52,8 +52,10 @@ from app.database import SessionLocal  # noqa: E402  admin app DB session
 EASTERN = ZoneInfo("America/New_York")
 
 # (column, nullable) pairs corrected on the events table. Only timestamptz
-# columns the admin form writes; repeat_pattern / excluded_dates / manual_dates
-# are JSONB and carry no absolute instants.
+# columns the admin form writes; repeat_pattern / excluded_dates are JSONB
+# without absolute instants. manual_dates is out of scope for this script:
+# its object entries carry local "HH:MM" wall-clock times, and its legacy
+# ISO datetime strings would need a separate pass (warned about below).
 DATETIME_COLUMNS = [
     ("start_datetime", False),
     ("end_datetime", True),
@@ -74,6 +76,10 @@ def correct_event_times(db, ids=None, apply=False):
     is written back in one transaction (committed here) and only for ``ids``;
     ``apply=True`` with ``ids=None`` raises ValueError so a blanket second run
     cannot shift rows twice.
+
+    The session timezone is pinned to UTC first: timestamptz values come back
+    with an offset in the session's zone, so an unpinned Eastern session would
+    make every broken row look already-correct.
     """
     if apply and ids is None:
         raise ValueError(
@@ -81,12 +87,14 @@ def correct_event_times(db, ids=None, apply=False):
             "would double-shift rows written with real offsets (reschedule "
             "modal). List the events to correct: --apply --ids <poi_id> [...]"
         )
+    db.execute(text("SET TIME ZONE 'UTC'"))
 
     sql = (
         "SELECT e.poi_id AS poi_id, e.start_datetime AS start_datetime, "
         "e.end_datetime AS end_datetime, "
         "e.recurrence_end_date AS recurrence_end_date, "
         "e.vendor_application_deadline AS vendor_application_deadline, "
+        "e.manual_dates AS manual_dates, "
         "p.name AS poi_name, p.publication_status AS publication_status "
         "FROM events e JOIN points_of_interest p ON p.id = e.poi_id"
     )
@@ -101,15 +109,26 @@ def correct_event_times(db, ids=None, apply=False):
 
     results = []
     for row in rows:
+        # manual_dates legacy entries can be full ISO datetime strings; flag
+        # them so an operator does not assume this script covers everything.
+        manual = row.manual_dates or []
+        if any(isinstance(d, str) and "T" in d for d in manual):
+            print(
+                f"  WARNING: {row.poi_name} ({row.poi_id}) has manual_dates "
+                "with datetime strings; this script does not correct "
+                "manual_dates."
+            )
+
         changes = {}
         for column, _nullable in DATETIME_COLUMNS:
             value = getattr(row, column)
             if value is None:
                 continue
-            # The stored value is an aware UTC instant whose UTC wall clock is
-            # the Eastern wall clock the admin intended. Rebuild that wall
-            # clock in Eastern: strip the UTC offset, attach Eastern.
-            corrected = value.replace(tzinfo=None).replace(tzinfo=EASTERN)
+            # Normalize to UTC first (belt and suspenders on top of the pinned
+            # session), then rebuild the intended wall clock: strip the UTC
+            # offset, attach Eastern.
+            utc_value = value.astimezone(timezone.utc)
+            corrected = utc_value.replace(tzinfo=None).replace(tzinfo=EASTERN)
             if corrected == value:
                 continue
             changes[column] = (value, corrected)
@@ -165,7 +184,7 @@ def main() -> int:
 
     print("=" * 60)
     mode = "APPLY" if args.apply else "DRY RUN (nothing will change)"
-    print(f"Event timezone correction — {mode}")
+    print("Event timezone correction: " + mode)
     print("=" * 60)
 
     db = SessionLocal()

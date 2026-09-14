@@ -22,6 +22,8 @@ _spec = importlib.util.spec_from_file_location("fix_event_timezones", _SCRIPT_PA
 fix_script = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fix_script)
 
+from sqlalchemy import text
+
 from conftest import orm_create_event
 
 
@@ -121,3 +123,38 @@ def test_winter_row_reinterprets_as_est(db_session):
 
     row = _event_row(db_session, poi)
     assert row.start_datetime == datetime(2026, 1, 16, 0, 0, tzinfo=UTC)
+
+
+def test_computation_is_independent_of_session_timezone(db_session):
+    """A non-UTC session timezone must not change the computed correction.
+
+    timestamptz values render in the session's TimeZone; without pinning the
+    session to UTC an Eastern session would hand back values whose UTC wall
+    clock is already the intended Eastern clock, and every broken row would
+    report "no shift needed".
+    """
+    poi = orm_create_event(
+        db_session,
+        name="Eastern Session Trivia",
+        event_fields={
+            "start_datetime": datetime(2026, 9, 1, 19, 0, tzinfo=UTC),
+            "end_datetime": datetime(2026, 9, 1, 21, 0, tzinfo=UTC),
+        },
+    )
+    db_session.execute(text("SET TIME ZONE 'America/New_York'"))
+
+    results = fix_script.correct_event_times(db_session, ids=[poi.id], apply=True)
+
+    _row, changes = results[0]
+    assert changes["start_datetime"] == (
+        datetime(2026, 9, 1, 19, 0, tzinfo=UTC),
+        datetime(2026, 9, 1, 23, 0, tzinfo=UTC),
+    )
+    assert changes["end_datetime"] == (
+        datetime(2026, 9, 1, 21, 0, tzinfo=UTC),
+        datetime(2026, 9, 2, 1, 0, tzinfo=UTC),
+    )
+
+    row = _event_row(db_session, poi)
+    assert row.start_datetime == datetime(2026, 9, 1, 23, 0, tzinfo=UTC)
+    assert row.end_datetime == datetime(2026, 9, 2, 1, 0, tzinfo=UTC)
