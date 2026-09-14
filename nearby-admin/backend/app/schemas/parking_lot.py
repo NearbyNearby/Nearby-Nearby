@@ -74,6 +74,26 @@ class ParkingLotUpdate(EmptyStringToNoneMixin, BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ParkingLotShareFromPoi(EmptyStringToNoneMixin, BaseModel):
+    """One of a POI's own parking rows (#171 "Share this lot"), in the same
+    shape the ParkingLocationGroup row carries (lat/lng, `w3w` shorthand)."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    lat: float
+    lng: float
+    parking_types: List[str] = Field(default_factory=list)
+    accessible_parking_details: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+    w3w: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator("parking_types", "accessible_parking_details", mode="before")
+    @classmethod
+    def _none_list_to_empty(cls, v):
+        return v or []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ParkingLotOwner(BaseModel):
     """Minimal owner summary, matching the ``owner`` key of a unified entry."""
 

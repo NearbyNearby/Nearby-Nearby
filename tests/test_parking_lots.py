@@ -670,7 +670,10 @@ class TestShareFromPoi:
     def test_owner_page_lists_the_lot_once_and_neighbor_can_link_it(
         self, admin_client, db_session
     ):
-        owner = create_business(admin_client, name="Owner Cafe", published=True)
+        owner = create_business(
+            admin_client, name="Owner Cafe", published=True,
+            parking_locations=[_parking_pin("Shared Cafe Lot", 35.8, -79.0)],
+        )
         lot = admin_client.post(
             f"/api/parking-lots/share-from-poi/{owner['id']}",
             json={"name": "Shared Cafe Lot", "lat": 35.8, "lng": -79.0},
