@@ -83,14 +83,26 @@ function mondayOf(date) {
   return d;
 }
 
+// The last minute of the series' end day, read as a local calendar date.
+function endOfDay(value) {
+  if (!value) return null;
+  const ymd = typeof value === 'string' ? value.slice(0, 10) : dateToLocalYMD(value);
+  const d = ymdHmToDate(ymd, '23:59');
+  return d && !isNaN(d.getTime()) ? d : null;
+}
+
+// The preview lists this many dates, and "Show more dates" adds this many.
+const PREVIEW_PAGE = 10;
+
 // ---------------------------------------------------------------------------
 // Preview calculation helper — returns up to `limit` future occurrence Dates
 // starting from `startDate`, applying the given repeat_pattern and skipping
-// any dates found in `excludedDates`.
+// any dates found in `excludedDates`. Dates before `from` are skipped and
+// nothing after `until` (the series end) is returned.
 //
 // Kept intentionally simple — no rrule dependency.
 // ---------------------------------------------------------------------------
-function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit = 5) {
+function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit = 5, { from = null, until = null } = {}) {
   if (!startDate || !pattern?.frequency) return [];
 
   const excluded = new Set(
@@ -112,13 +124,13 @@ function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit 
   // Ensure we start from the next valid occurrence after startDate
   cursor.setHours(startDate.getHours ? startDate.getHours() : 0);
 
-  // Safety cap — never iterate more than 1 000 steps to prevent infinite loops
-  const MAX_ITERATIONS = 1000;
-  let iterations = 0;
+  // Stop at the series end, and never look past 60 months (the server's
+  // expansion cap), so an open-ended series ends the loop too.
+  const horizon = new Date(startDate);
+  horizon.setMonth(horizon.getMonth() + 60);
+  const stopAt = until && until < horizon ? until : horizon;
 
-  while (results.length < limit && iterations < MAX_ITERATIONS) {
-    iterations++;
-
+  while (results.length < limit && cursor <= stopAt) {
     // Advance cursor by one unit *before* the first check so we don't include
     // the start date itself (it's the "current" event, not a future occurrence).
     const candidate = new Date(cursor);
@@ -139,7 +151,7 @@ function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit 
       include = selectedIndices.includes(candidate.getDay()) && weeksSinceStart % weekStep === 0;
     }
 
-    if (include && !excluded.has(candidate.toDateString())) {
+    if (include && !(from && candidate < from) && !excluded.has(candidate.toDateString())) {
       results.push(new Date(candidate));
     }
 
@@ -196,6 +208,7 @@ export default function RecurringEventSection({ form }) {
   const [pendingManualDate, setPendingManualDate] = useState(null);
   const [pendingManualStart, setPendingManualStart] = useState('');
   const [pendingManualEnd, setPendingManualEnd] = useState('');
+  const [previewCount, setPreviewCount] = useState(PREVIEW_PAGE);
 
   const isRepeating = form.values.event?.is_repeating || false;
   const pattern = form.values.event?.repeat_pattern || {};
@@ -322,15 +335,22 @@ export default function RecurringEventSection({ form }) {
     );
   }
 
-  // Compute preview occurrences
-  const previewOccurrences =
+  // Compute preview occurrences: upcoming dates only (#186), through the
+  // series end, one extra to know whether "Show more dates" has more to show.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcoming =
     isRepeating && startDatetime
       ? calculateNextOccurrences(
           startDatetime instanceof Date ? startDatetime : new Date(startDatetime),
           pattern,
-          excludedDates
+          excludedDates,
+          previewCount + 1,
+          { from: today, until: endOfDay(recurrenceEndDate) }
         )
       : [];
+  const previewOccurrences = upcoming.slice(0, previewCount);
+  const hasMoreOccurrences = upcoming.length > previewCount;
 
   const showDaysOfWeek = isRepeating && WEEKLY_FREQUENCIES.includes(frequency);
 
@@ -638,6 +658,15 @@ export default function RecurringEventSection({ form }) {
                     </Group>
                   );
                 })
+              )}
+              {hasMoreOccurrences && (
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  onClick={() => setPreviewCount((n) => n + PREVIEW_PAGE)}
+                >
+                  Show more dates
+                </Button>
               )}
             </Stack>
           </Card>
