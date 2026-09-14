@@ -6,7 +6,6 @@ UTC day, so UTC-labeled bounds would drop evening events on the edges of the
 requested range. The bounds are Eastern days (all POIs are in North Carolina).
 """
 
-import pytest
 from conftest import orm_create_event
 from datetime import datetime, timezone
 
