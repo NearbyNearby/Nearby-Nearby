@@ -277,4 +277,37 @@ describe('RecurringEventSection', () => {
     const occurrenceTexts = screen.getAllByText(/2026/);
     expect(occurrenceTexts.length).toBeGreaterThan(0);
   });
+
+  it('previews "Every 2 Weeks" as every other week', () => {
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'biweekly', interval: 1, days_of_week: ['Tue'] },
+          start_datetime: new Date('2026-03-03T10:00:00'), // a Tuesday
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Mar 17, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Mar 31, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 10, 2026/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mar 24, 2026/)).not.toBeInTheDocument();
+  });
+
+  it('previews weekly with no days picked on the start weekday, honoring the interval', () => {
+    render(
+      <TestWrapper
+        initialValues={{
+          is_repeating: true,
+          repeat_pattern: { frequency: 'weekly', interval: 2, days_of_week: [] },
+          start_datetime: new Date('2026-03-03T10:00:00'), // a Tuesday
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Mar 17, 2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mar 4, 2026/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mar 10, 2026/)).not.toBeInTheDocument();
+  });
 });

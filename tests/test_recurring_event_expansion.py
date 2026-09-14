@@ -235,6 +235,42 @@ class TestExpandRecurringDates:
         assert results[1].day == 4
         assert results[2].day == 7
 
+    def test_biweekly_is_every_other_week(self):
+        """The admin's "Every 2 Weeks" option ("biweekly") used to be an unknown
+        frequency, so the series collapsed to its first date."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        # 2026-03-03 is a Tuesday; 15:00Z is 10 AM Eastern.
+        start = datetime(2026, 3, 3, 15, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "biweekly", "interval": 1, "days_of_week": ["Tue"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 3, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 4, 1, tzinfo=timezone.utc),
+        )
+        eastern = ZoneInfo("America/New_York")
+        assert [r.astimezone(eastern).day for r in results] == [3, 17, 31]
+        assert all(r.astimezone(eastern).hour == 10 for r in results)
+
+    def test_biweekly_weekend_pair_stays_together(self):
+        """Weeks run Monday to Sunday, so Sat + Sun every other week pairs up."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        # 2026-08-01 is a Saturday; 13:00Z is 9 AM Eastern.
+        start = datetime(2026, 8, 1, 13, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "biweekly", "interval": 1, "days_of_week": ["Sat", "Sun"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 8, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 8, 17, tzinfo=timezone.utc),
+        )
+        eastern = ZoneInfo("America/New_York")
+        assert [r.astimezone(eastern).day for r in results] == [1, 2, 15, 16]
+
     def test_empty_pattern_returns_single(self):
         """None or empty repeat_pattern should return just the start_datetime."""
         from shared.utils.recurring_events import expand_recurring_dates

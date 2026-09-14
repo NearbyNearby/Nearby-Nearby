@@ -76,6 +76,13 @@ function formatTimeLabel(hm) {
   return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
+// Local midnight of the Monday that starts `date`'s week.
+function mondayOf(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
+}
+
 // ---------------------------------------------------------------------------
 // Preview calculation helper — returns up to `limit` future occurrence Dates
 // starting from `startDate`, applying the given repeat_pattern and skipping
@@ -116,13 +123,20 @@ function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit 
     // the start date itself (it's the "current" event, not a future occurrence).
     const candidate = new Date(cursor);
 
-    // Should this candidate be skipped based on days_of_week?
+    // Should this candidate be skipped based on days_of_week and the week
+    // interval? Weeks run Monday to Sunday, matching the public site's resolver
+    // and the server's rrule; "biweekly" is weekly at twice the interval.
     let include = true;
 
-    if (WEEKLY_FREQUENCIES.includes(frequency) && daysOfWeek.length > 0) {
-      const candidateDay = candidate.getDay(); // 0=Sun
-      const selectedIndices = daysOfWeek.map((d) => dayMap[d]).filter((i) => i !== undefined);
-      include = selectedIndices.includes(candidateDay);
+    if (WEEKLY_FREQUENCIES.includes(frequency)) {
+      const selectedIndices = daysOfWeek.length > 0
+        ? daysOfWeek.map((d) => dayMap[d]).filter((i) => i !== undefined)
+        : [startDate.getDay()];
+      const weekStep = frequency === 'biweekly' ? interval * 2 : interval;
+      const weeksSinceStart = Math.round(
+        (mondayOf(candidate) - mondayOf(startDate)) / (7 * 24 * 60 * 60 * 1000)
+      );
+      include = selectedIndices.includes(candidate.getDay()) && weeksSinceStart % weekStep === 0;
     }
 
     if (include && !excluded.has(candidate.toDateString())) {
@@ -135,21 +149,10 @@ function calculateNextOccurrences(startDate, pattern, excludedDates = [], limit 
         cursor.setDate(cursor.getDate() + interval);
         break;
       case 'weekly':
-        // For weekly with day selection, step one day at a time so we can
-        // hit each selected weekday within the same week
-        cursor.setDate(cursor.getDate() + 1);
-        break;
       case 'biweekly':
-        // Same as weekly — step daily but the outer interval semantics are
-        // encoded by stepping two calendar weeks when no specific day matched
-        // within the current week.  Simplify: step 1 day and let the
-        // days_of_week filter do the work; after finishing the week, skip
-        // the next week.
+        // Step one day at a time; the include check above picks the selected
+        // weekdays in the right weeks.
         cursor.setDate(cursor.getDate() + 1);
-        // If we just moved into a new week (Mon), skip the alternate week
-        if (cursor.getDay() === 1 && interval > 1) {
-          cursor.setDate(cursor.getDate() + 7);
-        }
         break;
       case 'monthly':
         cursor.setMonth(cursor.getMonth() + interval);

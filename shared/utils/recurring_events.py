@@ -14,6 +14,8 @@ from shared.utils.event_time import EVENT_TZ, localize_event_datetime
 _FREQ_MAP = {
     "daily": DAILY,
     "weekly": WEEKLY,
+    # The admin's "Every 2 Weeks" option: weekly at twice the interval.
+    "biweekly": WEEKLY,
     "monthly": MONTHLY,
     "yearly": YEARLY,
 }
@@ -84,6 +86,8 @@ def expand_recurring_dates(
         return [start_datetime] if date_from <= start_datetime <= date_to else []
 
     interval = repeat_pattern.get("interval", 1)
+    if freq_str == "biweekly":
+        interval = (interval or 1) * 2
 
     # Issue #180: run the rule on the America/New_York wall clock, not on the
     # stored UTC instant. A weekly 7 PM Eastern event is 23:00Z in summer but
