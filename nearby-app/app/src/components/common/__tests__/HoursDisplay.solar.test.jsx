@@ -1,5 +1,5 @@
 /**
- * Tests for HoursDisplay dawn/dusk grid rows — issue #174
+ * Tests for HoursDisplay dawn/dusk grid rows (issue #174)
  *
  * Detail pages pass the POI's coordinates so the weekly grid can show each
  * day's computed sunrise/sunset clock time. Without coordinates the grid

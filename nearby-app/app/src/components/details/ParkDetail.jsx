@@ -22,6 +22,7 @@ function buildSections(poi, helpers) {
   const {
     displayLoc, handleDirections, handleCopyAddress, handleCopyCoords,
     copiedAddress, copiedCoords, handleCopyPhone, copiedPhone, handleCopyEmail, copiedEmail,
+    _lat, _lng,
   } = helpers;
 
   const out = [];
@@ -470,7 +471,7 @@ export default function ParkDetail({ poi }) {
   ]);
   const sections = buildSections(poi, {
     displayLoc, handleDirections, handleCopyAddress, handleCopyCoords, copiedAddress, copiedCoords,
-    handleCopyPhone, copiedPhone, handleCopyEmail, copiedEmail,
+    handleCopyPhone, copiedPhone, handleCopyEmail, copiedEmail, _lat, _lng,
   }).filter((s) => !HIDDEN_ACCORDIONS.has(s.id));
 
   return (
