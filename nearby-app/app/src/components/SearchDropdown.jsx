@@ -102,7 +102,12 @@ function SearchDropdown({
             {results.map((poi, index) => {
               // #126: show the POI's primary category (e.g. "Shopping & Retail");
               // fall back to the generic type label when no main_category is set.
-              const badgeLabel = poi.main_category?.name || TYPE_LABELS[poi.poi_type] || poi.poi_type;
+              // Events say "Event: Farmers Market" so the market event and the
+              // market organization (same category) can be told apart.
+              const category = poi.main_category?.name;
+              const badgeLabel = category
+                ? (poi.poi_type === 'EVENT' ? `Event: ${category}` : category)
+                : TYPE_LABELS[poi.poi_type] || poi.poi_type;
               return (
                 <li
                   key={poi.id}
