@@ -123,7 +123,13 @@ def ensure_categories(db: Session):
 
 
 def get_category(db: Session, name: str) -> Category | None:
-    return db.query(Category).filter(Category.name == name).first()
+    # Fall back to the unique slug: "Food & Drink" here and the "Food + Drink"
+    # that seed_categories creates are the same category (slug food-drink), and
+    # inserting a second one violates ix_categories_slug.
+    return (
+        db.query(Category).filter(Category.name == name).first()
+        or db.query(Category).filter(Category.slug == generate_slug(name)).first()
+    )
 
 
 # (name, applicable_to, parent_name, is_active)
