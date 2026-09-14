@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, ForeignKey, Table, Boolean, Integer
+from sqlalchemy import Column, String, ForeignKey, Table, Boolean, Integer, Index, text
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 
@@ -17,7 +17,10 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False, unique=True)
+    # Name only has to be unique among siblings (per parent_id, enforced by the
+    # ix_categories_parent_lower_name index in the DB); the same name may repeat
+    # under different parents, e.g. "Women's" under Clothing and under Hair Salon.
+    name = Column(String, nullable=False)
     slug = Column(String, nullable=False, unique=True, index=True)
 
     # For self-referencing hierarchy (subcategories) - enables infinite depth
@@ -31,3 +34,15 @@ class Category(Base):
     sort_order = Column(Integer, default=0)
 
     pois = relationship("PointOfInterest", secondary=poi_category_association, back_populates="categories")
+
+    # Mirror of the migration y_cat_sibling_names_001 expression index, so
+    # metadata.create_all (test DBs, fresh dev DBs) enforces the same
+    # per-parent case-insensitive name rule as alembic does.
+    __table_args__ = (
+        Index(
+            'ix_categories_parent_lower_name',
+            text("COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'::uuid)"),
+            text('lower(name)'),
+            unique=True,
+        ),
+    )
