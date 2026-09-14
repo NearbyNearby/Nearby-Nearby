@@ -464,7 +464,7 @@ function Map({ center, markers, zoom = 13, showNearby = false }) {
       className="map-container"
     >
       <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; OpenStreetMap contributors'
       />
 

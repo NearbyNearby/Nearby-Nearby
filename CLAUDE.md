@@ -174,7 +174,7 @@ User can:
 | `nearby-app/app/src/components/nearby-feature/NearbySection.jsx` | Main container with map, filters, search, pagination, directions modal |
 | `nearby-app/app/src/components/nearby-feature/NearbyCard.jsx` | POI cards with distance, hours, amenities, action buttons |
 | `nearby-app/app/src/components/nearby-feature/NearbyFilters.jsx` | Horizontal scrolling filter pills with lucide-react icons |
-| `nearby-app/app/src/components/Map.jsx` | Leaflet map with Carto Voyager tiles and numbered markers |
+| `nearby-app/app/src/components/Map.jsx` | Leaflet map with OpenStreetMap tiles and numbered markers |
 
 ### Features
 
@@ -187,7 +187,7 @@ User can:
 - **Past event exclusion**: Automatically hides events that have already ended
 
 **Map Features:**
-- **Carto Voyager tiles**: Warm, MapQuest-like colors
+- **OpenStreetMap tiles**: Keyless standard OSM raster tiles
 - **Numbered markers**: Purple circles with numbers matching card positions
 - **Current location**: Gold/yellow circle for the current POI
 - **Auto-fit bounds**: Map zooms to show all markers
