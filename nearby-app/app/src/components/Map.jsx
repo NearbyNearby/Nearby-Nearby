@@ -211,7 +211,7 @@ function Map({ currentPOI = null, nearbyPOIs = [], radiusMiles, onMarkerClick, h
         attributionControl={false}
       >
         {/* #102: Leaflet's default prefix is "🇺🇦 Leaflet"; drop the flag but keep
-            the library credit and the OSM/CARTO attributions below. */}
+            the library credit and the OSM attribution below. */}
         <AttributionControl position="bottomright" prefix="Leaflet" />
 
         {/* OpenStreetMap standard tiles - keyless (CARTO stamps "API KEY REQUIRED" on keyless tiles).
