@@ -14,6 +14,37 @@ A test user has been created with the following credentials:
 
 ## Available Scripts
 
+### `fix_event_timezones.py`
+Issue #180 data fix: corrects event rows whose times were stored wrong by the
+old timezone-naive admin form (a 7 PM Eastern entry stored as 19:00Z). It
+reinterprets the stored UTC wall clock as America/New_York wall time for
+`start_datetime`, `end_datetime`, `recurrence_end_date`, and
+`vendor_application_deadline`. Default mode is a dry run that changes nothing;
+`--apply` requires an explicit `--ids` list so a blanket second run cannot
+shift the same rows twice (events written through the reschedule modal carry
+real offsets and must NOT be corrected).
+
+**Usage:**
+```bash
+cd backend/scripts
+
+# Dry run over ALL events: prints current vs corrected values (UTC and Eastern)
+python fix_event_timezones.py
+
+# Dry run for specific events only
+python fix_event_timezones.py --ids <poi_id> [<poi_id> ...]
+
+# Apply the correction to ONLY the listed events, in one transaction
+python fix_event_timezones.py --apply --ids <poi_id> [<poi_id> ...]
+```
+
+**Before touching prod:** take a manual RDS snapshot first (see the
+"Production Deployment" section of the root CLAUDE.md). Run it in prod as an
+ECS `run-task` on the admin task def with a `command` override, the same
+pattern the embedding backfill uses (see the "Embedding / Semantic Search"
+section of the root CLAUDE.md). Read the dry-run output and pick ids before
+applying.
+
 ### `manage_users.py`
 Comprehensive user management script with multiple commands.
 
