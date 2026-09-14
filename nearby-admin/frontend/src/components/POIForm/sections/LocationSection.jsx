@@ -9,6 +9,7 @@ import { DebouncedTextInput } from '../../DebouncedTextInput';
 import { getDebouncedInputProps } from '../constants/helpers';
 import { PARKING_OPTIONS } from '../../../utils/constants';
 import CoordinateInput from '../components/CoordinateInput';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 import {
   EntryPhotoUpload,
   ParkingPhotosUpload,
@@ -18,6 +19,14 @@ import {
 // Lazy load the map component
 const LocationMap = lazy(() => import('../../LocationMap'));
 import { LocationMapSkeleton } from '../../LocationMap';
+
+// A city outside this list (e.g. from address autocomplete) is appended so the
+// Select can still show it.
+const CITY_OPTIONS = [
+  'Pittsboro', 'Siler City', 'Chapel Hill', 'Carrboro', 'Goldston',
+  'Bear Creek', 'Bennett', 'Bonlee', 'Bynum', 'Gulf', 'Moncure',
+  'Sanford', 'Apex', 'Holly Springs', 'Fuquay-Varina'
+];
 
 export const LocationSection = React.memo(function LocationSection({
   form,
@@ -64,10 +73,10 @@ export const LocationSection = React.memo(function LocationSection({
       <Divider my="sm" label="Address (Optional)" labelPosition="center" />
 
       <SimpleGrid cols={{ base: 1, sm: 2 }}>
-        <DebouncedTextInput
+        <AddressAutocomplete
+          form={form}
           label="Street Address"
           placeholder="123 Main St"
-          {...getDebouncedInputProps(form, 'address_street')}
         />
         <DebouncedTextInput
           label="Address Line 2 (Suite, Unit, etc.)"
@@ -80,11 +89,11 @@ export const LocationSection = React.memo(function LocationSection({
         <Select
           label="City"
           placeholder="Select or type city"
-          data={[
-            'Pittsboro', 'Siler City', 'Chapel Hill', 'Carrboro', 'Goldston',
-            'Bear Creek', 'Bennett', 'Bonlee', 'Bynum', 'Gulf', 'Moncure',
-            'Sanford', 'Apex', 'Holly Springs', 'Fuquay-Varina'
-          ]}
+          data={
+            !form.values.address_city || CITY_OPTIONS.includes(form.values.address_city)
+              ? CITY_OPTIONS
+              : [...CITY_OPTIONS, form.values.address_city]
+          }
           searchable
           allowDeselect
           nothingFoundMessage="Type to enter a custom city"

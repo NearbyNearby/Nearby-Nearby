@@ -61,6 +61,7 @@ jobs:
         with:
           context: nearby-admin/frontend
           file: nearby-admin/frontend/Dockerfile.prod
+          build-args: VITE_GEOAPIFY_API_KEY=${{ secrets.GEOAPIFY_API_KEY }}
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_FRONTEND }}:latest

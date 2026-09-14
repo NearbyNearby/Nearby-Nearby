@@ -13,6 +13,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Vite inlines VITE_* vars at build time (address autocomplete key)
+ARG VITE_GEOAPIFY_API_KEY
+ENV VITE_GEOAPIFY_API_KEY=$VITE_GEOAPIFY_API_KEY
+
 # Build the app for production
 RUN npm run build
 
