@@ -114,25 +114,26 @@ Event Types (applicable: EVENT)
 # nearby-admin/backend/app/crud/crud_category.py
 
 def create_category(db: Session, category: CategoryCreate) -> Category:
-    """Create a new category with auto-generated slug."""
-    slug = slugify(category.name)
-
-    # Ensure unique slug: slugs stay globally unique (public app URLs look
-    # categories up by slug). When the plain slug is taken, the parent's slug
-    # is prefixed (hair-salon-womens); when that is taken too, -2, -3, ...
-    # are appended. A rename regenerates the slug the same way.
-    existing = db.query(Category).filter(Category.slug == slug).first()
-    if existing:
-        slug = f"{slug}-{uuid.uuid4().hex[:6]}"
+    """Create a category. Names are unique per parent (case-insensitive)."""
+    clash = db.query(Category).filter(
+        Category.parent_id == category.parent_id,
+        func.lower(Category.name) == category.name.lower(),
+    ).first()
+    if clash:
+        _raise_sibling_clash(db, category.name, category.parent_id)  # 409
 
     db_category = Category(
         name=category.name,
-        slug=slug,
+        # Slugs stay globally unique (public app URLs look categories up by
+        # slug): plain slug, then parent-prefixed (hair-salon-womens), then -2, -3.
+        slug=unique_slug(category.slug, db, category.parent_id),
         parent_id=category.parent_id,
-        applicable_types=category.applicable_types
+        applicable_to=category.applicable_to,
+        is_active=category.is_active,
+        sort_order=category.sort_order,
     )
     db.add(db_category)
-    db.commit()
+    db.commit()  # an IntegrityError from a race also becomes the 409
     db.refresh(db_category)
     return db_category
 ```
