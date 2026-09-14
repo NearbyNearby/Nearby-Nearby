@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, AttributionControl } from 'react-leaflet';
 import { Drawer, Title, Text, Stack, Paper, Loader, Group, Box, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconSearch } from '@tabler/icons-react';
@@ -251,7 +251,10 @@ function POIMap() {
               scrollWheelZoom={true} 
               style={{ height: "100%", width: "100%", borderRadius: 'var(--mantine-radius-md)' }}
               key={filteredPois.length} // Force re-render when POIs change
+              attributionControl={false}
             >
+              {/* #102: Leaflet's default prefix is "🇺🇦 Leaflet"; drop the flag, keep the credit. */}
+              <AttributionControl position="bottomright" prefix="Leaflet" />
               <TileLayer 
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' 
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
