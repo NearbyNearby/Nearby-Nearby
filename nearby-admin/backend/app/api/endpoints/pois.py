@@ -14,6 +14,7 @@ from app.utils.autosave_whitelist import AUTOSAVE_ALLOWED_FIELDS, AUTOSAVE_DENIE
 from app.utils.poi_revision import record_poi_revision
 from app.crud.crud_poi import apply_phase1_computed
 from app.schemas._coercers import coerce_empty_literals
+from shared.utils import event_time
 
 router = APIRouter()
 
@@ -235,6 +236,14 @@ def autosave_poi(
     assert_event_publish_invariant(_poi_type_str, _effective_publication_status, poi.event is not None)
 
     coerce_empty_literals(filtered, schemas.PointOfInterestUpdate)
+
+    # Issue #180: autosave bypasses the pydantic schemas, so naive event
+    # datetimes (the admin form's "YYYY-MM-DD HH:mm:ss") would reach the
+    # timestamptz columns unlabeled and be stored as UTC. Label them Eastern
+    # here; aware values pass through unchanged.
+    for _f in event_time.EVENT_DATETIME_FIELDS:
+        if _f in filtered:
+            filtered[_f] = event_time.localize_event_datetime(filtered[_f])
 
     # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, not
     # JSONB. Pull any provided link fields out of the autosave payload so they are
@@ -612,8 +621,8 @@ def reschedule_event(
     }
 
     # Override with new dates and status
-    event_data['start_datetime'] = body.new_start_datetime
-    event_data['end_datetime'] = body.new_end_datetime
+    event_data['start_datetime'] = event_time.localize_event_datetime(body.new_start_datetime)
+    event_data['end_datetime'] = event_time.localize_event_datetime(body.new_end_datetime)
     event_data['event_status'] = 'Scheduled'
     event_data['rescheduled_from_event_id'] = poi_id
     event_data['new_event_link'] = None

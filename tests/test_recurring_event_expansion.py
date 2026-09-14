@@ -7,6 +7,7 @@ repeat_pattern JSONB, respecting excluded_dates, manual_dates, and recurrence_en
 
 import pytest
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 
 class TestExpandRecurringDates:
@@ -265,3 +266,103 @@ class TestExpandRecurringDates:
         )
         for i in range(len(results) - 1):
             assert results[i] <= results[i + 1]
+
+
+class TestExpansionDSTAndLocalWeekday:
+    """Issue #180: expansion must run on the America/New_York wall clock.
+
+    Once storage is correct a weekly 7 PM Eastern event is stored as 23:00Z in
+    summer (EDT) and 00:00Z in winter (EST). Running rrule on the aware UTC
+    value drifts the local time by an hour at the DST change and, for evening
+    events, evaluates byweekday on the UTC day (a 7 PM Tuesday lands on
+    Wednesday 00:00Z)."""
+
+    def test_weekly_evening_survives_fall_dst_change(self):
+        """Weekly Tue 19:00 local (23:00Z before Nov 1 2026, 00:00Z after) stays
+        19:00 local on Tuesdays on both sides of the DST change."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        # Tue 2026-10-20, 19:00 EDT = 23:00Z
+        start = datetime(2026, 10, 20, 23, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "weekly", "interval": 1, "days_of_week": ["Tue"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 10, 20, tzinfo=timezone.utc),
+            # Wide enough to cover the full Eastern day of Tue Nov 17 (the last
+            # expected occurrence), so only the DST behavior is under test.
+            date_to=datetime(2026, 11, 18, 4, 59, 59, tzinfo=timezone.utc),
+        )
+        # Oct 20, 27 are EDT (23:00Z); Nov 3, 10, 17 are EST (00:00Z next day).
+        # All are Tuesdays at 19:00 America/New_York.
+        assert len(results) == 5
+        for dt in results:
+            local = dt.astimezone(ZoneInfo("America/New_York"))
+            assert local.weekday() == 1  # Tuesday
+            assert (local.hour, local.minute) == (19, 0)
+        assert results[0] == datetime(2026, 10, 20, 23, 0, tzinfo=timezone.utc)
+        assert results[2] == datetime(2026, 11, 4, 0, 0, tzinfo=timezone.utc)
+
+    def test_late_evening_event_stays_on_local_weekday(self):
+        """A weekly Tue 21:00 local event is 02:00Z Wednesday in winter (EST);
+        byweekday must still fire on the LOCAL Tuesday, not the UTC Wednesday.
+        The start is the UTC-labeled instant the DB returns (psycopg2 gives
+        timestamptz values in UTC), an aware Eastern datetime never reaches
+        this function from storage."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        # Tue 2026-01-06, 21:00 EST = Wed 02:00Z
+        start = datetime(2026, 1, 7, 2, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "weekly", "interval": 1, "days_of_week": ["Tue"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 1, 31, 23, 59, 59, tzinfo=timezone.utc),
+        )
+        assert len(results) == 4
+        for dt in results:
+            local = dt.astimezone(ZoneInfo("America/New_York"))
+            assert local.weekday() == 1  # local Tuesday, not UTC Wednesday
+            assert (local.hour, local.minute) == (21, 0)
+
+    def test_manual_date_object_start_time_is_local(self):
+        """A manual date {date, start_time "19:00"} yields 19:00 America/New_York,
+        not 19:00 UTC."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        start = datetime(2026, 3, 4, 14, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "weekly", "interval": 1, "days_of_week": ["Wed"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 3, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 3, 31, 23, 59, 59, tzinfo=timezone.utc),
+            manual_dates=[{"date": "2026-03-15", "start_time": "19:00"}],
+        )
+        manual = [dt for dt in results if dt.date().isoformat() == "2026-03-15"]
+        assert len(manual) == 1
+        local = manual[0].astimezone(ZoneInfo("America/New_York"))
+        assert (local.hour, local.minute) == (19, 0)
+
+    def test_naive_manual_date_string_is_local(self):
+        """A legacy naive ISO manual date string is an Eastern wall time."""
+        from shared.utils.recurring_events import expand_recurring_dates
+
+        start = datetime(2026, 3, 4, 14, 0, 0, tzinfo=timezone.utc)
+        pattern = {"frequency": "weekly", "interval": 1, "days_of_week": ["Wed"]}
+
+        results = expand_recurring_dates(
+            start_datetime=start,
+            repeat_pattern=pattern,
+            date_from=datetime(2026, 3, 1, tzinfo=timezone.utc),
+            date_to=datetime(2026, 3, 31, 23, 59, 59, tzinfo=timezone.utc),
+            manual_dates=["2026-03-15T19:00:00"],
+        )
+        manual = [dt for dt in results if dt.date().isoformat() == "2026-03-15"]
+        assert len(manual) == 1
+        local = manual[0].astimezone(ZoneInfo("America/New_York"))
+        assert (local.hour, local.minute) == (19, 0)
