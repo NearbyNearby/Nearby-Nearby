@@ -402,9 +402,10 @@ function calculateEaster(year) {
 
 // Format time from 24hr to 12hr
 //
-// #174: with `date` + coordinates, a solar end (dawn/dusk) renders as the real
-// clock time for that date, offset folded in ("7:25 PM (20 min before dusk)").
-// Without them the bare word is kept so no wrong time is ever shown.
+// #174: with `date` + coordinates, a solar end (dawn/dusk) renders with the real
+// clock time for that date: "Dusk (7:45 PM)", or with the offset folded in,
+// "7:25 PM (20 min before dusk)". Without them the bare word is kept so no
+// wrong time is ever shown.
 export function formatTime(timeObj, date = null, lat = null, lng = null) {
   if (!timeObj) return '';
 
@@ -413,7 +414,7 @@ export function formatTime(timeObj, date = null, lat = null, lng = null) {
   }
 
   if ((timeObj.type === 'dawn' || timeObj.type === 'dusk') && date) {
-    const word = timeObj.type === 'dawn' ? 'dawn' : 'dusk';
+    const word = timeObj.type === 'dawn' ? 'Dawn' : 'Dusk';
     const resolved = resolveTime(timeObj, date, lat, lng);
     if (resolved) {
       const clock = formatClock(resolved);
@@ -421,11 +422,11 @@ export function formatTime(timeObj, date = null, lat = null, lng = null) {
       if (offset !== 0) {
         const mins = Math.abs(offset);
         const relation = offset < 0 ? 'before' : 'after';
-        return `${clock} (${mins} min ${relation} ${word})`;
+        return `${clock} (${mins} min ${relation} ${word.toLowerCase()})`;
       }
-      return clock;
+      return `${word} (${clock})`;
     }
-    return timeObj.type === 'dawn' ? 'Dawn' : 'Dusk';
+    return word;
   }
 
   if (timeObj.type === 'dawn') return 'Dawn';

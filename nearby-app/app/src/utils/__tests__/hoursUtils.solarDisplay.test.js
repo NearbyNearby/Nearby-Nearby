@@ -79,12 +79,12 @@ const EARLY = new Date(2026, 6, 15, 5, 0, 0);
 // ── formatTime ────────────────────────────────────────────────────────────
 
 describe('formatTime  -  solar ends show real clock times (#174)', () => {
-  it('renders dusk as a real clock time with coordinates and date', () => {
-    expect(formatTime({ type: 'dusk' }, NOON, LAT, LNG)).toBe('7:45 PM');
+  it('renders dusk with its real clock time given coordinates and date', () => {
+    expect(formatTime({ type: 'dusk' }, NOON, LAT, LNG)).toBe('Dusk (7:45 PM)');
   });
 
-  it('renders dawn as a real clock time with coordinates and date', () => {
-    expect(formatTime({ type: 'dawn' }, NOON, LAT, LNG)).toBe('6:30 AM');
+  it('renders dawn with its real clock time given coordinates and date', () => {
+    expect(formatTime({ type: 'dawn' }, NOON, LAT, LNG)).toBe('Dawn (6:30 AM)');
   });
 
   it('folds a negative offset into the time and says so', () => {
@@ -97,8 +97,8 @@ describe('formatTime  -  solar ends show real clock times (#174)', () => {
       .toBe('7:00 AM (30 min after dawn)');
   });
 
-  it('adds no annotation for a zero offset', () => {
-    expect(formatTime({ type: 'dusk', offset: 0 }, NOON, LAT, LNG)).toBe('7:45 PM');
+  it('treats a zero offset as plain dusk', () => {
+    expect(formatTime({ type: 'dusk', offset: 0 }, NOON, LAT, LNG)).toBe('Dusk (7:45 PM)');
   });
 
   it('falls back to the bare word when coordinates are missing', () => {
@@ -122,7 +122,7 @@ describe('getOpenCloseStatusLabel  -  open/opens labels with real times (#174)',
   it('shows the computed dusk time in the open-now label', () => {
     const { variant, label } = getOpenCloseStatusLabel(dawnDuskWeek(DAWN_DUSK), NOON, LAT, LNG);
     expect(variant).toBe('open');
-    expect(label).toBe('Open until 7:45 PM');
+    expect(label).toBe('Open until Dusk (7:45 PM)');
   });
 
   it('shows the offset dusk time in the open-now label', () => {
@@ -140,13 +140,13 @@ describe('getOpenCloseStatusLabel  -  open/opens labels with real times (#174)',
   it('stays open at 19:30 when the close is raw dusk', () => {
     const { variant, label } = getOpenCloseStatusLabel(wednesdayDawnDusk(DAWN_DUSK), EVENING, LAT, LNG);
     expect(variant).toBe('open');
-    expect(label).toBe('Open until 7:45 PM');
+    expect(label).toBe('Open until Dusk (7:45 PM)');
   });
 
   it('shows the computed dawn time in the opens-soon label', () => {
     const { variant, label } = getOpenCloseStatusLabel(wednesdayDawnDusk(DAWN_DUSK), EARLY, LAT, LNG);
     expect(variant).toBe('opensoon');
-    expect(label).toBe('Opens at 6:30 AM');
+    expect(label).toBe('Opens at Dawn (6:30 AM)');
   });
 
   it('shows the offset dawn time in the opens-soon label', () => {
