@@ -64,8 +64,8 @@ def _poi_location_lat_lng(location):
         return None, None
 
 
-def _default_missing_restroom_coords(entries, fallback_lat, fallback_lng):
-    """Default a restroom entry's missing lat/lng to the POI's own location.
+def _default_missing_point_coords(entries, fallback_lat, fallback_lng):
+    """Default a point entry's missing lat/lng to the POI's own location.
 
     Issue #117: editors very often skip re-pinning the exact GPS position of
     an indoor restroom. ``shared/poi_points.py`` requires a parseable
@@ -73,6 +73,10 @@ def _default_missing_restroom_coords(entries, fallback_lat, fallback_lng):
     (name, description, features included, not just the pin), leaving only the
     restroom's photos (stored independently in the images table) behind.
     Defaulting to the POI's own coordinates keeps everything the editor typed.
+
+    Issue #179: the same data loss hits ``parking_locations`` (a lot typed
+    with a name and types but no pin vanished on save), so the helper is
+    applied to that field too.
     """
     if not isinstance(entries, list) or fallback_lat is None or fallback_lng is None:
         return
@@ -83,6 +87,10 @@ def _default_missing_restroom_coords(entries, fallback_lat, fallback_lng):
             entry['lat'] = fallback_lat
         if entry.get('lng') in (None, ''):
             entry['lng'] = fallback_lng
+
+
+# Backwards-compatible alias: #117's original name, still imported elsewhere.
+_default_missing_restroom_coords = _default_missing_point_coords
 
 
 def _set_optional_geometries(db_obj, *, geom_line=None, geom_area=None,
@@ -485,8 +493,13 @@ def create_poi(db: Session, poi: schemas.PointOfInterestCreate, user_id=None):
     _parking_link_value = poi_data.pop(_PARKING_LINK_FIELD, None)
     # Issue #117: default missing restroom lat/lng to the POI's own coordinates
     # so a row with no pin doesn't get silently dropped in its entirety.
-    _default_missing_restroom_coords(
+    # Issue #179: same for the POI's own parking rows.
+    _default_missing_point_coords(
         _point_values.get('toilet_locations'),
+        poi.location.coordinates[1], poi.location.coordinates[0],
+    )
+    _default_missing_point_coords(
+        _point_values.get('parking_locations'),
         poi.location.coordinates[1], poi.location.coordinates[0],
     )
 
@@ -749,9 +762,11 @@ def update_poi(db: Session, *, db_obj: models.PointOfInterest, obj_in: schemas.P
     # Issue #117: default missing restroom lat/lng to the POI's own coordinates
     # (the just-updated location above, else the existing one) so a row with no
     # pin doesn't get silently dropped in its entirety.
-    if 'toilet_locations' in _point_values:
+    # Issue #179: same for the POI's own parking rows.
+    if 'toilet_locations' in _point_values or 'parking_locations' in _point_values:
         _fallback_lat, _fallback_lng = _poi_location_lat_lng(db_obj.location)
-        _default_missing_restroom_coords(_point_values['toilet_locations'], _fallback_lat, _fallback_lng)
+        _default_missing_point_coords(_point_values.get('toilet_locations'), _fallback_lat, _fallback_lng)
+        _default_missing_point_coords(_point_values.get('parking_locations'), _fallback_lat, _fallback_lng)
 
     # Task 2.4: line/area geometry update (partial-update safe). A key present in
     # update_data means the client sent it: a GeoJSON dict is validated -> WKT

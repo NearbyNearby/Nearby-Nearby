@@ -536,7 +536,177 @@ class TestOwnParkingUntouched:
 
 
 # --------------------------------------------------------------------------- #
-# 11. Photos
+# 13. Issue #179: a parking row without a pin must not be dropped
+# --------------------------------------------------------------------------- #
+NO_PIN_ROW = {
+    "name": "Quiltmaker Lot",
+    "lat": None, "lng": None, "w3w": "",
+    "parking_types": ["Lot"],
+    "accessible_parking_details": [],
+    "notes": "Gravel lot behind the cafe",
+}
+
+
+class TestParkingWithoutPinIsNotDropped:
+    """Issue #179: a parking row typed with a name and types but no pin
+    vanished on save (`poi_points.geom` is NOT NULL, so the coordinate-less
+    entry was skipped wholesale). Same bug #117 fixed for restrooms: the
+    missing lat/lng is defaulted to the POI's own coordinates."""
+
+    def test_create_without_pin_keeps_the_row(self, admin_client):
+        biz = create_business(
+            admin_client, name="Pin Less Biz", parking_locations=[NO_PIN_ROW],
+        )
+        assert len(biz["parking_locations"]) == 1
+        row = biz["parking_locations"][0]
+        assert row["name"] == "Quiltmaker Lot"
+        assert row["parking_types"] == ["Lot"]
+        assert row["notes"] == "Gravel lot behind the cafe"
+        # Defaulted to the POI's own coordinates rather than being dropped.
+        assert row["lat"] == pytest.approx(35.8)
+        assert row["lng"] == pytest.approx(-79.0)
+
+        got = admin_client.get(f"/api/pois/{biz['id']}").json()
+        assert got["parking_locations"] == biz["parking_locations"]
+
+    def test_update_without_pin_keeps_the_row(self, admin_client):
+        biz = create_business(admin_client, name="Pin Less Update Biz")
+
+        resp = admin_client.put(
+            f"/api/pois/{biz['id']}",
+            json={"parking_locations": [NO_PIN_ROW]},
+        )
+        assert resp.status_code == 200, resp.text
+        row = resp.json()["parking_locations"][0]
+        assert row["name"] == "Quiltmaker Lot"
+        assert row["lat"] is not None and row["lng"] is not None
+
+    def test_autosave_without_pin_keeps_the_row(self, admin_client):
+        biz = create_business(admin_client, name="Pin Less Autosave Biz")
+
+        resp = admin_client.patch(
+            f"/api/pois/{biz['id']}/autosave",
+            json={"parking_locations": [NO_PIN_ROW]},
+        )
+        assert resp.status_code == 200, resp.text
+
+        got = admin_client.get(f"/api/pois/{biz['id']}").json()
+        assert len(got["parking_locations"]) == 1
+        assert got["parking_locations"][0]["name"] == "Quiltmaker Lot"
+
+
+# --------------------------------------------------------------------------- #
+# 14. Issue #171 / #161: "Share this lot" promotes an own pin to a lot
+# --------------------------------------------------------------------------- #
+class TestShareFromPoi:
+    def test_share_creates_a_lot_the_picker_can_find(self, admin_client):
+        poi = create_business(admin_client, name="The Quiltmaker Cafe", published=True)
+        resp = admin_client.post(
+            f"/api/parking-lots/share-from-poi/{poi['id']}",
+            json={
+                "name": "Quiltmaker Lot",
+                "lat": 35.8, "lng": -79.0,
+                "parking_types": ["Lot"],
+                "accessible_parking_details": ["Van accessible"],
+                "notes": "Gravel lot behind the cafe",
+                "w3w": "filled.count.soap",
+            },
+        )
+        assert resp.status_code == 201, resp.text
+        lot = resp.json()
+        assert lot["owner_poi_id"] == poi["id"]
+        assert lot["is_standalone"] is False
+        assert lot["name"] == "Quiltmaker Lot"
+        assert lot["parking_types"] == ["Lot"]
+        assert lot["accessible_parking_details"] == ["Van accessible"]
+        assert lot["notes"] == "Gravel lot behind the cafe"
+        assert lot["what3words"] == "filled.count.soap"
+        assert lot["latitude"] == pytest.approx(35.8)
+        assert lot["longitude"] == pytest.approx(-79.0)
+        assert lot["publication_status"] == "published"
+
+        # Manage Parking Lots / the picker list the shared lot.
+        listed = admin_client.get("/api/parking-lots/").json()
+        assert lot["id"] in {r["id"] for r in listed}
+
+    def test_share_twice_is_idempotent_and_returns_the_existing_lot(self, admin_client):
+        poi = create_business(admin_client, name="Idempotent Cafe", published=True)
+        body = {"name": "Cafe Lot", "lat": 35.8, "lng": -79.0}
+        first = admin_client.post(
+            f"/api/parking-lots/share-from-poi/{poi['id']}", json=body
+        )
+        assert first.status_code == 201
+        again = admin_client.post(
+            f"/api/parking-lots/share-from-poi/{poi['id']}", json=body
+        )
+        assert again.status_code == 200
+        assert again.json()["id"] == first.json()["id"]
+
+        listed = admin_client.get(
+            f"/api/parking-lots/?owner_poi_id={poi['id']}"
+        ).json()
+        assert [r["id"] for r in listed] == [first.json()["id"]]
+
+    def test_share_404_for_unknown_poi(self, admin_client):
+        resp = admin_client.post(
+            f"/api/parking-lots/share-from-poi/{uuid.uuid4()}",
+            json={"name": "Nowhere Lot", "lat": 35.8, "lng": -79.0},
+        )
+        assert resp.status_code == 404
+
+    def test_share_422_without_name_or_coords(self, admin_client):
+        poi = create_business(admin_client, name="Validation Cafe")
+        no_name = admin_client.post(
+            f"/api/parking-lots/share-from-poi/{poi['id']}",
+            json={"lat": 35.8, "lng": -79.0},
+        )
+        assert no_name.status_code == 422
+        no_coords = admin_client.post(
+            f"/api/parking-lots/share-from-poi/{poi['id']}",
+            json={"name": "No Pin Lot"},
+        )
+        assert no_coords.status_code == 422
+
+    def test_owner_page_lists_the_lot_once_and_neighbor_can_link_it(
+        self, admin_client, db_session
+    ):
+        owner = create_business(admin_client, name="Owner Cafe", published=True)
+        lot = admin_client.post(
+            f"/api/parking-lots/share-from-poi/{owner['id']}",
+            json={"name": "Shared Cafe Lot", "lat": 35.8, "lng": -79.0},
+        ).json()
+
+        # No self-link: the owner's page already shows its own pin.
+        assert db_session.query(POIParkingLink).filter(
+            POIParkingLink.poi_id == uuid.UUID(owner["id"])
+        ).count() == 0
+
+        owner_parking = admin_client.get(f"/api/pois/{owner['id']}").json()["parking_lots"]
+        assert [e["origin"] for e in owner_parking] == ["own"]
+        assert owner_parking[0]["name"] == "Shared Cafe Lot"
+
+        # A neighbor links the shared lot and, published, sees it publicly.
+        neighbor = create_business(admin_client, name="Neighbor Shop", published=True)
+        admin_client.put(
+            f"/api/pois/{neighbor['id']}", json={"parking_lot_links": [lot["id"]]}
+        )
+        public = read_parking_lots(
+            db_session, uuid.UUID(neighbor["id"]), audience="public"
+        )
+        assert [e["name"] for e in public] == ["Shared Cafe Lot"]
+        assert public[0]["origin"] == "linked"
+
+    def test_share_inherits_the_owner_poi_publication_status(self, admin_client):
+        poi = create_business(admin_client, name="Draft Owner Cafe")
+        lot = admin_client.post(
+            f"/api/parking-lots/share-from-poi/{poi['id']}",
+            json={"name": "Draft Lot", "lat": 35.8, "lng": -79.0},
+        ).json()
+        assert lot["publication_status"] == "draft"
+
+
+# --------------------------------------------------------------------------- #
+# Photos
 # --------------------------------------------------------------------------- #
 class TestParkingLotPhotos:
     def test_caption_round_trips_inside_the_lot_entry(self, admin_client, db_session):
