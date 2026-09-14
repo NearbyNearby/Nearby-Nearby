@@ -7,7 +7,6 @@ Eastern. Policy: naive event datetimes arriving at any write path are
 America/New_York wall times; aware values (Z or offset) pass through unchanged.
 """
 
-import pytest
 from datetime import datetime, timezone
 
 

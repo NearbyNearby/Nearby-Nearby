@@ -4,9 +4,8 @@ Expands a repeat_pattern JSONB into concrete datetime instances within a given r
 respecting excluded_dates, manual_dates, and recurrence_end_date.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional
-from zoneinfo import ZoneInfo
 from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY, YEARLY, MO, TU, WE, TH, FR, SA, SU
 from dateutil.parser import isoparse
 

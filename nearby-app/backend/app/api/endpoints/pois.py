@@ -28,19 +28,19 @@ from shared.utils.event_time import EVENT_TZ
 logger = logging.getLogger(__name__)
 
 
-def _eastern_day_bounds(date_from_str: str, date_to_str: str):
-    """Turn YYYY-MM-DD bounds into aware datetimes spanning the Eastern days.
+def _eastern_day_bound(date_str: str, end_of_day: bool = False):
+    """Turn a YYYY-MM-DD string into the aware start (or end) of that Eastern day.
 
     Issue #180: event datetimes are Eastern wall clocks, so a range request for
     a given day must include occurrences up to 11:59:59 PM Eastern, which in
     winter is 04:59:59Z the next UTC day. UTC-labeled bounds dropped evening
     events on the edges of the requested range.
     """
-    dt_from = datetime.strptime(date_from_str, "%Y-%m-%d").replace(tzinfo=EVENT_TZ)
-    dt_to = datetime.strptime(date_to_str, "%Y-%m-%d").replace(
-        hour=23, minute=59, second=59, tzinfo=EVENT_TZ
-    )
-    return dt_from, dt_to
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    if end_of_day:
+        dt = dt.replace(hour=23, minute=59, second=59)
+    return dt.replace(tzinfo=EVENT_TZ)
+
 
 router = APIRouter()
 
@@ -180,14 +180,12 @@ def _apply_event_search_filters(pois, date_from=None, date_to=None, event_status
     dt_to = None
     if date_from:
         try:
-            dt_from = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=EVENT_TZ)
+            dt_from = _eastern_day_bound(date_from)
         except ValueError:
             pass
     if date_to:
         try:
-            dt_to = datetime.strptime(date_to, "%Y-%m-%d").replace(
-                hour=23, minute=59, second=59, tzinfo=EVENT_TZ
-            )
+            dt_to = _eastern_day_bound(date_to, end_of_day=True)
         except ValueError:
             pass
 
@@ -881,7 +879,8 @@ def api_get_events_in_range(
     from sqlalchemy.orm import joinedload
 
     try:
-        dt_from, dt_to = _eastern_day_bounds(date_from, date_to)
+        dt_from = _eastern_day_bound(date_from)
+        dt_to = _eastern_day_bound(date_to, end_of_day=True)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
