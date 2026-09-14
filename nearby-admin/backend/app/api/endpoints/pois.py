@@ -241,10 +241,9 @@ def autosave_poi(
     # datetimes (the admin form's "YYYY-MM-DD HH:mm:ss") would reach the
     # timestamptz columns unlabeled and be stored as UTC. Label them Eastern
     # here; aware values pass through unchanged.
-    from shared.utils.event_time import localize_event_datetime as _localize
     for _f in event_time.EVENT_DATETIME_FIELDS:
         if _f in filtered:
-            filtered[_f] = _localize(filtered[_f])
+            filtered[_f] = event_time.localize_event_datetime(filtered[_f])
 
     # Task 2.1: POI-to-POI link fields persist as poi_relationships edges, not
     # JSONB. Pull any provided link fields out of the autosave payload so they are

@@ -10,8 +10,6 @@ America/New_York wall times; aware values (Z or offset) pass through unchanged.
 import pytest
 from datetime import datetime, timezone
 
-from conftest import create_event
-
 
 def _instant(iso_str):
     """Parse an API datetime string into an aware UTC datetime."""

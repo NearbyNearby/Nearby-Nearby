@@ -12,11 +12,11 @@ from datetime import datetime, timezone
 
 
 def _create_recurring_trivia(db):
-    """Weekly Tue 19:00 Eastern, first occurrence Tue 2026-11-03 (00:00Z Nov 4)."""
+    """Weekly Tue 19:00 Eastern, first occurrence Tue 2026-11-03 (EST) = 00:00Z Nov 4."""
     return orm_create_event(
         db, name="Range Edge Trivia", published=True, slug="range-edge-trivia",
         event_fields={
-            "start_datetime": datetime(2026, 11, 3, 0, 0, tzinfo=timezone.utc),
+            "start_datetime": datetime(2026, 11, 4, 0, 0, tzinfo=timezone.utc),
             "is_repeating": True,
             "repeat_pattern": {"frequency": "weekly", "interval": 1, "days_of_week": ["Tue"]},
         },
@@ -32,8 +32,14 @@ class TestEventsInRangeEasternBounds:
         # 19:00 EST Nov 17 = 00:00Z Nov 18, outside a UTC 23:59:59Z cutoff.
         resp = app_client.get("/api/events/in-range?date_from=2026-11-03&date_to=2026-11-17")
         assert resp.status_code == 200
-        dates = [r["occurrence_datetime"][:10] for r in resp.json()]
-        assert "2026-11-17" in dates
+        # Full instant compare: the last occurrence must be the exact
+        # 2026-11-18T00:00:00Z instant, not just some Nov 17-ish date prefix.
+        expected = datetime(2026, 11, 18, 0, 0, tzinfo=timezone.utc)
+        instants = [
+            datetime.fromisoformat(r["occurrence_datetime"].replace("Z", "+00:00"))
+            for r in resp.json()
+        ]
+        assert expected in instants
 
     def test_nonrepeating_evening_on_last_day_of_range(self, db_session, app_client):
         # 19:00 EST Nov 18 = 00:00Z Nov 19: outside a UTC 23:59:59Z cutoff for

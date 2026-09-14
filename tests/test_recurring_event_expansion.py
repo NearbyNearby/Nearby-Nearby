@@ -305,12 +305,15 @@ class TestExpansionDSTAndLocalWeekday:
         assert results[2] == datetime(2026, 11, 4, 0, 0, tzinfo=timezone.utc)
 
     def test_late_evening_event_stays_on_local_weekday(self):
-        """A weekly Tue 21:00 local event is 01:00Z Wednesday in winter; byweekday
-        must still fire on the LOCAL Tuesday, not the UTC Wednesday."""
+        """A weekly Tue 21:00 local event is 02:00Z Wednesday in winter (EST);
+        byweekday must still fire on the LOCAL Tuesday, not the UTC Wednesday.
+        The start is the UTC-labeled instant the DB returns (psycopg2 gives
+        timestamptz values in UTC), an aware Eastern datetime never reaches
+        this function from storage."""
         from shared.utils.recurring_events import expand_recurring_dates
 
         # Tue 2026-01-06, 21:00 EST = Wed 02:00Z
-        start = datetime(2026, 1, 6, 21, 0, tzinfo=ZoneInfo("America/New_York"))
+        start = datetime(2026, 1, 7, 2, 0, tzinfo=timezone.utc)
         pattern = {"frequency": "weekly", "interval": 1, "days_of_week": ["Tue"]}
 
         results = expand_recurring_dates(
