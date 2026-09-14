@@ -119,11 +119,13 @@ class TestSearchResultsCarryTheFlag:
     from hybrid-search results, so the flag must ride along.
 
     The query avoids the word "market": TYPE_KEYWORDS infers poi_type EVENT
-    from it and would filter these BUSINESS fixtures out entirely.
+    from it and would filter these BUSINESS fixtures out entirely. It is also
+    not the start of either name, so neither is boosted as a name hit and both
+    come back.
     """
 
     def test_hybrid_search_results_carry_dont_display_location(self, hidden_and_visible, app_client):
-        resp = app_client.get("/api/pois/hybrid-search", params={"q": "Hidden Location"})
+        resp = app_client.get("/api/pois/hybrid-search", params={"q": "Location"})
         assert resp.status_code == 200
         rows = resp.json()
         assert _by_name(rows, "Hidden Location Market")["dont_display_location"] is True
