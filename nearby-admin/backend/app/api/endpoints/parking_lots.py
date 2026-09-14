@@ -25,7 +25,7 @@ link fields do.
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from geoalchemy2 import Geography
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
@@ -37,6 +37,7 @@ from app.models.poi import PointOfInterest
 from app.schemas.parking_lot import (
     ParkingLot as ParkingLotSchema,
     ParkingLotCreate,
+    ParkingLotShareFromPoi,
     ParkingLotUpdate,
 )
 from shared.parking_lots import lot_images
@@ -291,6 +292,76 @@ def list_linked_pois(
             "label": link.label,
         })
     return out
+
+
+@router.post("/parking-lots/share-from-poi/{poi_id}",
+             response_model=ParkingLotSchema, status_code=201)
+def share_lot_from_poi(
+    poi_id: uuid.UUID,
+    obj_in: ParkingLotShareFromPoi,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin_or_editor()),
+):
+    """"Share this lot" (#171 / #161): copy one of a POI's own parking rows
+    into a shareable lot owned by that POI, so Manage Parking Lots and other
+    listings' pickers can find it.
+
+    A COPY, not a move: the own pin keeps rendering exactly as before. No
+    self-link is created: the owner's page already shows its own pin, and a
+    link would list the lot twice there. Idempotent: re-sharing a lot with the
+    same (case-insensitive, trimmed) name within 25 metres returns the
+    existing lot with 200 instead of creating a duplicate.
+    """
+    poi = db.query(PointOfInterest).filter(PointOfInterest.id == poi_id).first()
+    if poi is None:
+        raise HTTPException(status_code=404, detail="POI not found")
+
+    name = obj_in.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Parking lot name is required")
+    if obj_in.lat is None or obj_in.lng is None:
+        raise HTTPException(status_code=422, detail="A pinned location is required")
+
+    existing = db.query(ParkingLot).filter(
+        ParkingLot.owner_poi_id == poi_id,
+        func.lower(func.trim(ParkingLot.name)) == name.lower(),
+    ).all()
+    for lot in existing:
+        if lot.geom is None:
+            continue
+        distance = db.execute(
+            text(
+                "SELECT ST_Distance("
+                "ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, geom::geography) "
+                "FROM parking_lots WHERE id = :i"
+            ),
+            {"lng": float(obj_in.lng), "lat": float(obj_in.lat), "i": str(lot.id)},
+        ).scalar()
+        if distance is not None and float(distance) <= 25:
+            db.refresh(lot)
+            response.status_code = 200
+            return _lot_response(db, lot)
+
+    lot = ParkingLot(
+        owner_poi_id=poi_id,
+        name=name,
+        parking_types=obj_in.parking_types or [],
+        accessible_parking_details=obj_in.accessible_parking_details or [],
+        notes=obj_in.notes,
+        what3words=obj_in.w3w,
+        publication_status=poi.publication_status or "draft",
+    )
+    _set_geom(lot, obj_in.lat, obj_in.lng)
+
+    db.add(lot)
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database integrity error: {e}")
+    db.refresh(lot)
+    return _lot_response(db, lot)
 
 
 @router.post("/parking-lots/promote-from-point/{poi_point_id}",

@@ -250,10 +250,12 @@ def autosave_poi(
     # Issue #117: default missing restroom lat/lng to the POI's own coordinates
     # (location isn't autosave-editable, so `poi.location` is always current) so
     # a row with no pin doesn't get silently dropped in its entirety.
-    if 'toilet_locations' in _point_values:
-        from app.crud.crud_poi import _poi_location_lat_lng, _default_missing_restroom_coords
+    # Issue #179: same for the POI's own parking rows.
+    if 'toilet_locations' in _point_values or 'parking_locations' in _point_values:
+        from app.crud.crud_poi import _poi_location_lat_lng, _default_missing_point_coords
         _fallback_lat, _fallback_lng = _poi_location_lat_lng(poi.location)
-        _default_missing_restroom_coords(_point_values['toilet_locations'], _fallback_lat, _fallback_lng)
+        _default_missing_point_coords(_point_values.get('toilet_locations'), _fallback_lat, _fallback_lng)
+        _default_missing_point_coords(_point_values.get('parking_locations'), _fallback_lat, _fallback_lng)
 
     # Parking lots (#90/#161): links to SHAREABLE lots persist as
     # poi_parking_links edges, not a column. Pull them out of the autosave
