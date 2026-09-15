@@ -335,59 +335,60 @@ export default function PoiHeader({
               </div>
             )}
           </div>
-
-          <div className="poi_button_group_1">
-            {!hideExact && coords && (
-              <TealButton onClick={handleDirections}>
-                <SvgDirections />
-                <span className="poi_button_title">Directions</span>
-              </TealButton>
-            )}
-            {!hideExact && coords && (
-              <TealButton onClick={handleCopyLatLong}>
-                <SvgLatLong />
-                <span className="poi_button_title">{copiedCoords ? 'Copied!' : 'Lat + Long'}</span>
-              </TealButton>
-            )}
-            {/* Server tier-gates phone_number/website_url in the payload, so the
-                CTA self-hides for free tier without a client paid gate. */}
-            {phoneHref && (
-              <TealButton href={phoneHref} target="_self" rel="">
-                <SvgCall />
-                <span className="poi_button_title">Call</span>
-              </TealButton>
-            )}
-            {webHref && (
-              <TealButton href={webHref}>
-                <SvgWebsite />
-                <span className="poi_button_title">Website</span>
-              </TealButton>
-            )}
-
-            {extraButtons.map((btn, i) => (
-              <TealButton
-                key={i}
-                extraClass={btn.extraClass || ''}
-                onClick={btn.onClick}
-                href={btn.href}
-                target={btn.target}
-                rel={btn.rel}
-              >
-                {btn.svg}
-                <span className="poi_button_title">{btn.label}</span>
-              </TealButton>
-            ))}
-
-            <TealButton extraClass="btn_view_nearby" onClick={handleViewNearby}>
-              <SvgNearby />
-              <span className="poi_button_title">View Nearby</span>
-            </TealButton>
-            <TealButton extraClass="btn_share" onClick={handleShare}>
-              <SvgShare />
-              <span className="poi_button_title">Share</span>
-            </TealButton>
-          </div>
         </div>{/* end poi_col1 */}
+
+        {/* Outside poi_col1 so it can span the full header width on desktop. */}
+        <div className="poi_button_group_1">
+          {!hideExact && coords && (
+            <TealButton onClick={handleDirections}>
+              <SvgDirections />
+              <span className="poi_button_title">Directions</span>
+            </TealButton>
+          )}
+          {!hideExact && coords && (
+            <TealButton onClick={handleCopyLatLong}>
+              <SvgLatLong />
+              <span className="poi_button_title">{copiedCoords ? 'Copied!' : 'Lat + Long'}</span>
+            </TealButton>
+          )}
+          {/* Server tier-gates phone_number/website_url in the payload, so the
+              CTA self-hides for free tier without a client paid gate. */}
+          {phoneHref && (
+            <TealButton href={phoneHref} target="_self" rel="">
+              <SvgCall />
+              <span className="poi_button_title">Call</span>
+            </TealButton>
+          )}
+          {webHref && (
+            <TealButton href={webHref}>
+              <SvgWebsite />
+              <span className="poi_button_title">Website</span>
+            </TealButton>
+          )}
+
+          {extraButtons.map((btn, i) => (
+            <TealButton
+              key={i}
+              extraClass={btn.extraClass || ''}
+              onClick={btn.onClick}
+              href={btn.href}
+              target={btn.target}
+              rel={btn.rel}
+            >
+              {btn.svg}
+              <span className="poi_button_title">{btn.label}</span>
+            </TealButton>
+          ))}
+
+          <TealButton extraClass="btn_view_nearby" onClick={handleViewNearby}>
+            <SvgNearby />
+            <span className="poi_button_title">View Nearby</span>
+          </TealButton>
+          <TealButton extraClass="btn_share" onClick={handleShare}>
+            <SvgShare />
+            <span className="poi_button_title">Share</span>
+          </TealButton>
+        </div>
 
         <div className="poi_col2">
           {typeInfoBox}
