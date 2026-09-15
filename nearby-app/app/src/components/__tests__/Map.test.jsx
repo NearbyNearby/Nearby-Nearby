@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // react-leaflet is stubbed so the assertions are about OUR logic (which POI gets
@@ -16,12 +16,11 @@ vi.mock('react-leaflet', () => ({
   AttributionControl: ({ prefix }) => (
     <div data-testid="attribution" data-prefix={String(prefix)} />
   ),
-  Marker: ({ icon, eventHandlers, number, zIndexOffset, children }) => (
+  Marker: ({ icon, eventHandlers, zIndexOffset, children }) => (
     <div
       data-testid="marker"
       data-icon={decodeURIComponent(icon?.options?.iconUrl || '')}
       data-icon-class={icon?.options?.className || ''}
-      data-number={String(number)}
       data-z-index-offset={String(zIndexOffset)}
       onClick={() => eventHandlers?.click?.()}
     >
@@ -31,15 +30,6 @@ vi.mock('react-leaflet', () => ({
   Popup: ({ children }) => <div data-testid="popup">{children}</div>,
   useMap: () => ({ fitBounds: () => {}, setView: () => {} }),
   useMapEvents: () => ({ scrollWheelZoom: { enable: () => {}, disable: () => {} } }),
-}));
-// The cluster group needs a live Leaflet map; the stub keeps its props so the
-// label function can be driven directly.
-const cluster = vi.hoisted(() => ({ props: null }));
-vi.mock('react-leaflet-cluster', () => ({
-  default: (props) => {
-    cluster.props = props;
-    return <div data-testid="marker-cluster">{props.children}</div>;
-  },
 }));
 // The basemap has its own tests (BrandBaseMap.test.jsx).
 vi.mock('../BrandBaseMap', () => ({ default: () => <div data-testid="brand-basemap" /> }));
@@ -117,19 +107,10 @@ describe('Map marker numbering (#133 / #101)', () => {
   });
 });
 
-describe('Map page numbering and overlapping pins', () => {
-  // A cluster's child markers as markercluster hands them to iconCreateFunction.
-  const fakeCluster = (numbers) => ({
-    getAllChildMarkers: () => numbers.map((number) => ({ options: { number } })),
-  });
-  const iconFor = (numbers) => cluster.props.iconCreateFunction(fakeCluster(numbers)).options;
-
+describe('Map page numbering', () => {
   it('numbers a later page from its first card (page 2 shows 9-12)', () => {
     render(<Map currentPOI={null} nearbyPOIs={POIS} startNumber={9} />);
-    const markers = screen.getAllByTestId('marker');
-    expect(markers.map(markerNumber)).toEqual([9, 10, 11, 12]);
-    // The cluster label reads the same number off each marker.
-    expect(markers.map((m) => Number(m.getAttribute('data-number')))).toEqual([9, 10, 11, 12]);
+    expect(screen.getAllByTestId('marker').map(markerNumber)).toEqual([9, 10, 11, 12]);
   });
 
   it('still numbers a lone pin on a later page', () => {
@@ -137,26 +118,17 @@ describe('Map page numbering and overlapping pins', () => {
     expect(markerNumber(screen.getByTestId('marker'))).toBe(9);
   });
 
-  it('labels merged pins with the numbers inside them', () => {
-    render(<Map currentPOI={null} nearbyPOIs={POIS} />);
-    expect(iconFor([16, 14, 15, 17]).html).toBe('<span>14-17</span>');
-    expect(iconFor([3, 7]).html).toBe('<span>3, 7</span>');
+  it('draws its own numbered pin for every card, even ones at the same spot', () => {
+    const sameSpot = POIS.map((p) => ({ ...p, location: at(-79.171, 35.721) }));
+    render(<Map currentPOI={null} nearbyPOIs={sameSpot} startNumber={13} />);
+    expect(screen.getAllByTestId('marker').map(markerNumber)).toEqual([13, 14, 15, 16]);
   });
 
-  it('shows a count, styled unlike a pin, when the numbers are too scattered to list', () => {
-    render(<Map currentPOI={null} nearbyPOIs={POIS} />);
-    const icon = iconFor([2, 5, 9, 12, 20]);
-    expect(icon.html).toBe('<span>5</span><small>places</small>');
-    expect(icon.className).toContain('map-marker-cluster--count');
-  });
-
-  it('keeps the current POI pin out of the cluster group', () => {
+  it('draws the current POI pin under the numbered pins', () => {
     const current = { id: 'x', name: 'Current', location: at(-79.17, 35.72) };
     render(<Map currentPOI={current} nearbyPOIs={POIS} />);
-    const clustered = within(screen.getByTestId('marker-cluster')).getAllByTestId('marker');
-    expect(clustered.map(markerNumber)).toEqual([1, 2, 3, 4]);
-    expect(clustered.some(isCurrentPin)).toBe(false);
-    expect(screen.getAllByTestId('marker').filter(isCurrentPin)).toHaveLength(1);
+    const [currentPin] = screen.getAllByTestId('marker').filter(isCurrentPin);
+    expect(currentPin.getAttribute('data-z-index-offset')).toBe('-1000');
   });
 
   it('lifts the highlighted pin above its neighbours', () => {
