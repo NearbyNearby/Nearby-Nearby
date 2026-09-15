@@ -9,6 +9,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 // rather than about Leaflet's DOM, which needs real layout to behave in jsdom.
 // The stubs still receive the real L.Icon objects Map.jsx builds.
 // ---------------------------------------------------------------------------
+const leafletMap = vi.hoisted(() => ({ fitBounds: vi.fn(), setView: vi.fn() }));
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children, center }) => (
     <div data-testid="map" data-center={JSON.stringify(center)}>{children}</div>
@@ -28,7 +29,7 @@ vi.mock('react-leaflet', () => ({
     </div>
   ),
   Popup: ({ children }) => <div data-testid="popup">{children}</div>,
-  useMap: () => ({ fitBounds: () => {}, setView: () => {} }),
+  useMap: () => leafletMap,
   useMapEvents: () => ({ scrollWheelZoom: { enable: () => {}, disable: () => {} } }),
 }));
 // The basemap has its own tests (BrandBaseMap.test.jsx).
@@ -122,6 +123,11 @@ describe('Map page numbering', () => {
     const sameSpot = POIS.map((p) => ({ ...p, location: at(-79.171, 35.721) }));
     render(<Map currentPOI={null} nearbyPOIs={sameSpot} startNumber={13} />);
     expect(screen.getAllByTestId('marker').map(markerNumber)).toEqual([13, 14, 15, 16]);
+  });
+
+  it('zooms in far enough to separate a page of pins a block apart', () => {
+    render(<Map currentPOI={null} nearbyPOIs={POIS} />);
+    expect(leafletMap.fitBounds).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ maxZoom: 19 }));
   });
 
   it('draws the current POI pin under the numbered pins', () => {

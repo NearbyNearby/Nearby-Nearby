@@ -73,10 +73,10 @@ function AutoFitBounds({ bounds }) {
       if (boundsKey === prevBoundsKeyRef.current) return;
       prevBoundsKeyRef.current = boundsKey;
 
-      // Street level at most. The pins shown are one page of cards, so the search
-      // radius says nothing about how spread out they are; a page of downtown
-      // results needs this close a view to separate.
-      const maxZoom = 17;
+      // The pins shown are one page of cards, so the search radius says nothing
+      // about how spread out they are. Downtown pages sit within a block and only
+      // separate this close in (pins are not grouped).
+      const maxZoom = 19;
 
       try {
         if (bounds.length === 1) {
