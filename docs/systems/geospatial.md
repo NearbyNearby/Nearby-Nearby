@@ -366,7 +366,7 @@ async def get_poi_nearby(
 
 ### Map Component
 
-The basemap is `BrandBaseMap.jsx`: it fetches CARTO's Positron vector style once, recolours it with the NN palette (`utils/brandMapStyle.js`), and adds it to the Leaflet map as a MapLibre layer (`@maplibre/maplibre-gl-leaflet`), so markers, clusters and popups stay plain Leaflet. MapLibre loads lazily with the first map. Every request to `*.basemaps.cartocdn.com` gets `?key=` from `VITE_CARTO_BASEMAPS_KEY`, a build arg fed from the GitHub secret `CARTO_BASEMAPS_KEY` (get one free at carto.com/basemaps/apikey; keyless CARTO raster tiles are stamped "API KEY REQUIRED", #172). Without WebGL2, or if the style fetch fails, it falls back to OSM raster tiles. MapLibre's worker is a same-origin file, so the CSP needs no `worker-src` change.
+The basemap is `BrandBaseMap.jsx`: it fetches CARTO's Positron vector style once, recolours it with the NN palette (`utils/brandMapStyle.js`), and adds it to the Leaflet map as a MapLibre layer (`@maplibre/maplibre-gl-leaflet`), so markers and popups stay plain Leaflet. MapLibre loads lazily with the first map. Every request to `*.basemaps.cartocdn.com` gets `?key=` from `VITE_CARTO_BASEMAPS_KEY`, a build arg fed from the GitHub secret `CARTO_BASEMAPS_KEY` (get one free at carto.com/basemaps/apikey; keyless CARTO raster tiles are stamped "API KEY REQUIRED", #172). Without WebGL2, or if the style fetch fails, it falls back to OSM raster tiles. MapLibre's worker is a same-origin file, so the CSP needs no `worker-src` change.
 
 ```jsx
 // nearby-app/app/src/components/Map.jsx
