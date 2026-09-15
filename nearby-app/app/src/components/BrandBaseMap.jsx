@@ -32,7 +32,7 @@ const hasWebGL2 = () => {
 };
 
 // Brand-coloured vector basemap drawn by MapLibre inside the Leaflet map, so
-// markers, clusters and popups stay plain Leaflet. MapLibre (~300 KB gzipped)
+// markers and popups stay plain Leaflet. MapLibre (~300 KB gzipped)
 // loads only when a map mounts. Falls back to OSM raster tiles without WebGL2
 // or when the style can't be fetched.
 export default function BrandBaseMap() {

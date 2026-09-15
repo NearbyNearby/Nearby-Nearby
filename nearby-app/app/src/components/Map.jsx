@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, Popup, AttributionControl, useMap, useMapEvents } from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import 'react-leaflet-cluster/dist/assets/MarkerCluster.css';
 import BrandBaseMap from './BrandBaseMap';
 
 // Fix for default marker icons in React-Leaflet
@@ -60,36 +58,6 @@ const createNumberedIcon = (number, isHighlighted = false) => {
   });
 };
 
-// Downtown Pittsboro POIs sit within a few metres of each other (some share one
-// address), so their pins stacked and hid each other's numbers. Pins that would
-// overlap merge into one bubble: a pill naming them ("14-17", or "3, 7") when that
-// stays short, otherwise a round count ("12 places"). Clicking it zooms in, or
-// fans the pins out when they sit on the same spot.
-const clusterLabel = (numbers) => {
-  const sorted = [...numbers].sort((a, b) => a - b);
-  const isRun = sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1);
-  if (isRun) return `${sorted[0]}-${sorted[sorted.length - 1]}`;
-  if (sorted.length === 2) return sorted.join(', ');
-  return null;
-};
-
-const createClusterIcon = (cluster) => {
-  const markers = cluster.getAllChildMarkers();
-  const label = clusterLabel(markers.map((m) => m.options.number));
-  if (!label) {
-    return L.divIcon({
-      html: `<span>${markers.length}</span><small>places</small>`,
-      className: 'map-marker-cluster map-marker-cluster--count',
-      iconSize: L.point(46, 46),
-    });
-  }
-  return L.divIcon({
-    html: `<span>${label}</span>`,
-    className: 'map-marker-cluster',
-    iconSize: L.point(Math.max(40, Math.round(label.length * 9 + 22)), 36),
-  });
-};
-
 // Component to auto-fit bounds so all markers are visible
 function AutoFitBounds({ bounds }) {
   const map = useMap();
@@ -105,10 +73,10 @@ function AutoFitBounds({ bounds }) {
       if (boundsKey === prevBoundsKeyRef.current) return;
       prevBoundsKeyRef.current = boundsKey;
 
-      // Street level at most. The pins shown are one page of cards, so the search
-      // radius says nothing about how spread out they are; a page of downtown
-      // results needs this close a view to separate (overlaps cluster anyway).
-      const maxZoom = 17;
+      // The pins shown are one page of cards, so the search radius says nothing
+      // about how spread out they are. Downtown pages sit within a block and only
+      // separate this close in (pins are not grouped).
+      const maxZoom = 19;
 
       try {
         if (bounds.length === 1) {
@@ -265,14 +233,7 @@ function Map({ currentPOI = null, nearbyPOIs = [], startNumber = 1, onMarkerClic
 
         {/* Nearby POI markers - PURPLE NUMBERED CIRCLES. The number is the POI's position in the list the
             caller renders as cards, so an unmapped POI leaves a gap rather than
-            shifting every later marker (#133). The current POI stays outside
-            the cluster group so it is never merged away. */}
-        <MarkerClusterGroup
-          iconCreateFunction={createClusterIcon}
-          maxClusterRadius={46}
-          showCoverageOnHover={false}
-          spiderfyOnMaxZoom={true}
-        >
+            shifting every later marker (#133). */}
         {nearbyPOIs.map((poi, index) => {
           if (!poi.location) return null;
           // Hide pin for POIs that opted out of exact-location display
@@ -290,10 +251,7 @@ function Map({ currentPOI = null, nearbyPOIs = [], startNumber = 1, onMarkerClic
 
           return (
             <Marker
-              // Keyed by number too: `number` is read by the cluster label and
-              // Leaflet only takes it at creation.
-              key={`${poi.id}-${number}`}
-              number={number}
+              key={poi.id}
               position={coords}
               icon={createNumberedIcon(showNumber ? number : null, isHighlighted)}
               zIndexOffset={isHighlighted ? 1000 : 0}
@@ -314,7 +272,6 @@ function Map({ currentPOI = null, nearbyPOIs = [], startNumber = 1, onMarkerClic
             </Marker>
           );
         })}
-        </MarkerClusterGroup>
       </MapContainer>
     </div>
   );
