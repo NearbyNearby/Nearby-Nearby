@@ -67,3 +67,13 @@ describe('BusinessDetail: follow-up pass (#183)', () => {
     expect(pricing).toHaveTextContent('$25 and under');
   });
 });
+
+describe('BusinessDetail: header action row', () => {
+  it('sits outside the left column so it can span the header (Share was clipped)', () => {
+    renderDetail({ phone_number: '919-555-0100', website_url: 'https://example.com' });
+    const row = document.querySelector('.poi_button_group_1');
+    expect(row.parentElement).toHaveClass('poi_intro_wrapper');
+    expect(row.closest('.poi_col1')).toBeNull();
+    expect(row).toHaveTextContent('Share');
+  });
+});
