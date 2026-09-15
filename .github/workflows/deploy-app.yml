@@ -100,6 +100,7 @@ jobs:
         with:
           context: .
           file: nearby-app/Dockerfile
+          build-args: VITE_CARTO_BASEMAPS_KEY=${{ secrets.CARTO_BASEMAPS_KEY }}
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest

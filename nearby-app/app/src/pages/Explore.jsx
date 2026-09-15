@@ -467,8 +467,8 @@ export default function Explore() {
   /* map ------------------------------------------------------------ */
   // #133: the map gets the SAME list, in the SAME order, that the cards render,
   // so marker N is always card N. (It used to promote the first mapped result to
-  // a "current POI" gold pin and pass the rest, which shifted every number.)
-  // Explore has no current POI, so no gold pin; Map handles currentPOI={null}.
+  // a "current POI" pin and pass the rest, which shifted every number.)
+  // Explore has no current POI, so no current pin; Map handles currentPOI={null}.
   const hasMappedResult = filteredResults.some((p) => p?.location?.coordinates);
 
   /* render --------------------------------------------------------- */

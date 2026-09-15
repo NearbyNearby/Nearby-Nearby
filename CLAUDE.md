@@ -174,7 +174,7 @@ User can:
 | `nearby-app/app/src/components/nearby-feature/NearbySection.jsx` | Main container with map, filters, search, pagination, directions modal |
 | `nearby-app/app/src/components/nearby-feature/NearbyCard.jsx` | POI cards with distance, hours, amenities, action buttons |
 | `nearby-app/app/src/components/nearby-feature/NearbyFilters.jsx` | Horizontal scrolling filter pills with lucide-react icons |
-| `nearby-app/app/src/components/Map.jsx` | Leaflet map with OpenStreetMap tiles and numbered markers |
+| `nearby-app/app/src/components/Map.jsx` | Leaflet map with the brand-coloured CARTO basemap and numbered markers |
 
 ### Features
 
@@ -187,9 +187,9 @@ User can:
 - **Past event exclusion**: Automatically hides events that have already ended
 
 **Map Features:**
-- **OpenStreetMap tiles**: Keyless standard OSM raster tiles
+- **Brand basemap**: CARTO Positron vector tiles recoloured with the NN palette (`utils/brandMapStyle.js`), drawn by MapLibre inside Leaflet (`BrandBaseMap.jsx`); falls back to OSM raster tiles without WebGL2. Key: `VITE_CARTO_BASEMAPS_KEY` (GitHub secret `CARTO_BASEMAPS_KEY`)
 - **Numbered markers**: Purple circles with numbers matching card positions
-- **Current location**: Gold/yellow circle for the current POI
+- **Current location**: Teal dot with a halo for the current POI
 - **Auto-fit bounds**: Map zooms to show all markers
 - **Click to highlight**: Clicking a marker scrolls to and highlights the card
 
