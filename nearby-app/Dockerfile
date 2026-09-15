@@ -15,6 +15,10 @@ RUN npm install
 # Copy frontend source
 COPY nearby-app/app/ ./
 
+# Vite inlines VITE_* vars at build time (CARTO basemap key)
+ARG VITE_CARTO_BASEMAPS_KEY
+ENV VITE_CARTO_BASEMAPS_KEY=$VITE_CARTO_BASEMAPS_KEY
+
 # Build the frontend
 RUN npm run build
 

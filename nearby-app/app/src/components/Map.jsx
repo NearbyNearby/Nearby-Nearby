@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, AttributionControl, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, Popup, AttributionControl, useMap, useMapEvents } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'react-leaflet-cluster/dist/assets/MarkerCluster.css';
+import BrandBaseMap from './BrandBaseMap';
 
 // Fix for default marker icons in React-Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -13,19 +14,20 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Create a yellow/gold circle for current POI
+// Teal "you are here" dot with a soft halo for the current POI
 const createCurrentIcon = () => {
   const svg = `<svg width="38" height="38" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="18" cy="18" r="16" fill="#F4C542" stroke="#562556" stroke-width="2"/>
-    <circle cx="18" cy="18" r="6" fill="#562556"/>
+    <circle cx="19" cy="19" r="18" fill="#245B4E" fill-opacity="0.2"/>
+    <circle cx="19" cy="19" r="11" fill="#245B4E" stroke="white" stroke-width="3"/>
+    <circle cx="19" cy="19" r="4" fill="white"/>
   </svg>`;
   const svgUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 
   return new L.Icon({
     iconUrl: svgUrl,
     iconSize: [38, 38],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -18]
+    iconAnchor: [19, 19],
+    popupAnchor: [0, -19]
   });
 };
 
@@ -181,7 +183,7 @@ function ScrollWheelToggle() {
 function Map({ currentPOI = null, nearbyPOIs = [], startNumber = 1, onMarkerClick, highlightedId }) {
   // `currentPOI` is optional: Explore (#133) has no "current" POI and passes its
   // FULL result list as nearbyPOIs so marker numbers equal the card numbers.
-  // NearbySection still passes a real currentPOI and gets the gold pin, plus only
+  // NearbySection still passes a real currentPOI and gets the teal pin, plus only
   // the current page's POIs with `startNumber` set to the page's first card number.
   const currentCoords = currentPOI?.location?.coordinates
     ? [
@@ -239,17 +241,10 @@ function Map({ currentPOI = null, nearbyPOIs = [], startNumber = 1, onMarkerClic
         attributionControl={false}
       >
         {/* #102: Leaflet's default prefix is "🇺🇦 Leaflet"; drop the flag but keep
-            the library credit and the OSM attribution below. */}
+            the library credit and the basemap attribution. */}
         <AttributionControl position="bottomright" prefix="Leaflet" />
 
-        {/* OpenStreetMap standard tiles - keyless (CARTO stamps "API KEY REQUIRED" on keyless tiles).
-            OSM serves up to z19 and 400s at z20, so Leaflet upscales z19 tiles beyond that. */}
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={20}
-          maxNativeZoom={19}
-        />
+        <BrandBaseMap />
 
         <AutoFitBounds bounds={allCoords} />
         <ScrollWheelToggle />

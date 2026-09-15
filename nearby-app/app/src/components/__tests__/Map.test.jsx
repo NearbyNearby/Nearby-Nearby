@@ -13,15 +13,6 @@ vi.mock('react-leaflet', () => ({
   MapContainer: ({ children, center }) => (
     <div data-testid="map" data-center={JSON.stringify(center)}>{children}</div>
   ),
-  TileLayer: ({ url, attribution, maxZoom, maxNativeZoom }) => (
-    <div
-      data-testid="tile-layer"
-      data-url={String(url)}
-      data-attribution={String(attribution)}
-      data-max-zoom={String(maxZoom)}
-      data-max-native-zoom={String(maxNativeZoom)}
-    />
-  ),
   AttributionControl: ({ prefix }) => (
     <div data-testid="attribution" data-prefix={String(prefix)} />
   ),
@@ -50,18 +41,20 @@ vi.mock('react-leaflet-cluster', () => ({
     return <div data-testid="marker-cluster">{props.children}</div>;
   },
 }));
+// The basemap has its own tests (BrandBaseMap.test.jsx).
+vi.mock('../BrandBaseMap', () => ({ default: () => <div data-testid="brand-basemap" /> }));
 
 import Map from '../Map.jsx';
 
 const at = (lng, lat) => ({ type: 'Point', coordinates: [lng, lat] });
 
-// Number drawn inside the pin's SVG, or null for the gold "current" pin.
+// Number drawn inside the pin's SVG, or null for the teal "current" pin.
 const markerNumber = (el) => {
   const m = el.getAttribute('data-icon').match(/>(\d+)<\/text>/);
   return m ? Number(m[1]) : null;
 };
 const markerName = (el) => el.querySelector('strong')?.textContent;
-const isCurrentPin = (el) => el.getAttribute('data-icon').includes('#F4C542');
+const isCurrentPin = (el) => el.getAttribute('data-icon').includes('#245B4E');
 
 const POIS = [
   { id: 'a', name: 'Alpha',   location: at(-79.171, 35.721) },
@@ -98,21 +91,21 @@ describe('Map marker numbering (#133 / #101)', () => {
     expect(onMarkerClick).toHaveBeenCalledWith('d', 3);
   });
 
-  it('draws no gold "current location" pin when there is no current POI (Explore)', () => {
+  it('draws no teal "current location" pin when there is no current POI (Explore)', () => {
     render(<Map currentPOI={null} nearbyPOIs={POIS} />);
     expect(screen.getAllByTestId('marker').some(isCurrentPin)).toBe(false);
     // Centers on the first mapped result instead.
     expect(screen.getByTestId('map').getAttribute('data-center')).toBe(JSON.stringify([35.721, -79.171]));
   });
 
-  it('still draws the gold current pin, unnumbered, when a current POI is given (NearbySection)', () => {
+  it('still draws the teal current pin, unnumbered, when a current POI is given (NearbySection)', () => {
     const current = { id: 'x', name: 'Current', location: at(-79.17, 35.72) };
     render(<Map currentPOI={current} nearbyPOIs={POIS} />);
     const markers = screen.getAllByTestId('marker');
     expect(markers).toHaveLength(5);
     expect(isCurrentPin(markers[0])).toBe(true);
     expect(markerNumber(markers[0])).toBeNull();
-    // The nearby pins keep card numbering 1..4; the gold pin doesn't consume one.
+    // The nearby pins keep card numbering 1..4; the teal pin doesn't consume one.
     expect(markers.slice(1).map(markerNumber)).toEqual([1, 2, 3, 4]);
     expect(screen.getByTestId('map').getAttribute('data-center')).toBe(JSON.stringify([35.72, -79.17]));
   });
@@ -212,23 +205,10 @@ describe('Map attribution (#102)', () => {
   });
 });
 
-describe('Map tile layer (#172)', () => {
-  // CARTO now stamps "API KEY REQUIRED" across every keyless tile, so the public
-  // app must use OSM standard tiles (keyless, single host) instead.
-  it('loads OpenStreetMap tiles, not CARTO', () => {
+describe('Map basemap', () => {
+  it('draws the brand basemap under the pins', () => {
     render(<Map currentPOI={null} nearbyPOIs={POIS} />);
-    const layer = screen.getByTestId('tile-layer');
-    expect(layer.getAttribute('data-url')).toBe('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
-    expect(layer.getAttribute('data-url')).not.toContain('cartocdn');
-    expect(layer.getAttribute('data-attribution')).toContain('OpenStreetMap');
-    expect(layer.getAttribute('data-attribution')).not.toContain('CARTO');
-  });
-
-  it('clamps native zoom to what OSM serves and lets Leaflet upscale past it', () => {
-    render(<Map currentPOI={null} nearbyPOIs={POIS} />);
-    const layer = screen.getByTestId('tile-layer');
-    expect(layer.getAttribute('data-max-native-zoom')).toBe('19');
-    expect(layer.getAttribute('data-max-zoom')).toBe('20');
+    expect(screen.getByTestId('brand-basemap')).toBeInTheDocument();
   });
 });
 
