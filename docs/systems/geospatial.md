@@ -8,7 +8,7 @@ The Geospatial System handles location-based features using PostgreSQL with Post
 - `nearby-app/backend/app/crud/crud_poi.py` - Geospatial queries
 - `nearby-app/backend/app/api/endpoints/pois.py` - Nearby endpoints
 - `nearby-app/backend/app/models/poi.py` - Location fields
-- `nearby-app/app/src/components/Map.jsx` - Map visualization (OpenStreetMap tiles)
+- `nearby-app/app/src/components/Map.jsx` - Map visualization (brand-coloured CARTO basemap)
 - `nearby-app/app/src/components/nearby-feature/` - Nearby Nearby Feature components
 
 ---
@@ -20,7 +20,7 @@ The platform's namesake and flagship feature. When viewing any POI detail page, 
 ### What It Does
 
 1. **Shows nearby POIs** - Fetches and displays businesses, parks, trails, and events near the current POI
-2. **Interactive map** - Leaflet map with OpenStreetMap tiles and numbered markers that link to result cards
+2. **Interactive map** - Leaflet map with the brand-coloured basemap and numbered markers that link to result cards
 3. **Smart filtering** - Filter by type (All, Businesses, Events, Parks, Trails) and by date
 4. **Hybrid AI search** - Search within nearby results using keyword + semantic understanding
 5. **Directions** - One-click navigation to Google Maps, Apple Maps, or Waze
@@ -33,7 +33,7 @@ The platform's namesake and flagship feature. When viewing any POI detail page, 
 | `NearbySection.jsx` | Main container with map, filters, search, pagination, and directions modal |
 | `NearbyCard.jsx` | Individual POI cards with distance, hours, amenities, and action buttons |
 | `NearbyFilters.jsx` | Horizontal scrolling filter pills with icons (lucide-react) |
-| `Map.jsx` | Leaflet map with OpenStreetMap tiles and numbered markers |
+| `Map.jsx` | Leaflet map with the brand-coloured basemap and numbered markers |
 
 ### Key Features
 
@@ -51,9 +51,9 @@ The platform's namesake and flagship feature. When viewing any POI detail page, 
 - Past event exclusion - automatically hides ended events
 
 **Map Features:**
-- **OpenStreetMap tiles** - Keyless standard OSM raster tiles
+- **Brand basemap** - CARTO Positron vector tiles recoloured with the NN palette, drawn by MapLibre; OSM raster fallback without WebGL2
 - **Numbered markers** - Purple circles with numbers matching card positions
-- **Current location** - Gold/yellow circle for the current POI
+- **Current location** - Teal dot with a halo for the current POI
 - **Auto-fit bounds** - Map zooms to show all markers
 - **Click to highlight** - Clicking a marker scrolls to and highlights the card
 
@@ -366,25 +366,20 @@ async def get_poi_nearby(
 
 ### Map Component
 
-Uses keyless OpenStreetMap standard tiles:
+The basemap is `BrandBaseMap.jsx`: it fetches CARTO's Positron vector style once, recolours it with the NN palette (`utils/brandMapStyle.js`), and adds it to the Leaflet map as a MapLibre layer (`@maplibre/maplibre-gl-leaflet`), so markers, clusters and popups stay plain Leaflet. MapLibre loads lazily with the first map. Every request to `*.basemaps.cartocdn.com` gets `?key=` from `VITE_CARTO_BASEMAPS_KEY`, a build arg fed from the GitHub secret `CARTO_BASEMAPS_KEY` (get one free at carto.com/basemaps/apikey; keyless CARTO raster tiles are stamped "API KEY REQUIRED", #172). Without WebGL2, or if the style fetch fails, it falls back to OSM raster tiles. MapLibre's worker is a same-origin file, so the CSP needs no `worker-src` change.
 
 ```jsx
 // nearby-app/app/src/components/Map.jsx
 
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
+import BrandBaseMap from './BrandBaseMap';
 
 function Map({ currentPOI, nearbyPOIs, radiusMiles, onMarkerClick, highlightedId }) {
   return (
     <MapContainer center={currentCoords} zoom={14} className="leaflet-map">
-      {/* OpenStreetMap - keyless; OSM serves up to z19, Leaflet upscales past it */}
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        maxZoom={20}
-        maxNativeZoom={19}
-      />
+      <BrandBaseMap />
 
-      {/* Current POI - Gold circle */}
+      {/* Current POI - teal dot */}
       <Marker position={currentCoords} icon={createCurrentIcon()} />
 
       {/* Nearby POIs - Purple numbered circles */}

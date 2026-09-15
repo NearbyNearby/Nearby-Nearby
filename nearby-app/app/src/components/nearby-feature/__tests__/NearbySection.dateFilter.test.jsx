@@ -19,6 +19,7 @@ vi.mock('react-leaflet', () => ({
   useMapEvents: () => ({ scrollWheelZoom: { enable: () => {}, disable: () => {} } }),
 }));
 vi.mock('react-leaflet-cluster', () => ({ default: ({ children }) => <div>{children}</div> }));
+vi.mock('../../BrandBaseMap', () => ({ default: () => null }));
 vi.mock('../../../config', () => ({ getApiUrl: (p) => p }));
 vi.mock('../../SearchBar', () => ({ default: () => null }));
 
